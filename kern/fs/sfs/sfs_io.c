@@ -37,6 +37,7 @@
 #include <lib.h>
 #include <uio.h>
 #include <vfs.h>
+#include <buf.h>
 #include <device.h>
 #include <sfs.h>
 #include "sfsprivate.h"
@@ -102,10 +103,13 @@ sfs_rwblock(struct sfs_fs *sfs, struct uio *uio)
  * Read a block.
  */
 int
-sfs_readblock(struct sfs_fs *sfs, daddr_t block, void *data)
+sfs_readblock(struct fs *fs, daddr_t block, void *data, size_t len)
 {
+	struct sfs_fs *sfs = fs->fs_data;
 	struct iovec iov;
 	struct uio ku;
+
+	KASSERT(len == SFS_BLOCKSIZE);
 
 	SFSUIO(&iov, &ku, data, block, UIO_READ);
 	return sfs_rwblock(sfs, &ku);
@@ -115,10 +119,13 @@ sfs_readblock(struct sfs_fs *sfs, daddr_t block, void *data)
  * Write a block.
  */
 int
-sfs_writeblock(struct sfs_fs *sfs, daddr_t block, void *data)
+sfs_writeblock(struct fs *fs, daddr_t block, void *data, size_t len)
 {
+	struct sfs_fs *sfs = fs->fs_data;
 	struct iovec iov;
 	struct uio ku;
+
+	KASSERT(len == SFS_BLOCKSIZE);
 
 	SFSUIO(&iov, &ku, data, block, UIO_WRITE);
 	return sfs_rwblock(sfs, &ku);
@@ -137,22 +144,17 @@ sfs_writeblock(struct sfs_fs *sfs, daddr_t block, void *data)
  * SKIPSTART is the number of bytes to skip past at the beginning of
  * the sector; LEN is the number of bytes to actually read or write.
  * UIO is the area to do the I/O into.
+ *
+ * Requires up to 2 buffers.
  */
 static
 int
 sfs_partialio(struct sfs_vnode *sv, struct uio *uio,
 	      uint32_t skipstart, uint32_t len)
 {
-	/*
-	 * I/O buffer for handling partial sectors.
-	 *
-	 * Note: in real life (and when you've done the fs assignment)
-	 * you would get space from the disk buffer cache for this,
-	 * not use a static area.
-	 */
-	static char iobuf[SFS_BLOCKSIZE];
-
 	struct sfs_fs *sfs = sv->sv_v.vn_fs->fs_data;
+	struct buf *iobuffer;
+	char *ioptr;
 	daddr_t diskblock;
 	uint32_t fileblock;
 	int result;
@@ -161,9 +163,6 @@ sfs_partialio(struct sfs_vnode *sv, struct uio *uio,
 	bool doalloc = (uio->uio_rw==UIO_WRITE);
 
 	KASSERT(skipstart + len <= SFS_BLOCKSIZE);
-
-	/* We're using a global static buffer; it had better be locked */
-	KASSERT(vfs_biglock_do_i_hold());
 
 	/* Compute the block offset of this block in the file */
 	fileblock = uio->uio_offset / SFS_BLOCKSIZE;
@@ -177,16 +176,19 @@ sfs_partialio(struct sfs_vnode *sv, struct uio *uio,
 	if (diskblock == 0) {
 		/*
 		 * There was no block mapped at this point in the file.
-		 * Zero the buffer.
+		 *
+		 * We must be reading, or sfs_bmap would have
+		 * allocated a block for us.
 		 */
 		KASSERT(uio->uio_rw == UIO_READ);
-		bzero(iobuf, sizeof(iobuf));
+		return uiomovezeros(len, uio);
 	}
 	else {
 		/*
 		 * Read the block.
 		 */
-		result = sfs_readblock(sfs, diskblock, iobuf);
+		result = buffer_read(&sfs->sfs_absfs, diskblock, SFS_BLOCKSIZE,
+				     &iobuffer);
 		if (result) {
 			return result;
 		}
@@ -195,40 +197,40 @@ sfs_partialio(struct sfs_vnode *sv, struct uio *uio,
 	/*
 	 * Now perform the requested operation into/out of the buffer.
 	 */
-	result = uiomove(iobuf+skipstart, len, uio);
+	ioptr = buffer_map(iobuffer);
+	result = uiomove(ioptr+skipstart, len, uio);
 	if (result) {
+		buffer_release(iobuffer);
 		return result;
 	}
 
 	/*
-	 * If it was a write, write back the modified block.
+	 * If it was a write, mark the modified block dirty.
 	 */
 	if (uio->uio_rw == UIO_WRITE) {
-		result = sfs_writeblock(sfs, diskblock, iobuf);
-		if (result) {
-			return result;
-		}
+		buffer_mark_dirty(iobuffer);
 	}
 
+	buffer_release(iobuffer);
 	return 0;
 }
 
 /*
  * Do I/O (either read or write) of a single whole block.
+ *
+ * Requires up to 2 buffers.
  */
 static
 int
 sfs_blockio(struct sfs_vnode *sv, struct uio *uio)
 {
 	struct sfs_fs *sfs = sv->sv_v.vn_fs->fs_data;
+	struct buf *iobuf;
+	void *ioptr;
 	daddr_t diskblock;
 	uint32_t fileblock;
 	int result;
 	bool doalloc = (uio->uio_rw==UIO_WRITE);
-	off_t saveoff;
-	off_t diskoff;
-	off_t saveres;
-	off_t diskres;
 
 	/* Get the block number within the file */
 	fileblock = uio->uio_offset / SFS_BLOCKSIZE;
@@ -250,36 +252,41 @@ sfs_blockio(struct sfs_vnode *sv, struct uio *uio)
 		return uiomovezeros(SFS_BLOCKSIZE, uio);
 	}
 
-	/*
-	 * Do the I/O directly to the uio region. Save the uio_offset,
-	 * and substitute one that makes sense to the device.
-	 */
-	saveoff = uio->uio_offset;
-	diskoff = diskblock * SFS_BLOCKSIZE;
-	uio->uio_offset = diskoff;
+	if (uio->uio_rw == UIO_READ) {
+		result = buffer_read(&sfs->sfs_absfs, diskblock, SFS_BLOCKSIZE,
+				     &iobuf);
+	}
+	else {
+		result = buffer_get(&sfs->sfs_absfs, diskblock, SFS_BLOCKSIZE,
+				    &iobuf);
+	}
+	if (result) {
+		return result;
+	}
 
 	/*
-	 * Temporarily set the residue to be one block size.
+	 * Do the I/O into the buffer.
 	 */
-	KASSERT(uio->uio_resid >= SFS_BLOCKSIZE);
-	saveres = uio->uio_resid;
-	diskres = SFS_BLOCKSIZE;
-	uio->uio_resid = diskres;
+	ioptr = buffer_map(iobuf);
+	result = uiomove(ioptr, SFS_BLOCKSIZE, uio);
+	if (result) {
+		buffer_release(iobuf);
+		return result;
+	}
 
-	result = sfs_rwblock(sfs, uio);
+	if (uio->uio_rw == UIO_WRITE) {
+		buffer_mark_valid(iobuf);
+		buffer_mark_dirty(iobuf);
+	}
 
-	/*
-	 * Now, restore the original uio_offset and uio_resid and update
-	 * them by the amount of I/O done.
-	 */
-	uio->uio_offset = (uio->uio_offset - diskoff) + saveoff;
-	uio->uio_resid = (uio->uio_resid - diskres) + saveres;
-
-	return result;
+	buffer_release(iobuf);
+	return 0;
 }
 
 /*
  * Do I/O of a whole region of data, whether or not it's block-aligned.
+ *
+ * Requires up to 3 buffers.
  */
 int
 sfs_io(struct sfs_vnode *sv, struct uio *uio)
@@ -288,6 +295,13 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 	uint32_t nblocks, i;
 	int result = 0;
 	uint32_t extraresid = 0;
+	struct sfs_dinode *inodeptr;
+
+	result = sfs_dinode_load(sv);
+	if (result) {
+		return result;
+	}
+	inodeptr = sfs_dinode_map(sv);
 
 	/*
 	 * If reading, check for EOF. If we can read a partial area,
@@ -295,11 +309,14 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 	 * add it back to uio_resid at the end.
 	 */
 	if (uio->uio_rw == UIO_READ) {
-		off_t size = sv->sv_i.sfi_size;
-		off_t endpos = uio->uio_offset + uio->uio_resid;
+		off_t size, endpos;
+
+		size = inodeptr->sfi_size;
+		endpos = uio->uio_offset + uio->uio_resid;
 
 		if (uio->uio_offset >= size) {
 			/* At or past EOF - just return */
+			sfs_dinode_unload(sv);
 			return 0;
 		}
 
@@ -366,10 +383,11 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 
 	/* If writing, adjust file length */
 	if (uio->uio_rw == UIO_WRITE &&
-	    uio->uio_offset > (off_t)sv->sv_i.sfi_size) {
-		sv->sv_i.sfi_size = uio->uio_offset;
-		sv->sv_dirty = true;
+	    uio->uio_offset > (off_t)inodeptr->sfi_size) {
+		inodeptr->sfi_size = uio->uio_offset;
+		sfs_dinode_mark_dirty(sv);
 	}
+	sfs_dinode_unload(sv);
 
 	/* Add in any extra amount we couldn't read because of EOF */
 	uio->uio_resid += extraresid;
@@ -377,4 +395,3 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 	/* Done */
 	return result;
 }
-

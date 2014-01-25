@@ -72,6 +72,8 @@ struct fs_ops {
 	const char   *(*fsop_getvolname)(struct fs *);
 	struct vnode *(*fsop_getroot)(struct fs *);
 	int           (*fsop_unmount)(struct fs *);
+	int           (*fsop_readblock)(struct fs *, daddr_t, void *, size_t);
+	int           (*fsop_writeblock)(struct fs *, daddr_t, void *, size_t);
 };
 
 /*
@@ -81,6 +83,10 @@ struct fs_ops {
 #define FSOP_GETVOLNAME(fs)  ((fs)->fs_ops->fsop_getvolname(fs))
 #define FSOP_GETROOT(fs)     ((fs)->fs_ops->fsop_getroot(fs))
 #define FSOP_UNMOUNT(fs)     ((fs)->fs_ops->fsop_unmount(fs))
+#define FSOP_READBLOCK(fs,bn,ptr,sz) \
+				((fs)->fs_ops->fsop_readblock(fs,bn,ptr,sz))
+#define FSOP_WRITEBLOCK(fs,bn,ptr,sz) \
+				((fs)->fs_ops->fsop_writeblock(fs,bn,ptr,sz))
 
 
 #endif /* _FS_H_ */

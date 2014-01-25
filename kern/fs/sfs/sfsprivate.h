@@ -30,6 +30,8 @@
 #ifndef _SFSPRIVATE_H_
 #define _SFSPRIVATE_H_
 
+struct buf; /* in buf.h */
+
 
 /* ops tables (in sfs_vnops.c) */
 extern const struct vnode_ops sfs_fileops;
@@ -41,13 +43,13 @@ extern const struct vnode_ops sfs_dirops;
 
 
 /* Functions in sfs_balloc.c */
-int sfs_balloc(struct sfs_fs *sfs, daddr_t *diskblock);
+int sfs_balloc(struct sfs_fs *sfs, daddr_t *diskblock, struct buf **bufret);
 void sfs_bfree(struct sfs_fs *sfs, daddr_t diskblock);
 int sfs_bused(struct sfs_fs *sfs, daddr_t diskblock);
 
 /* Functions in sfs_bmap.c */
-int sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock, bool doalloc,
-		daddr_t *diskblock);
+int sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock,
+		bool doalloc, daddr_t *diskblock);
 int sfs_itrunc(struct sfs_vnode *sv, off_t len);
 
 /* Functions in sfs_dir.c */
@@ -61,7 +63,10 @@ int sfs_lookonce(struct sfs_vnode *sv, const char *name,
 		int *slot);
 
 /* Functions in sfs_inode.c */
-int sfs_sync_inode(struct sfs_vnode *sv);
+int sfs_dinode_load(struct sfs_vnode *sv);
+void sfs_dinode_unload(struct sfs_vnode *sv);
+struct sfs_dinode *sfs_dinode_map(struct sfs_vnode *sv);
+void sfs_dinode_mark_dirty(struct sfs_vnode *sv);
 int sfs_reclaim(struct vnode *v);
 int sfs_loadvnode(struct sfs_fs *sfs, uint32_t ino, int forcetype,
 		struct sfs_vnode **ret);
@@ -69,8 +74,8 @@ int sfs_makeobj(struct sfs_fs *sfs, int type, struct sfs_vnode **ret);
 struct vnode *sfs_getroot(struct fs *fs);
 
 /* Functions in sfs_io.c */
-int sfs_readblock(struct sfs_fs *sfs, daddr_t block, void *data);
-int sfs_writeblock(struct sfs_fs *sfs, daddr_t block, void *data);
+int sfs_readblock(struct fs *fs, daddr_t block, void *data, size_t len);
+int sfs_writeblock(struct fs *fs, daddr_t block, void *data, size_t len);
 int sfs_io(struct sfs_vnode *sv, struct uio *uio);
 
 

@@ -153,6 +153,10 @@ thread_create(const char *name)
 	thread->t_curspl = IPL_HIGH;
 	thread->t_iplhigh_count = 1; /* corresponding to t_curspl */
 
+	/* VFS fields */
+	thread->t_inuse_buffers = 0;
+	thread->t_reserved_buffers = 0;
+
 	/* If you add to struct thread, be sure to initialize here */
 
 	return thread;
@@ -250,6 +254,10 @@ thread_destroy(struct thread *thread)
 	 * If you add things to struct thread, be sure to clean them up
 	 * either here or in thread_exit(). (And not both...)
 	 */
+
+	/* VFS fields, cleaned up in thread_exit */
+	KASSERT(thread->t_inuse_buffers == 0);
+	KASSERT(thread->t_reserved_buffers == 0);
 
 	/* Thread subsystem fields */
 	KASSERT(thread->t_proc == NULL);
@@ -778,10 +786,13 @@ thread_exit(void)
 
 	cur = curthread;
 
-	/*
-	 * Detach from our process. You might need to move this action
-	 * around, depending on how your wait/exit works.
-	 */
+	KASSERT(cur->t_inuse_buffers == 0);
+	KASSERT(cur->t_reserved_buffers == 0);
+
+	/* We should be attached only to the kernel process. */
+	KASSERT(cur->t_proc == kproc);
+
+	/* Detach from the kernel process. */
 	proc_remthread(cur);
 
 	/* Make sure we *are* detached (move this only if you're sure!) */

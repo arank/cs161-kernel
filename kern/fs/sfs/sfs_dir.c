@@ -36,12 +36,15 @@
 #include <kern/errno.h>
 #include <lib.h>
 #include <uio.h>
+#include <buf.h>
 #include <sfs.h>
 #include "sfsprivate.h"
 
 /*
  * Read the directory entry out of slot SLOT of a directory vnode.
  * The "slot" is the index of the directory entry, starting at 0.
+ *
+ * Requires up to 3 buffers.
  */
 static
 int
@@ -76,6 +79,8 @@ sfs_readdir(struct sfs_vnode *sv, int slot, struct sfs_dir *sd)
 /*
  * Write (overwrite) the directory entry in slot SLOT of a directory
  * vnode.
+ *
+ * Requires up to 3 buffers.
  */
 static
 int
@@ -112,28 +117,43 @@ sfs_writedir(struct sfs_vnode *sv, int slot, struct sfs_dir *sd)
  * Compute the number of entries in a directory.
  * This actually computes the number of existing slots, and does not
  * account for empty slots.
+ *
+ * Requires 1 buffer.
  */
 static
 int
-sfs_dir_nentries(struct sfs_vnode *sv)
+sfs_dir_nentries(struct sfs_vnode *sv, int *ret)
 {
 	off_t size;
+	struct sfs_dinode *inodeptr;
+	int result;
 
-	KASSERT(sv->sv_i.sfi_type == SFS_TYPE_DIR);
+	KASSERT(sv->sv_type == SFS_TYPE_DIR);
 
-	size = sv->sv_i.sfi_size;
+	result = sfs_dinode_load(sv);
+	if (result) {
+		return result;
+	}
+	inodeptr = sfs_dinode_map(sv);
+
+	size = inodeptr->sfi_size;
 	if (size % sizeof(struct sfs_dir) != 0) {
 		panic("sfs: directory %u: Invalid size %llu\n",
 		      sv->sv_ino, size);
 	}
 
-	return size / sizeof(struct sfs_dir);
+	sfs_dinode_unload(sv);
+
+	*ret = size / sizeof(struct sfs_dir);
+	return 0;
 }
 
 /*
  * Search a directory for a particular filename in a directory, and
  * return its inode number, its slot, and/or the slot number of an
  * empty directory slot if one is found.
+ *
+ * Requires up to 3 buffers.
  */
 int
 sfs_dir_findname(struct sfs_vnode *sv, const char *name,
@@ -142,7 +162,10 @@ sfs_dir_findname(struct sfs_vnode *sv, const char *name,
 	struct sfs_dir tsd;
 	int found, nentries, i, result;
 
-	nentries = sfs_dir_nentries(sv);
+	result = sfs_dir_nentries(sv, &nentries);
+	if (result) {
+		return result;
+	}
 
 	/* For each slot... */
 	found = 0;
@@ -184,6 +207,8 @@ sfs_dir_findname(struct sfs_vnode *sv, const char *name,
 /*
  * Create a link in a directory to the specified inode by number, with
  * the specified name, and optionally hand back the slot.
+ *
+ * Requires up to 3 buffers.
  */
 int
 sfs_dir_link(struct sfs_vnode *sv, const char *name, uint32_t ino, int *slot)
@@ -207,7 +232,10 @@ sfs_dir_link(struct sfs_vnode *sv, const char *name, uint32_t ino, int *slot)
 
 	/* If we didn't get an empty slot, add the entry at the end. */
 	if (emptyslot < 0) {
-		emptyslot = sfs_dir_nentries(sv);
+		result = sfs_dir_nentries(sv, &emptyslot);
+		if (result) {
+			return result;
+		}
 	}
 
 	/* Set up the entry. */
@@ -226,6 +254,8 @@ sfs_dir_link(struct sfs_vnode *sv, const char *name, uint32_t ino, int *slot)
 
 /*
  * Unlink a name in a directory, by slot number.
+ *
+ * Requires up to 3 buffers.
  */
 int
 sfs_dir_unlink(struct sfs_vnode *sv, int slot)
@@ -243,6 +273,10 @@ sfs_dir_unlink(struct sfs_vnode *sv, int slot)
 /*
  * Look for a name in a directory and hand back a vnode for the
  * file, if there is one.
+ *
+ * Returns the vnode with its inode unloaded.
+ *
+ * Requires up to 3 buffers.
  */
 int
 sfs_lookonce(struct sfs_vnode *sv, const char *name,
@@ -261,11 +295,6 @@ sfs_lookonce(struct sfs_vnode *sv, const char *name,
 	result = sfs_loadvnode(sfs, ino, SFS_TYPE_INVAL, ret);
 	if (result) {
 		return result;
-	}
-
-	if ((*ret)->sv_i.sfi_linkcount == 0) {
-		panic("sfs: name %s (inode %u) in dir %u has linkcount 0\n",
-		      name, (*ret)->sv_ino, sv->sv_ino);
 	}
 
 	return 0;

@@ -38,6 +38,7 @@
 #include <thread.h>
 #include <proc.h>
 #include <vfs.h>
+#include <buf.h>
 #include <sfs.h>
 #include <syscall.h>
 #include <test.h>
@@ -403,6 +404,21 @@ cmd_kheapdump(int nargs, char **args)
 	return 0;
 }
 
+static
+int
+cmd_bufstats(int nargs, char **args)
+{
+	if (nargs == 1) {
+		(void)args;
+		buffer_printstats();
+	}
+	else {
+		kprintf("Usage: bufstats\n");
+	}
+
+	return 0;
+}
+
 ////////////////////////////////////////
 //
 // Menus.
@@ -504,6 +520,7 @@ static const char *mainmenu[] = {
 	"[kh] Kernel heap stats              ",
 	"[khgen] Next kernel heap generation ",
 	"[khdump] Dump kernel heap           ",
+	"[bufstats} Print buffer cache stats ",
 	"[q] Quit and shut down              ",
 	NULL
 };
@@ -553,6 +570,7 @@ static struct {
 	{ "kh",         cmd_kheapstats },
 	{ "khgen",      cmd_kheapgeneration },
 	{ "khdump",     cmd_kheapdump },
+	{ "bufstats",   cmd_bufstats },
 
 	/* base system tests */
 	{ "at",		arraytest },
