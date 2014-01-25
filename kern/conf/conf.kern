@@ -417,6 +417,18 @@ defoption netfs
 
 ########################################
 #                                      #
+#  Synchronization problems assignment #
+#                                      #
+########################################
+
+defoption synchprobs
+optfile   synchprobs  synchprobs/cows.c
+optfile   synchprobs  synchprobs/common.c
+optfile   synchprobs  synchprobs/deletiongames.c
+
+
+########################################
+#                                      #
 #              Test code               #
 #                                      #
 ########################################

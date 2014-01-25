@@ -27,65 +27,16 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CLOCK_H_
-#define _CLOCK_H_
+#include <types.h>
+#include <lib.h>
+#include <wchan.h>
+#include <thread.h>
+#include <synch.h>
+#include <test.h>
+#include <kern/errno.h>
 
-/*
- * Time-related definitions.
- */
+void thread_fork_or_panic(const char *name, struct proc *proc,
+                          void (*func)(void *, unsigned long),
+                          void *data1, unsigned long data2);
 
-#include <kern/time.h>
-
-#include "opt-synchprobs.h"
-
-
-/*
- * hardclock() is called on every CPU HZ times a second, possibly only
- * when the CPU is not idle, for scheduling.
- */
-
-/* hardclocks per second */
-#if OPT_SYNCHPROBS
-/* Make synchronization more exciting :) */
-#define HZ  10000
-#else
-/* More realistic value */
-#define HZ  100
-#endif
-
-void hardclock_bootstrap(void);
-void hardclock(void);
-
-/*
- * timerclock() is called on one CPU once a second to allow simple
- * timed operations. (This is a fairly simpleminded interface.)
- */
-void timerclock(void);
-
-/*
- * gettime() may be used to fetch the current time of day.
- */
-void gettime(struct timespec *ret);
-
-/*
- * arithmetic on times
- *
- * add: ret = t1 + t2
- * sub: ret = t1 - t2
- */
-
-void timespec_add(const struct timespec *t2,
-		  const struct timespec *t1,
-		  struct timespec *ret);
-void timespec_sub(const struct timespec *t1,
-		  const struct timespec *t2,
-		  struct timespec *ret);
-
-/*
- * clocksleep() suspends execution for the requested number of seconds,
- * like userlevel sleep(3). (Don't confuse it with wchan_sleep.)
- */
-void clocksleep(int seconds);
-
-
-#endif /* _CLOCK_H_ */
+void shuffle(unsigned *array, unsigned len);

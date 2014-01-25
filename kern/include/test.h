@@ -36,6 +36,10 @@
  */
 
 
+/* This is only actually available if OPT_SYNCHPROBS is set. */
+int cows(int, char **);
+int deletiongames(int, char **);
+
 /*
  * Test code.
  */
