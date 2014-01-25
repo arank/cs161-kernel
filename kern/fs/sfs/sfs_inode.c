@@ -189,15 +189,18 @@ sfs_reclaim(struct vnode *v)
 	 * decision was made to reclaim it. (You must also synchronize
 	 * this with sfs_loadvnode.)
 	 */
+	spinlock_acquire(&v->vn_countlock);
 	if (v->vn_refcount != 1) {
 
 		/* consume the reference VOP_DECREF gave us */
 		KASSERT(v->vn_refcount>1);
 		v->vn_refcount--;
 
+		spinlock_release(&v->vn_countlock);
 		vfs_biglock_release();
 		return EBUSY;
 	}
+	spinlock_release(&v->vn_countlock);
 
 	/*
 	 * This grossness arises because reclaim gets called via

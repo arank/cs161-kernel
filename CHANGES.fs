@@ -13,6 +13,7 @@ code for 2.x. I am not even including its old changelog entries.)
 20140123 dholland	Revert the doom counter. System/161 has one now.
 20140123 dholland	Added a "bufstats" menu command.
 20140123 dholland	In buf.c, busy_buffers -> inuse_buffers for clarity.
+20140122 dholland	Make vn_countlock a spinlock.
 20140114 dholland	Reorganize SFS sources and revise the solutions.
 
 20130104 nmurphy	Merge doom-counter code into the buffer cache branch.

@@ -31,6 +31,7 @@
 #define _VNODE_H_
 
 
+#include <spinlock.h>
 struct uio;
 struct stat;
 
@@ -54,6 +55,7 @@ struct stat;
 struct vnode {
 	int vn_refcount;                /* Reference count */
 	int vn_opencount;
+	struct spinlock vn_countlock;   /* Lock for vn_refcount/opencount */
 
 	struct fs *vn_fs;               /* Filesystem vnode belongs to */
 
