@@ -163,16 +163,6 @@ sfs_sync(struct fs *fs)
 		return result;
 	}
 
-#if 0	/* This is subsumed by sync_fs_buffers, plus would now be recursive */
-
-	/* Go over the array of loaded vnodes, syncing as we go. */
-	num = vnodearray_num(sfs->sfs_vnodes);
-	for (i=0; i<num; i++) {
-		struct vnode *v = vnodearray_get(sfs->sfs_vnodes, i);
-		VOP_FSYNC(v);
-	}
-#endif
-
 	lock_acquire(sfs->sfs_bitlock);
 
 	/* If the free block map needs to be written, write it. */
@@ -261,6 +251,7 @@ sfs_unmount(struct fs *fs)
 	lock_release(sfs->sfs_bitlock);
 	lock_destroy(sfs->sfs_vnlock);
 	lock_destroy(sfs->sfs_bitlock);
+	lock_destroy(sfs->sfs_renamelock);
 
 	/* Destroy the fs object */
 	kfree(sfs);
@@ -361,6 +352,15 @@ sfs_domount(void *options, struct device *dev, struct fs **ret)
 		return ENOMEM;
 	}
 
+	sfs->sfs_renamelock = lock_create("sfs_renamelock");
+	if (sfs->sfs_renamelock == NULL) {
+		lock_destroy(sfs->sfs_bitlock);
+		lock_destroy(sfs->sfs_vnlock);
+		vnodearray_destroy(sfs->sfs_vnodes);
+		kfree(sfs);
+		return ENOMEM;
+	}
+
 	lock_acquire(sfs->sfs_vnlock);
 	lock_acquire(sfs->sfs_bitlock);
 
@@ -372,6 +372,7 @@ sfs_domount(void *options, struct device *dev, struct fs **ret)
 		lock_release(sfs->sfs_bitlock);
 		lock_destroy(sfs->sfs_vnlock);
 		lock_destroy(sfs->sfs_bitlock);
+		lock_destroy(sfs->sfs_renamelock);
 		vnodearray_destroy(sfs->sfs_vnodes);
 		kfree(sfs);
 		return result;
@@ -388,6 +389,7 @@ sfs_domount(void *options, struct device *dev, struct fs **ret)
 		lock_release(sfs->sfs_bitlock);
 		lock_destroy(sfs->sfs_vnlock);
 		lock_destroy(sfs->sfs_bitlock);
+		lock_destroy(sfs->sfs_renamelock);
 		vnodearray_destroy(sfs->sfs_vnodes);
 		kfree(sfs);
 		return EINVAL;
@@ -408,6 +410,7 @@ sfs_domount(void *options, struct device *dev, struct fs **ret)
 		lock_release(sfs->sfs_bitlock);
 		lock_destroy(sfs->sfs_vnlock);
 		lock_destroy(sfs->sfs_bitlock);
+		lock_destroy(sfs->sfs_renamelock);
 		vnodearray_destroy(sfs->sfs_vnodes);
 		kfree(sfs);
 		return ENOMEM;
@@ -418,6 +421,7 @@ sfs_domount(void *options, struct device *dev, struct fs **ret)
 		lock_release(sfs->sfs_bitlock);
 		lock_destroy(sfs->sfs_vnlock);
 		lock_destroy(sfs->sfs_bitlock);
+		lock_destroy(sfs->sfs_renamelock);
 		bitmap_destroy(sfs->sfs_freemap);
 		vnodearray_destroy(sfs->sfs_vnodes);
 		kfree(sfs);
