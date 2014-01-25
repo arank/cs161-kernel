@@ -218,6 +218,8 @@ sfs_partialio(struct sfs_vnode *sv, struct uio *uio,
 /*
  * Do I/O (either read or write) of a single whole block.
  *
+ * Locking: must hold vnode lock. May get/release sfs_bitlock.
+ * 
  * Requires up to 2 buffers.
  */
 static

@@ -180,7 +180,7 @@ sfs_dinode_mark_dirty(struct sfs_vnode *sv)
  *    possibly also sfs_bitlock, while holding the vnode lock.
  *
  * Requires 1 buffer locally but may also afterward call sfs_itrunc,
- * which takes 3.
+ * which takes 4.
  */
 int
 sfs_reclaim(struct vnode *v)
@@ -222,7 +222,7 @@ sfs_reclaim(struct vnode *v)
 	 */
 	buffers_needed = curthread->t_reserved_buffers == 0;
 	if (buffers_needed) {
-		reserve_buffers(3, SFS_BLOCKSIZE);
+		reserve_buffers(4, SFS_BLOCKSIZE);
 	}
 
 	/* Get the on-disk inode. */
@@ -235,7 +235,7 @@ sfs_reclaim(struct vnode *v)
 		lock_release(sfs->sfs_vnlock);
 		lock_release(sv->sv_lock);
 		if (buffers_needed) {
-			unreserve_buffers(3, SFS_BLOCKSIZE);
+			unreserve_buffers(4, SFS_BLOCKSIZE);
 		}
 		return result;
 	}
@@ -249,7 +249,7 @@ sfs_reclaim(struct vnode *v)
 			lock_release(sfs->sfs_vnlock);
 			lock_release(sv->sv_lock);
 			if (buffers_needed) {
-				unreserve_buffers(3, SFS_BLOCKSIZE);
+				unreserve_buffers(4, SFS_BLOCKSIZE);
 			}
 			return result;
 		}
@@ -263,7 +263,7 @@ sfs_reclaim(struct vnode *v)
 	}
 
 	if (buffers_needed) {
-		unreserve_buffers(3, SFS_BLOCKSIZE);
+		unreserve_buffers(4, SFS_BLOCKSIZE);
 	}
 
 	/* Remove the vnode structure from the table in the struct sfs_fs. */

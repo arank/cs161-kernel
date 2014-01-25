@@ -423,7 +423,7 @@ sfs_mmap(struct vnode *v   /* add stuff as needed */)
  *
  * Locking: gets/releases vnode lock.
  *
- * Requires up to 3 buffers.
+ * Requires up to 4 buffers.
  */
 static
 int
@@ -433,11 +433,11 @@ sfs_truncate(struct vnode *v, off_t len)
 	int result;
 
 	lock_acquire(sv->sv_lock);
-	reserve_buffers(3, SFS_BLOCKSIZE);
+	reserve_buffers(4, SFS_BLOCKSIZE);
 
 	result = sfs_itrunc(sv, len);
 
-	unreserve_buffers(3, SFS_BLOCKSIZE);
+	unreserve_buffers(4, SFS_BLOCKSIZE);
 	lock_release(sv->sv_lock);
 	return result;
 }

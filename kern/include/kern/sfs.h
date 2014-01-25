@@ -41,8 +41,8 @@
 #define SFS_VOLNAME_SIZE  32            /* max length of volume name */
 #define SFS_NDIRECT       15            /* # of direct blocks in inode */
 #define SFS_NINDIRECT     1             /* # of indirect blocks in inode */
-#define SFS_NDINDIRECT    0             /* # of 2x indirect blocks in inode */
-#define SFS_NTINDIRECT    0             /* # of 3x indirect blocks in inode */
+#define SFS_NDINDIRECT    1             /* # of 2x indirect blocks in inode */
+#define SFS_NTINDIRECT    1             /* # of 3x indirect blocks in inode */
 #define SFS_DBPERIDB      128           /* # direct blks per indirect blk */
 #define SFS_NAMELEN       60            /* max length of filename */
 #define SFS_SB_LOCATION    0            /* block the superblock lives in */
@@ -86,7 +86,9 @@ struct sfs_dinode {
 	uint16_t sfi_linkcount;			/* # hard links to this file */
 	uint32_t sfi_direct[SFS_NDIRECT];	/* Direct blocks */
 	uint32_t sfi_indirect;			/* Indirect block */
-	uint32_t sfi_waste[128-3-SFS_NDIRECT];	/* unused space, set to 0 */
+	uint32_t sfi_dindirect;   /* Double indirect block */
+	uint32_t sfi_tindirect;   /* Triple indirect block */
+	uint32_t sfi_waste[128-5-SFS_NDIRECT];	/* unused space, set to 0 */
 };
 
 /*

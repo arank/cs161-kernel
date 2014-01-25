@@ -42,180 +42,283 @@
 #include "sfsprivate.h"
 
 /*
+ * Maximum block number that we can have in a file.
+ */
+static const uint32_t sfs_maxblock = 
+	SFS_NDIRECT +
+	SFS_NINDIRECT * SFS_DBPERIDB +
+	SFS_NDINDIRECT * SFS_DBPERIDB * SFS_DBPERIDB +
+	SFS_NTINDIRECT * SFS_DBPERIDB * SFS_DBPERIDB * SFS_DBPERIDB
+;
+
+/*
+ * Find out the indirection level of a file block number; that is,
+ * which block pointer in the inode one uses to get to it.
+ *
+ * FILEBLOCK is the file block number.
+ *
+ * INDIR_RET returns the indirection level.
+ *
+ * INDIRNUM_RET returns the index into the inode blocks at that
+ * indirection level, e.g. for the 3rd direct block this would be 3.
+ *
+ * OFFSET_RET returns the block number offset within the tree
+ * starting at the designated inode block pointer. For direct blocks
+ * this will always be 0.
+ *
+ * This function has been written so it will continue to work even if
+ * SFS_NINDIRECT, SFS_NDINDIRECT, and/or SFS_NTINDIRECT get changed
+ * around, although if you do that much of the rest of the code will
+ * still need attention.
+ *
+ * Fails with EFBIG if the requested offset is too large for the
+ * filesystem.
+ */
+static
+int
+sfs_get_indirection(uint32_t fileblock, unsigned *indir_ret,
+		    unsigned *indirnum_ret, uint32_t *offset_ret)
+{
+	static const struct {
+		unsigned num;
+		uint32_t blockseach;
+	} info[4] = {
+		{ SFS_NDIRECT,    1 },
+		{ SFS_NINDIRECT,  SFS_DBPERIDB },
+		{ SFS_NDINDIRECT, SFS_DBPERIDB * SFS_DBPERIDB },
+		{ SFS_NTINDIRECT, SFS_DBPERIDB * SFS_DBPERIDB * SFS_DBPERIDB },
+	};
+
+	unsigned indir;
+	uint32_t max;
+
+	for (indir = 0; indir < 4; indir++) {
+		max = info[indir].num * info[indir].blockseach;
+		if (fileblock < max) {
+			*indir_ret = indir;
+			*indirnum_ret = fileblock / info[indir].blockseach;
+			*offset_ret = fileblock % info[indir].blockseach;
+			return 0;
+		}
+		fileblock -= max;
+	}
+	return EFBIG;
+}
+
+
+/*
+ * Given a pointer to a block slot, return it, allocating a block
+ * if necessary.
+ */
+static
+int
+sfs_bmap_get(struct sfs_fs *sfs, uint32_t *blockptr, bool *dirtyptr,
+	     bool doalloc, daddr_t *diskblock_ret)
+{
+	daddr_t block;
+	int result;
+
+	/*
+	 * Get the block number
+	 */
+	block = *blockptr;
+
+	/*
+	 * Do we need to allocate?
+	 */
+	if (block==0 && doalloc) {
+		result = sfs_balloc(sfs, &block, NULL);
+		if (result) {
+			return result;
+		}
+
+		/* Remember what we allocated; mark storage dirty */
+		*blockptr = block;
+		*dirtyptr = true;
+	}
+
+	/*
+	 * Hand back the block
+	 */
+	*diskblock_ret = block;
+	return 0;
+}
+
+/*
+ * Look up the disk block number in a subtree; that is, we've picked
+ * one of the block pointers in the inode and we're now going to
+ * look up in the tree it points to.
+ *
+ * BLOCKPTR is the address of the block pointer in the inode.
+ * INDIR is its indirection level.
+ * DIRTYPTR is set if we change the block pointer.
+ *
+ * FILEBLOCK is the block offset into the subtree.
+ * DOALLOC is true if we're allocating blocks.
+ *
+ * DISKBLOCK_RET gets the resulting disk block number.
+ */
+static
+int
+sfs_bmap_subtree(struct sfs_fs *sfs,
+		 uint32_t *blockptr, unsigned indir, bool *dirtyptr,
+		 uint32_t fileblock, bool doalloc,
+		 daddr_t *diskblock_ret)
+{
+	daddr_t block;
+	struct buf *idbuf;
+	uint32_t *iddata;
+	bool idbuf_dirty;
+	uint32_t idoff;
+	uint32_t fileblocks_per_entry;
+	int result;
+
+	COMPILE_ASSERT(SFS_DBPERIDB * sizeof(iddata[0]) == SFS_BLOCKSIZE);
+
+	/* Get the block that blockptr points to (maybe allocating) */
+	result = sfs_bmap_get(sfs, blockptr, dirtyptr, doalloc,
+			      &block);
+	if (result) {
+		return result;
+	}
+
+	while (indir > 0) {
+
+		/* If nothing here, we're done */
+		if (block == 0) {
+			KASSERT(doalloc == false);
+			*diskblock_ret = 0;
+			return 0;
+		}
+
+		/* Read the indirect block */
+		result = buffer_read(&sfs->sfs_absfs, block,
+				     SFS_BLOCKSIZE, &idbuf);
+		if (result) {
+			return result;
+		}
+		iddata = buffer_map(idbuf);
+
+		/*
+		 * Compute the index into the indirect block.
+		 * Leave the remainder in fileblock for the next pass.
+		 */
+		switch (indir) {
+		    case 3:
+			fileblocks_per_entry = SFS_DBPERIDB * SFS_DBPERIDB;
+			break;
+		    case 2:
+			fileblocks_per_entry = SFS_DBPERIDB;
+			break;
+		    case 1:
+			fileblocks_per_entry = 1;
+			break;
+		    default:
+			panic("sfs_bmap_subtree: invalid indirect level %u\n",
+			      indir);
+		}
+		idoff = fileblock / fileblocks_per_entry;
+		fileblock = fileblock % fileblocks_per_entry;
+
+		blockptr = &iddata[idoff];
+		indir--;
+
+		/* Get the address of the next layer down (maybe allocating) */
+		result = sfs_bmap_get(sfs, blockptr, &idbuf_dirty, doalloc,
+				      &block);
+		if (result) {
+			buffer_release(idbuf);
+			return result;
+		}
+		if (idbuf_dirty) {
+			buffer_mark_dirty(idbuf);
+		}
+		buffer_release(idbuf);
+	}
+	*diskblock_ret = block;
+	return 0;
+}
+
+/*
  * Look up the disk block number (from 0 up to the number of blocks on
  * the disk) given a file and the logical block number within that
  * file. If DOALLOC is set, and no such block exists, one will be
  * allocated.
  *
- * Locking: must hold vnode lock. Acquires/releases buffer locks and
- * also sfs_bitlock.
+ * Locking: must hold vnode lock. May get/release buffer cache locks and (via
+ *    sfs_balloc) sfs_bitlock.
  *
  * Requires up to 2 buffers.
  */
 int
 sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock, bool doalloc,
-	 daddr_t *diskblock)
+		daddr_t *diskblock)
 {
 	struct sfs_fs *sfs = sv->sv_v.vn_fs->fs_data;
 	struct sfs_dinode *inodeptr;
-	struct buf *idbuffer;
-	uint32_t *idbufdata;
-	daddr_t block;
-	daddr_t idblock;
-	uint32_t idnum, idoff;
+	bool inode_dirty;
+	unsigned indir, indirnum;
+	uint32_t *blockptr;
 	int result;
 
-	COMPILE_ASSERT(SFS_DBPERIDB * sizeof(idbufdata[0]) == SFS_BLOCKSIZE);
 	KASSERT(lock_do_i_hold(sv->sv_lock));
 
+	/* Figure out where to start */
+	result = sfs_get_indirection(fileblock, &indir, &indirnum, &fileblock);
+	if (result) {
+		return result;
+	}
+
+	/* Load the inode */
 	result = sfs_dinode_load(sv);
 	if (result) {
 		return result;
 	}
 	inodeptr = sfs_dinode_map(sv);
 
-	/*
-	 * If the block we want is one of the direct blocks...
-	 */
-	if (fileblock < SFS_NDIRECT) {
-		/*
-		 * Get the block number
-		 */
-		block = inodeptr->sfi_direct[fileblock];
-
-		/*
-		 * Do we need to allocate?
-		 */
-		if (block==0 && doalloc) {
-			result = sfs_balloc(sfs, &block, NULL);
-			if (result) {
-				sfs_dinode_unload(sv);
-				return result;
-			}
-
-			/* Remember what we allocated; mark inode dirty */
-			inodeptr->sfi_direct[fileblock] = block;
-			sfs_dinode_mark_dirty(sv);
-		}
-
-		/*
-		 * Hand back the block
-		 */
-		if (block != 0 && !sfs_bused(sfs, block)) {
-			panic("sfs: Data block %u (block %u of file %u) "
-			      "marked free\n", block, fileblock, sv->sv_ino);
-		}
-		*diskblock = block;
-		sfs_dinode_unload(sv);
-		return 0;
+	/* Get the initial block pointer */
+	switch (indir) {
+	    case 0:
+		KASSERT(fileblock == 0);
+		blockptr = &inodeptr->sfi_direct[indirnum];
+		break;
+	    case 1:
+		KASSERT(indirnum == 0);
+		blockptr = &inodeptr->sfi_indirect;
+		break;
+	    case 2:
+		KASSERT(indirnum == 0);
+		blockptr = &inodeptr->sfi_dindirect;
+		break;
+	    case 3:
+		KASSERT(indirnum == 0);
+		blockptr = &inodeptr->sfi_tindirect;
+		break;
+	    default:
+		panic("sfs_bmap: invalid indirection %u\n", indir);
 	}
 
-	/*
-	 * It's not a direct block; it must be in the indirect block.
-	 * Subtract off the number of direct blocks, so FILEBLOCK is
-	 * now the offset into the indirect block space.
-	 */
-
-	fileblock -= SFS_NDIRECT;
-
-	/* Get the indirect block number and offset w/i that indirect block */
-	idnum = fileblock / SFS_DBPERIDB;
-	idoff = fileblock % SFS_DBPERIDB;
-
-	/*
-	 * We only have one indirect block. If the offset we were asked for
-	 * is too large, we can't handle it, so fail.
-	 */
-	if (idnum >= SFS_NINDIRECT) {
+	/* Do the work in the indicated subtree */
+	result = sfs_bmap_subtree(sfs,
+				  blockptr, indir, &inode_dirty,
+				  fileblock, doalloc,
+				  diskblock);
+	if (result) {
 		sfs_dinode_unload(sv);
-		return EFBIG;
+		return result;
 	}
 
-	/* Get the disk block number of the indirect block. */
-	idblock = inodeptr->sfi_indirect;
-
-	if (idblock==0 && !doalloc) {
-		/*
-		 * There's no indirect block allocated. We weren't
-		 * asked to allocate anything, so pretend the indirect
-		 * block was filled with all zeros.
-		 */
-		*diskblock = 0;
-		sfs_dinode_unload(sv);
-		return 0;
-	}
-	else if (idblock==0) {
-		/*
-		 * There's no indirect block allocated, but we need to
-		 * allocate a block whose number needs to be stored in
-		 * the indirect block. Thus, we need to allocate an
-		 * indirect block.
-		 */
-		result = sfs_balloc(sfs, &idblock, &idbuffer);
-		if (result) {
-			sfs_dinode_unload(sv);
-			return result;
-		}
-
-		/* Remember the block we just allocated */
-		inodeptr->sfi_indirect = idblock;
-
-		/* Mark the inode dirty */
+	if (inode_dirty) {
 		sfs_dinode_mark_dirty(sv);
-
-		/* Clear the indirect block buffer */
-
-		idbufdata = buffer_map(idbuffer);
-
-		/*
-		 * sfs_balloc already does this...
-		 *
-		 * bzero(idbufdata, SFS_BLOCKSIZE);
-		 * buffer_mark_dirty(idbuffer);
-		 */
 	}
-	else {
-		/*
-		 * We already have an indirect block allocated; load it.
-		 */
-		result = buffer_read(&sfs->sfs_absfs, idblock, SFS_BLOCKSIZE,
-				     &idbuffer);
-		if (result) {
-			sfs_dinode_unload(sv);
-			return result;
-		}
-		idbufdata = buffer_map(idbuffer);
-	}
-
-	/* Get the block out of the indirect block buffer */
-	block = idbufdata[idoff];
-
-	/* If there's no block there, allocate one */
-	if (block==0 && doalloc) {
-		result = sfs_balloc(sfs, &block, NULL);
-		if (result) {
-			buffer_release(idbuffer);
-			sfs_dinode_unload(sv);
-			return result;
-		}
-
-		/* Remember the block we allocated */
-		idbufdata[idoff] = block;
-
-		/* The indirect block is now dirty; mark it so */
-		buffer_mark_dirty(idbuffer);
-	}
-
-	/* Hand back the result and return. */
-	if (block != 0 && !sfs_bused(sfs, block)) {
-		panic("sfs: Data block %u (block %u of file %u) marked free\n",
-		      block, fileblock, sv->sv_ino);
-	}
-
-	buffer_release(idbuffer);
 	sfs_dinode_unload(sv);
 
-	*diskblock = block;
+	/* Hand back the result and return. */
+	if (*diskblock != 0 && !sfs_bused(sfs, *diskblock)) {
+		panic("sfs: Data block %u (block %u of file %u) "
+		      "marked free\n",
+		      *diskblock, fileblock, sv->sv_ino);
+	}
 	return 0;
 }
 
@@ -224,28 +327,26 @@ sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock, bool doalloc,
  *
  * Locking: must hold vnode lock. Acquires/releases buffer locks.
  * 
- * Requires up to 3 buffers.
+ * Requires up to 4 buffers.
  */
 int
 sfs_itrunc(struct sfs_vnode *sv, off_t len)
 {
 	struct sfs_fs *sfs = sv->sv_v.vn_fs->fs_data;
 
-	struct sfs_dinode *inodeptr;
-
-	struct buf *idbuffer;
-	uint32_t *idptr;
-
 	/* Length in blocks (divide rounding up) */
 	uint32_t blocklen = DIVROUNDUP(len, SFS_BLOCKSIZE);
 
-	uint32_t i, j;
-	daddr_t block, idblock;
+	struct sfs_dinode *inodeptr;
+	struct buf *idbuf, *didbuf, *tidbuf;
+	uint32_t *iddata = NULL, *diddata = NULL, *tiddata = NULL ;
+	uint32_t i;
+	daddr_t block, idblock, didblock, tidblock;
 	uint32_t baseblock, highblock;
-	int result;
-	int hasnonzero;
+	int result = 0, final_result = 0;
+	int id_hasnonzero = 0, did_hasnonzero = 0, tid_hasnonzero = 0;
 
-	COMPILE_ASSERT(SFS_DBPERIDB * sizeof(idptr[0]) == SFS_BLOCKSIZE);
+	COMPILE_ASSERT(SFS_DBPERIDB * sizeof(iddata[0]) == SFS_BLOCKSIZE);
 	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	result = sfs_dinode_load(sv);
@@ -261,61 +362,396 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 	for (i=0; i<SFS_NDIRECT; i++) {
 		block = inodeptr->sfi_direct[i];
 		if (i >= blocklen && block != 0) {
-			buffer_drop(&sfs->sfs_absfs, block, SFS_BLOCKSIZE);
 			sfs_bfree(sfs, block);
 			inodeptr->sfi_direct[i] = 0;
-			sfs_dinode_mark_dirty(sv);
 		}
 	}
 
 	/* Indirect block number */
 	idblock = inodeptr->sfi_indirect;
 
+	/* Double indirect block number */
+	didblock = inodeptr->sfi_dindirect;
+
+	/* Triple indirect block number */
+	tidblock = inodeptr->sfi_tindirect;
+
 	/* The lowest block in the indirect block */
 	baseblock = SFS_NDIRECT;
 
-	/* The highest block in the indirect block */
-	highblock = baseblock + SFS_DBPERIDB - 1;
+	/* The highest block in the file */
+	highblock = baseblock + SFS_DBPERIDB + SFS_DBPERIDB* SFS_DBPERIDB +
+			SFS_DBPERIDB* SFS_DBPERIDB* SFS_DBPERIDB - 1;
 
-	if (blocklen < highblock && idblock != 0) {
-		/* We're past the proposed EOF; may need to free stuff */
 
-		/* Read the indirect block */
-		result = buffer_read(&sfs->sfs_absfs, idblock, SFS_BLOCKSIZE,
-				     &idbuffer);
-		if (result) {
-			sfs_dinode_unload(sv);
-			return result;
-		}
-		idptr = buffer_map(idbuffer);
+	/* We are going to cycle through all the blocks, changing levels
+	 * of indirection. And free the ones that are past the new end
+	 * of file.
+	 */
+	if (blocklen < highblock) {
+		int indir = 1, level3 = 0, level2 = 0, level1 = 0;
+		int id_modified = 0, did_modified = 0, tid_modified = 0;
 
-		hasnonzero = 0;
-		for (j=0; j<SFS_DBPERIDB; j++) {
-			/* Discard any blocks that are past the new EOF */
-			if (blocklen < baseblock+j && idptr[j] != 0) {
-				buffer_drop(&sfs->sfs_absfs, idptr[j],
-					    SFS_BLOCKSIZE);
-				sfs_bfree(sfs, idptr[j]);
-				idptr[j] = 0;
-				buffer_mark_dirty(idbuffer);
+		while (indir <= 3) {
+
+			if (indir == 1) {
+				baseblock = SFS_NDIRECT;
+				if (idblock == 0) {
+					indir++;
+					continue;
+				}
 			}
-			/* Remember if we see any nonzero blocks in here */
-			if (idptr[j] != 0) {
-				hasnonzero=1;
+			if (indir == 2) {
+				baseblock = SFS_NDIRECT + SFS_DBPERIDB;
+				if (didblock == 0) {
+					indir++;
+					continue;
+				}
 			}
-		}
+			if (indir == 3) {
+				baseblock = SFS_NDIRECT + SFS_DBPERIDB + 
+					SFS_DBPERIDB * SFS_DBPERIDB;
+				if (tidblock == 0) {
+					indir++;
+					continue;
+				}
+			}
 
-		if (!hasnonzero) {
-			/* The whole indirect block is empty now; free it */
-			buffer_release_and_invalidate(idbuffer);
-			sfs_bfree(sfs, idblock);
-			inodeptr->sfi_indirect = 0;
-			sfs_dinode_mark_dirty(sv);
-		}
-		else {
-			buffer_release(idbuffer);
+			if (indir == 1) {
+				/*
+				 * If the level of indirection is 1,
+				 * we are cycling through the blocks
+				 * reachable from our indirect
+				 * blocks. Read the indirect block
+				 */
+
+				// otherwise we would not be here
+				KASSERT(idblock != 0);
+
+				/* Read the indirect block */
+				result = buffer_read(sv->sv_v.vn_fs, idblock,
+						SFS_BLOCKSIZE, &idbuf);
+				/* if there's an error, guess we just lose
+				 * all the blocks referenced by this indirect
+				 * block!
+				 */
+				if (result) {
+					kprintf("sfs_dotruncate: error "
+						"reading indirect block %u: "
+						"%s\n",
+						idblock, strerror(result));
+					final_result = result;
+					indir++;
+					continue;
+				}
+
+				/*
+				 * We do not need to execute the parts
+				 * for double and triple levels of
+				 * indirection.
+				 */
+				goto ilevel1;
+			}
+			if (indir == 2) {
+				// otherwise we would not be here
+				KASSERT(didblock != 0);
+
+				/* Read the double indirect block */
+				result = buffer_read(sv->sv_v.vn_fs, didblock,
+						SFS_BLOCKSIZE, &didbuf);
+				/*
+				 * if there's an error, guess we just
+				 * lose all the blocks referenced by
+				 * this double-indirect block!
+				 */
+				if (result) {
+					kprintf("sfs_dotruncate: error "
+						"reading double indirect "
+						"block %u: %s\n",
+						didblock, strerror(result));
+					final_result = result;
+					indir++;
+					continue;
+				}
+
+				/*
+				 * We do not need to execute the parts
+				 * for the triple level of indirection.
+				 */
+				goto ilevel2;
+			}
+			if (indir == 3) {
+
+				// otherwise we would not be here
+				KASSERT(tidblock != 0);
+
+				/* Read the triple indirect block */
+				result = buffer_read(sv->sv_v.vn_fs, tidblock,
+						SFS_BLOCKSIZE, &tidbuf);
+				/*
+				 * if there's an error, guess we just
+				 * lose all the blocks referenced by
+				 * this triple-indirect block!
+				 */
+				if (result) {
+					kprintf("sfs_dotruncate: error "
+						"reading triple indirect "
+						"block %u: %s\n",
+						tidblock, strerror(result));
+					final_result = result;
+					indir++;
+					continue;
+				}
+
+				goto ilevel3;
+			}
+
+			/*
+			 * This is the loop for level of indirection 3
+			 * Go through all double indirect blocks
+			 * pointed to from this triple indirect block,
+			 * discard the ones that are past the new end
+			 * of file.
+			 */
+
+			ilevel3:
+			tiddata = buffer_map(tidbuf);
+			for (level3 = 0; level3 < SFS_DBPERIDB; level3++) {
+				if (blocklen >= baseblock +
+				    SFS_DBPERIDB * SFS_DBPERIDB * (level3)
+				    || tiddata[level3] == 0) {
+					if (tiddata[level3] != 0) {
+						tid_hasnonzero = 1;
+					}
+					continue;
+				}
+
+				/*
+				 * Read the double indirect block,
+				 * hand it to the next inner loop.
+				 */
+
+				didblock = tiddata[level3];
+				result = buffer_read(sv->sv_v.vn_fs, didblock,
+						SFS_BLOCKSIZE, &didbuf);
+
+				/*
+				 * if there's an error, guess we just
+				 * lose all the blocks referenced by
+				 * this double-indirect block!
+				 */
+				if (result) {
+					kprintf("sfs_dotruncate: error "
+						"reading double indirect "
+						"block %u: %s\n",
+						didblock, strerror(result));
+					final_result = result;
+					continue;
+				}
+
+				/*
+				 * This is the loop for level of
+				 * indirection 2 Go through all
+				 * indirect blocks pointed to from
+				 * this double indirect block, discard
+				 * the ones that are past the new end
+				 * of file.
+				 */
+				ilevel2:
+				diddata = buffer_map(didbuf);
+				for (level2 = 0;
+				     level2 < SFS_DBPERIDB; level2++) {
+					/*
+					 * Discard any blocks that are
+					 * past the new EOF
+					 */
+					if (blocklen >= baseblock +
+					    (level3) * 
+					        SFS_DBPERIDB * SFS_DBPERIDB +
+					    (level2) * SFS_DBPERIDB
+					    || diddata[level2] == 0) {
+						if (diddata[level2] != 0) {
+							did_hasnonzero = 1;
+						}
+						continue;
+					}
+
+					/*
+					 * Read the indirect block,
+					 * hand it to the next inner
+					 * loop.
+					 */
+
+					idblock = diddata[level2];
+					result = buffer_read(sv->sv_v.vn_fs,
+							     idblock,
+							     SFS_BLOCKSIZE,
+							     &idbuf);
+					/*
+					 * if there's an error, guess
+					 * we just lose all the blocks
+					 * referenced by this indirect
+					 * block!
+					 */
+					if (result) {
+						kprintf("sfs_dotruncate: "
+							"error reading "
+							"indirect block "
+							"%u: %s\n",
+							idblock,
+							strerror(result));
+						final_result = result;
+						continue;
+					}
+
+
+					/*
+					 * This is the loop for level
+					 * of indirection 1
+					 * Go through all direct
+					 * blocks pointed to from this
+					 * indirect block, discard the
+					 * ones that are past the new
+					 * end of file.
+					 */
+					ilevel1:
+					iddata = buffer_map(idbuf);
+					for (level1 = 0;
+					     level1<SFS_DBPERIDB; level1++) {
+						/*
+						 * Discard any blocks
+						 * that are past the
+						 * new EOF
+						 */
+						if (blocklen < baseblock +
+						    (level3) * SFS_DBPERIDB * 
+						       SFS_DBPERIDB +
+						    (level2) * SFS_DBPERIDB +
+						    level1
+						    && iddata[level1] != 0) {
+
+							int block =
+								iddata[level1];
+							iddata[level1] = 0;
+							id_modified = 1;
+
+							sfs_bfree(sfs, block);
+						}
+
+						/*
+						 * Remember if we see
+						 * any nonzero blocks
+						 * in here
+						 */
+						if (iddata[level1]!=0) {
+							id_hasnonzero=1;
+						}
+					}
+					/* end for level 1*/
+
+					if (!id_hasnonzero) {
+						/*
+						 * The whole indirect
+						 * block is empty now;
+						 * free it
+						 */
+						sfs_bfree(sfs, idblock);
+						if (indir == 1) {
+							inodeptr->sfi_indirect
+								= 0;
+						}
+						if (indir != 1) {
+							did_modified = 1;
+							diddata[level2] = 0;
+						}
+					}
+					else if (id_modified) {
+						/*
+						 * The indirect block
+						 * has been modified
+						 */
+						buffer_mark_dirty(idbuf);
+						if (indir != 1) {
+							did_hasnonzero = 1;
+						}
+					}
+
+					buffer_release(idbuf);
+
+					/*
+					 * If we are just doing 1
+					 * level of indirection, break
+					 * out of the loop
+					 */
+					if (indir == 1) {
+						break;
+					}
+				}
+				/* end for level2 */
+
+				/*
+				 * If we are just doing 1 level of
+				 * indirection, break out of the loop
+				 */
+				if (indir == 1) {
+					break;
+				}
+
+				if (!did_hasnonzero) {
+					/*
+					 * The whole double indirect
+					 * block is empty now; free it
+					 */
+					sfs_bfree(sfs, didblock);
+					if (indir == 2) {
+						inodeptr->sfi_dindirect = 0;
+					}
+					if (indir == 3) {
+						tid_modified = 1;
+						tiddata[level3] = 0;
+					}
+				}
+				else if (did_modified) {
+					/*
+					 * The double indirect block
+					 * has been modified
+					 */
+					buffer_mark_dirty(didbuf);
+					if (indir == 3) {
+						tid_hasnonzero = 1;
+					}
+				}
+
+				buffer_release(didbuf);
+				if (indir < 3) {
+					break;
+				}
+			}
+			/* end for level 3 */
+			if (indir < 3) {
+				indir++;
+				continue;  /* while */
+			}
+			if (!tid_hasnonzero) {
+				/*
+				 * The whole triple indirect block is
+				 * empty now; free it
+				 */
+				sfs_bfree(sfs, tidblock);
+				inodeptr->sfi_tindirect = 0;
+			}
+			else if (tid_modified) {
+				/*
+				 * The triple indirect block has been
+				 * modified
+				 */
+				buffer_mark_dirty(tidbuf);
+			}
+			buffer_release(tidbuf);
+			indir++;
 		}
 	}
+
 
 	/* Set the file size */
 	inodeptr->sfi_size = len;
@@ -323,8 +759,9 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 	/* Mark the inode dirty */
 	sfs_dinode_mark_dirty(sv);
 
+	/* release the inode buffer */
 	sfs_dinode_unload(sv);
 
-	return 0;
+	return final_result;
 }
 
