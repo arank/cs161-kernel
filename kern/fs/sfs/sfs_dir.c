@@ -36,6 +36,7 @@
 #include <kern/errno.h>
 #include <lib.h>
 #include <uio.h>
+#include <synch.h>
 #include <buf.h>
 #include <sfs.h>
 #include "sfsprivate.h"
@@ -44,6 +45,8 @@
  * Read the directory entry out of slot SLOT of a directory vnode.
  * The "slot" is the index of the directory entry, starting at 0.
  *
+ * Locking: must hold vnode lock.
+ * 
  * Requires up to 3 buffers.
  */
 static
@@ -54,6 +57,8 @@ sfs_readdir(struct sfs_vnode *sv, int slot, struct sfs_dir *sd)
 	struct uio ku;
 	off_t actualpos;
 	int result;
+
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	/* Compute the actual position in the directory to read. */
 	actualpos = slot * sizeof(struct sfs_dir);
@@ -80,6 +85,8 @@ sfs_readdir(struct sfs_vnode *sv, int slot, struct sfs_dir *sd)
  * Write (overwrite) the directory entry in slot SLOT of a directory
  * vnode.
  *
+ * Locking: must hold vnode lock.
+ * 
  * Requires up to 3 buffers.
  */
 static
@@ -92,6 +99,8 @@ sfs_writedir(struct sfs_vnode *sv, int slot, struct sfs_dir *sd)
 	int result;
 
 	/* Compute the actual position in the directory. */
+
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 	KASSERT(slot>=0);
 	actualpos = slot * sizeof(struct sfs_dir);
 
@@ -118,6 +127,8 @@ sfs_writedir(struct sfs_vnode *sv, int slot, struct sfs_dir *sd)
  * This actually computes the number of existing slots, and does not
  * account for empty slots.
  *
+ * Locking: must hold vnode lock.
+ * 
  * Requires 1 buffer.
  */
 static
@@ -128,6 +139,7 @@ sfs_dir_nentries(struct sfs_vnode *sv, int *ret)
 	struct sfs_dinode *inodeptr;
 	int result;
 
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 	KASSERT(sv->sv_type == SFS_TYPE_DIR);
 
 	result = sfs_dinode_load(sv);
@@ -153,6 +165,8 @@ sfs_dir_nentries(struct sfs_vnode *sv, int *ret)
  * return its inode number, its slot, and/or the slot number of an
  * empty directory slot if one is found.
  *
+ * Locking: must hold vnode lock. May get/release sfs_bitlock.
+ *
  * Requires up to 3 buffers.
  */
 int
@@ -161,6 +175,8 @@ sfs_dir_findname(struct sfs_vnode *sv, const char *name,
 {
 	struct sfs_dir tsd;
 	int found, nentries, i, result;
+
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	result = sfs_dir_nentries(sv, &nentries);
 	if (result) {
@@ -208,6 +224,8 @@ sfs_dir_findname(struct sfs_vnode *sv, const char *name,
  * Create a link in a directory to the specified inode by number, with
  * the specified name, and optionally hand back the slot.
  *
+ * Locking: must hold vnode lock. May get/release sfs_bitlock.
+ *
  * Requires up to 3 buffers.
  */
 int
@@ -216,6 +234,8 @@ sfs_dir_link(struct sfs_vnode *sv, const char *name, uint32_t ino, int *slot)
 	int emptyslot = -1;
 	int result;
 	struct sfs_dir sd;
+
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	/* Look up the name. We want to make sure it *doesn't* exist. */
 	result = sfs_dir_findname(sv, name, NULL, NULL, &emptyslot);
@@ -255,12 +275,16 @@ sfs_dir_link(struct sfs_vnode *sv, const char *name, uint32_t ino, int *slot)
 /*
  * Unlink a name in a directory, by slot number.
  *
+ * Locking: must hold vnode lock. May get/release sfs_bitlock.
+ *
  * Requires up to 3 buffers.
  */
 int
 sfs_dir_unlink(struct sfs_vnode *sv, int slot)
 {
 	struct sfs_dir sd;
+
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	/* Initialize a suitable directory entry... */
 	bzero(&sd, sizeof(sd));
@@ -276,6 +300,10 @@ sfs_dir_unlink(struct sfs_vnode *sv, int slot)
  *
  * Returns the vnode with its inode unloaded.
  *
+ * Locking: must hold vnode lock. May get/release sfs_bitlock.
+ *    Also gets/releases sfs_vnlock.
+ *    Returns the result vnode locked.
+ *
  * Requires up to 3 buffers.
  */
 int
@@ -286,6 +314,8 @@ sfs_lookonce(struct sfs_vnode *sv, const char *name,
 	struct sfs_fs *sfs = sv->sv_v.vn_fs->fs_data;
 	uint32_t ino;
 	int result;
+
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	result = sfs_dir_findname(sv, name, &ino, slot, NULL);
 	if (result) {

@@ -36,6 +36,7 @@
 #include <kern/errno.h>
 #include <lib.h>
 #include <uio.h>
+#include <synch.h>
 #include <vfs.h>
 #include <buf.h>
 #include <device.h>
@@ -62,8 +63,6 @@ sfs_rwblock(struct sfs_fs *sfs, struct uio *uio)
 {
 	int result;
 	int tries=0;
-
-	KASSERT(vfs_biglock_do_i_hold());
 
 	DEBUG(DB_SFS, "sfs: %s %llu\n",
 	      uio->uio_rw == UIO_READ ? "read" : "write",
@@ -162,6 +161,7 @@ sfs_partialio(struct sfs_vnode *sv, struct uio *uio,
 	/* Allocate missing blocks if and only if we're writing */
 	bool doalloc = (uio->uio_rw==UIO_WRITE);
 
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 	KASSERT(skipstart + len <= SFS_BLOCKSIZE);
 
 	/* Compute the block offset of this block in the file */
@@ -232,6 +232,8 @@ sfs_blockio(struct sfs_vnode *sv, struct uio *uio)
 	int result;
 	bool doalloc = (uio->uio_rw==UIO_WRITE);
 
+	KASSERT(lock_do_i_hold(sv->sv_lock));
+
 	/* Get the block number within the file */
 	fileblock = uio->uio_offset / SFS_BLOCKSIZE;
 
@@ -296,6 +298,8 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 	int result = 0;
 	uint32_t extraresid = 0;
 	struct sfs_dinode *inodeptr;
+
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	result = sfs_dinode_load(sv);
 	if (result) {

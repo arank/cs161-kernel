@@ -35,6 +35,7 @@
 #include <types.h>
 #include <kern/errno.h>
 #include <lib.h>
+#include <synch.h>
 #include <vfs.h>
 #include <buf.h>
 #include <sfs.h>
@@ -45,6 +46,9 @@
  * the disk) given a file and the logical block number within that
  * file. If DOALLOC is set, and no such block exists, one will be
  * allocated.
+ *
+ * Locking: must hold vnode lock. Acquires/releases buffer locks and
+ * also sfs_bitlock.
  *
  * Requires up to 2 buffers.
  */
@@ -62,6 +66,7 @@ sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock, bool doalloc,
 	int result;
 
 	COMPILE_ASSERT(SFS_DBPERIDB * sizeof(idbufdata[0]) == SFS_BLOCKSIZE);
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	result = sfs_dinode_load(sv);
 	if (result) {
@@ -217,6 +222,8 @@ sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock, bool doalloc,
 /*
  * Do the work of truncating a file (or directory).
  *
+ * Locking: must hold vnode lock. Acquires/releases buffer locks.
+ * 
  * Requires up to 3 buffers.
  */
 int
@@ -239,12 +246,10 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 	int hasnonzero;
 
 	COMPILE_ASSERT(SFS_DBPERIDB * sizeof(idptr[0]) == SFS_BLOCKSIZE);
-
-	vfs_biglock_acquire();
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	result = sfs_dinode_load(sv);
 	if (result) {
-		vfs_biglock_release();
 		return result;
 	}
 	inodeptr = sfs_dinode_map(sv);
@@ -280,7 +285,6 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 				     &idbuffer);
 		if (result) {
 			sfs_dinode_unload(sv);
-			vfs_biglock_release();
 			return result;
 		}
 		idptr = buffer_map(idbuffer);
@@ -321,7 +325,6 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 
 	sfs_dinode_unload(sv);
 
-	vfs_biglock_release();
 	return 0;
 }
 

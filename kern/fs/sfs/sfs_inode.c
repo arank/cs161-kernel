@@ -35,6 +35,7 @@
 #include <types.h>
 #include <kern/errno.h>
 #include <lib.h>
+#include <synch.h>
 #include <thread.h>
 #include <current.h>
 #include <vfs.h>
@@ -56,6 +57,11 @@ sfs_vnode_create(uint32_t ino, unsigned type)
 	if (sv == NULL) {
 		return NULL;
 	}
+	sv->sv_lock = lock_create("sfs_vnode");
+	if (sv->sv_lock == NULL) {
+		kfree(sv);
+		return NULL;
+	}
 	sv->sv_ino = ino;
 	sv->sv_type = type;
 	sv->sv_dinobuf = NULL;
@@ -70,6 +76,7 @@ static
 void
 sfs_vnode_destroy(struct sfs_vnode *victim)
 {
+	lock_destroy(victim->sv_lock);
 	kfree(victim);
 }
 
@@ -91,7 +98,7 @@ sfs_dinode_load(struct sfs_vnode *sv)
 	struct sfs_fs *sfs = sv->sv_v.vn_fs->fs_data;
 	int result;
 
-	KASSERT(vfs_biglock_do_i_hold());
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	if (sv->sv_dinobufcount == 0) {
 		KASSERT(sv->sv_dinobuf == NULL);
@@ -121,7 +128,7 @@ sfs_dinode_load(struct sfs_vnode *sv)
 void
 sfs_dinode_unload(struct sfs_vnode *sv)
 {
-	KASSERT(vfs_biglock_do_i_hold());
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	KASSERT(sv->sv_dinobuf != NULL);
 	KASSERT(sv->sv_dinobufcount > 0);
@@ -143,7 +150,7 @@ sfs_dinode_unload(struct sfs_vnode *sv)
 struct sfs_dinode *
 sfs_dinode_map(struct sfs_vnode *sv)
 {
-	KASSERT(vfs_biglock_do_i_hold());
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	KASSERT(sv->sv_dinobuf != NULL);
 	return buffer_map(sv->sv_dinobuf);
@@ -158,7 +165,7 @@ sfs_dinode_map(struct sfs_vnode *sv)
 void
 sfs_dinode_mark_dirty(struct sfs_vnode *sv)
 {
-	KASSERT(vfs_biglock_do_i_hold());
+	KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	KASSERT(sv->sv_dinobuf != NULL);
 	buffer_mark_dirty(sv->sv_dinobuf);
@@ -168,6 +175,9 @@ sfs_dinode_mark_dirty(struct sfs_vnode *sv)
  * Called when the vnode refcount (in-memory usage count) hits zero.
  *
  * This function should try to avoid returning errors other than EBUSY.
+ *
+ * Locking: gets/releases vnode lock. Gets/releases sfs_vnlock, and 
+ *    possibly also sfs_bitlock, while holding the vnode lock.
  *
  * Requires 1 buffer locally but may also afterward call sfs_itrunc,
  * which takes 3.
@@ -182,12 +192,13 @@ sfs_reclaim(struct vnode *v)
 	bool buffers_needed;
 	int result;
 
-	vfs_biglock_acquire();
+	lock_acquire(sv->sv_lock);
+	lock_acquire(sfs->sfs_vnlock);
 
 	/*
 	 * Make sure someone else hasn't picked up the vnode since the
-	 * decision was made to reclaim it. (You must also synchronize
-	 * this with sfs_loadvnode.)
+	 * decision was made to reclaim it. (This must interact
+	 * properly with sfs_loadvnode.)
 	 */
 	spinlock_acquire(&v->vn_countlock);
 	if (v->vn_refcount != 1) {
@@ -197,7 +208,8 @@ sfs_reclaim(struct vnode *v)
 		v->vn_refcount--;
 
 		spinlock_release(&v->vn_countlock);
-		vfs_biglock_release();
+		lock_release(sfs->sfs_vnlock);
+		lock_release(sv->sv_lock);
 		return EBUSY;
 	}
 	spinlock_release(&v->vn_countlock);
@@ -220,7 +232,8 @@ sfs_reclaim(struct vnode *v)
 		 * This case is likely to lead to problems, but
 		 * there's essentially no helping it...
 		 */
-		vfs_biglock_release();
+		lock_release(sfs->sfs_vnlock);
+		lock_release(sv->sv_lock);
 		if (buffers_needed) {
 			unreserve_buffers(3, SFS_BLOCKSIZE);
 		}
@@ -233,7 +246,8 @@ sfs_reclaim(struct vnode *v)
 		result = sfs_itrunc(sv, 0);
 		if (result) {
 			sfs_dinode_unload(sv);
-			vfs_biglock_release();
+			lock_release(sfs->sfs_vnlock);
+			lock_release(sv->sv_lock);
 			if (buffers_needed) {
 				unreserve_buffers(3, SFS_BLOCKSIZE);
 			}
@@ -271,7 +285,8 @@ sfs_reclaim(struct vnode *v)
 
 	vnode_cleanup(&sv->sv_v);
 
-	vfs_biglock_release();
+	lock_release(sfs->sfs_vnlock);
+	lock_release(sv->sv_lock);
 
 	/* Release the storage for the vnode structure itself. */
 	sfs_vnode_destroy(sv);
@@ -284,8 +299,10 @@ sfs_reclaim(struct vnode *v)
  * Function to load a inode into memory as a vnode, or dig up one
  * that's already resident.
  *
- * The vnode is returned with its inode unloaded.
+ * The vnode is returned unlocked and with its inode not loaded.
  *
+ * Locking: gets/releases sfs_vnlock.
+ * 
  * May require 3 buffers if VOP_DECREF triggers reclaim.
  */
 int
@@ -299,6 +316,9 @@ sfs_loadvnode(struct sfs_fs *sfs, uint32_t ino, int forcetype,
 	const struct vnode_ops *ops;
 	unsigned i, num;
 	int result;
+
+	/* sfs_vnlock protects the vnodes table */
+	lock_acquire(sfs->sfs_vnlock);
 
 	/* Look in the vnodes table */
 	num = vnodearray_num(sfs->sfs_vnodes);
@@ -321,6 +341,7 @@ sfs_loadvnode(struct sfs_fs *sfs, uint32_t ino, int forcetype,
 			KASSERT(forcetype==SFS_TYPE_INVAL);
 
 			VOP_INCREF(&sv->sv_v);
+			lock_release(sfs->sfs_vnlock);
 
 			*ret = sv;
 			return 0;
@@ -339,11 +360,12 @@ sfs_loadvnode(struct sfs_fs *sfs, uint32_t ino, int forcetype,
 	 * Read the block the inode is in.
 	 *
 	 * (We can do this before creating and locking the new vnode
-	 * because we are holding the vfs biglock. Nobody else can
+	 * because we are holding the vnode table lock. Nobody else can
 	 * be in here trying to load the same vnode at the same time.)
 	 */
 	result = buffer_read(&sfs->sfs_absfs, ino, SFS_BLOCKSIZE, &dinobuf);
 	if (result) {
+		lock_release(sfs->sfs_vnlock);
 		return result;
 	}
 	dino = buffer_map(dinobuf);
@@ -379,12 +401,14 @@ sfs_loadvnode(struct sfs_fs *sfs, uint32_t ino, int forcetype,
 	/*
 	 * Now, cons up a vnode. Don't give it the inode buffer, as to
 	 * be consistent with the case where the vnode is already in
-	 * memory we return the vnode without the inode loaded. (The
-	 * buffer will be warm in the buffer cache, so a subsequent
-	 * sfs_dinode_load won't incur another I/O.)
+	 * memory (which cannot safely lock the vnode in order to load
+	 * the inode) we return the vnode without the inode
+	 * loaded. (The buffer will be warm in the buffer cache, so a
+	 * subsequent sfs_dinode_load won't incur another I/O.)
 	 */
 	sv = sfs_vnode_create(ino, dino->sfi_type);
 	if (sv==NULL) {
+		lock_release(sfs->sfs_vnlock);
 		return ENOMEM;
 	}
 
@@ -394,6 +418,7 @@ sfs_loadvnode(struct sfs_fs *sfs, uint32_t ino, int forcetype,
 	result = vnode_init(&sv->sv_v, ops, &sfs->sfs_absfs, sv);
 	if (result) {
 		sfs_vnode_destroy(sv);
+		lock_release(sfs->sfs_vnlock);
 		return result;
 	}
 
@@ -402,8 +427,10 @@ sfs_loadvnode(struct sfs_fs *sfs, uint32_t ino, int forcetype,
 	if (result) {
 		vnode_cleanup(&sv->sv_v);
 		sfs_vnode_destroy(sv);
+		lock_release(sfs->sfs_vnlock);
 		return result;
 	}
+	lock_release(sfs->sfs_vnlock);
 
 	/* Hand it back */
 	*ret = sv;
@@ -414,6 +441,9 @@ sfs_loadvnode(struct sfs_fs *sfs, uint32_t ino, int forcetype,
  * Create a new filesystem object and hand back its vnode.
  *
  * As a matter of convenience, returns the vnode with its inode loaded.
+ *
+ * Locking: Gets/release sfs_bitlock.
+ *    Also gets/releases sfs_vnlock, but does not hold them together.
  *
  * Requires up to 3 buffers as sfs_loadvnode might trigger reclaim and
  * truncate.
@@ -445,8 +475,10 @@ sfs_makeobj(struct sfs_fs *sfs, int type, struct sfs_vnode **ret)
 	}
 
 	/* And load the inode. */
+	lock_acquire((*ret)->sv_lock);
 	result = sfs_dinode_load(*ret);
 	if (result) {
+		lock_release((*ret)->sv_lock);
 		VOP_DECREF(&(*ret)->sv_v);
 		sfs_bfree(sfs, ino);
 		return result;
@@ -462,6 +494,9 @@ sfs_makeobj(struct sfs_fs *sfs, int type, struct sfs_vnode **ret)
 /*
  * Get vnode for the root of the filesystem.
  * The root vnode is always found in block 1 (SFS_ROOT_LOCATION).
+ *
+ * Locking: sfs_loadvnode locks the inode table and returns the
+ * new vnode locked; we just unlock it.
  */
 struct vnode *
 sfs_getroot(struct fs *fs)
@@ -470,7 +505,6 @@ sfs_getroot(struct fs *fs)
 	struct sfs_vnode *sv;
 	int result;
 
-	vfs_biglock_acquire();
 	reserve_buffers(1, SFS_BLOCKSIZE);
 
 	result = sfs_loadvnode(sfs, SFS_ROOT_LOCATION, SFS_TYPE_INVAL, &sv);
@@ -484,7 +518,6 @@ sfs_getroot(struct fs *fs)
 	}
 
 	unreserve_buffers(1, SFS_BLOCKSIZE);
-	vfs_biglock_release();
 
 	return &sv->sv_v;
 }

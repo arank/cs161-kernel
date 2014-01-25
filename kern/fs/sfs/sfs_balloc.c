@@ -35,6 +35,7 @@
 #include <types.h>
 #include <lib.h>
 #include <bitmap.h>
+#include <synch.h>
 #include <buf.h>
 #include <sfs.h>
 #include "sfsprivate.h"
@@ -86,11 +87,16 @@ sfs_balloc(struct sfs_fs *sfs, daddr_t *diskblock, struct buf **bufret)
 {
 	int result;
 
+	lock_acquire(sfs->sfs_bitlock);
+
 	result = bitmap_alloc(sfs->sfs_freemap, diskblock);
 	if (result) {
+		lock_release(sfs->sfs_bitlock);
 		return result;
 	}
 	sfs->sfs_freemapdirty = true;
+
+	lock_release(sfs->sfs_bitlock);
 
 	if (*diskblock >= sfs->sfs_super.sp_nblocks) {
 		panic("sfs: balloc: invalid block %u\n", *diskblock);
@@ -110,8 +116,10 @@ sfs_balloc(struct sfs_fs *sfs, daddr_t *diskblock, struct buf **bufret)
 void
 sfs_bfree(struct sfs_fs *sfs, daddr_t diskblock)
 {
+	lock_acquire(sfs->sfs_bitlock);
 	bitmap_unmark(sfs->sfs_freemap, diskblock);
 	sfs->sfs_freemapdirty = true;
+	lock_release(sfs->sfs_bitlock);
 }
 
 /*
@@ -120,10 +128,17 @@ sfs_bfree(struct sfs_fs *sfs, daddr_t diskblock)
 int
 sfs_bused(struct sfs_fs *sfs, daddr_t diskblock)
 {
+	int result;
+
 	if (diskblock >= sfs->sfs_super.sp_nblocks) {
 		panic("sfs: sfs_bused called on out of range block %u\n",
 		      diskblock);
 	}
-	return bitmap_isset(sfs->sfs_freemap, diskblock);
+
+	lock_acquire(sfs->sfs_bitlock);
+	result = bitmap_isset(sfs->sfs_freemap, diskblock);
+	lock_release(sfs->sfs_bitlock);
+
+	return result;
 }
 

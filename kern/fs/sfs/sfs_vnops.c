@@ -38,16 +38,43 @@
 #include <stat.h>
 #include <lib.h>
 #include <uio.h>
+#include <synch.h>
 #include <vfs.h>
 #include <buf.h>
 #include <sfs.h>
 #include "sfsprivate.h"
+
+/*
+ * Locking protocol for sfs:
+ *    The following locks exist:
+ *       vnode locks (sv_lock)
+ *       vnode table lock (sfs_vnlock)
+ *       bitmap lock (sfs_bitlock)
+ *       buffer lock
+ *
+ *    Ordering constraints:
+ *       vnode locks       before  vnode table lock
+ *       vnode locks       before  buffer locks
+ *       vnode table lock  before  bitmap lock
+ *       buffer lock      before  bitmap lock
+ *
+ *    I believe the vnode table lock and the buffer locks are
+ *    independent.
+ *
+ *    Ordering among vnode locks:
+ *       directory lock    before  lock of a file within the directory
+ *
+ *    Ordering among directory locks:
+ *       Parent first, then child.
+ */
 
 ////////////////////////////////////////////////////////////
 // Vnode operations.
 
 /*
  * This is called on *each* open().
+ *
+ * Locking: not needed
  */
 static
 int
@@ -70,6 +97,8 @@ sfs_eachopen(struct vnode *v, int openflags)
 /*
  * This is called on *each* open() of a directory.
  * Directories may only be open for read.
+ *
+ * Locking: not needed
  */
 static
 int
@@ -96,6 +125,8 @@ sfs_eachopendir(struct vnode *v, int openflags)
  *
  * This function should attempt to avoid returning errors, as handling
  * them usefully is often not possible.
+ *
+ * Locking: not needed
  */
 static
 int
@@ -109,6 +140,8 @@ sfs_lastclose(struct vnode *v)
 /*
  * Called for read(). sfs_io() does the work.
  *
+ * Locking: gets/releases vnode lock.
+ *
  * Requires up to 3 buffers.
  */
 static
@@ -120,19 +153,21 @@ sfs_read(struct vnode *v, struct uio *uio)
 
 	KASSERT(uio->uio_rw==UIO_READ);
 
-	vfs_biglock_acquire();
+	lock_acquire(sv->sv_lock);
 	reserve_buffers(3, SFS_BLOCKSIZE);
 
 	result = sfs_io(sv, uio);
 
 	unreserve_buffers(3, SFS_BLOCKSIZE);
-	vfs_biglock_release();
+	lock_release(sv->sv_lock);
 
 	return result;
 }
 
 /*
  * Called for write(). sfs_io() does the work.
+ *
+ * Locking: gets/releases vnode lock.
  *
  * Requires up to 3 buffers.
  */
@@ -145,19 +180,20 @@ sfs_write(struct vnode *v, struct uio *uio)
 
 	KASSERT(uio->uio_rw==UIO_WRITE);
 
-	vfs_biglock_acquire();
+	lock_acquire(sv->sv_lock);
 	reserve_buffers(3, SFS_BLOCKSIZE);
 
 	result = sfs_io(sv, uio);
 
 	unreserve_buffers(3, SFS_BLOCKSIZE);
-	vfs_biglock_release();
+	lock_release(sv->sv_lock);
 
 	return result;
 }
 
 /*
  * Called for ioctl()
+ * Locking: not needed.
  */
 static
 int
@@ -177,6 +213,8 @@ sfs_ioctl(struct vnode *v, int op, userptr_t data)
 /*
  * Called for stat/fstat/lstat.
  *
+ * Locking: gets/releases vnode lock.
+ *
  * Requires 1 buffer.
  */
 static
@@ -187,23 +225,22 @@ sfs_stat(struct vnode *v, struct stat *statbuf)
 	struct sfs_dinode *inodeptr;
 	int result;
 
-	vfs_biglock_acquire();
-
 	/* Fill in the stat structure */
 	bzero(statbuf, sizeof(struct stat));
 
 	result = VOP_GETTYPE(v, &statbuf->st_mode);
 	if (result) {
-		vfs_biglock_release();
 		return result;
 	}
+
+	lock_acquire(sv->sv_lock);
 
 	reserve_buffers(1, SFS_BLOCKSIZE);
 
 	result = sfs_dinode_load(sv);
 	if (result) {
 		unreserve_buffers(1, SFS_BLOCKSIZE);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return result;
 	}
 
@@ -219,12 +256,13 @@ sfs_stat(struct vnode *v, struct stat *statbuf)
 
 	sfs_dinode_unload(sv);
 	unreserve_buffers(1, SFS_BLOCKSIZE);
-	vfs_biglock_release();
+	lock_release(sv->sv_lock);
 	return 0;
 }
 
 /*
  * Return the type of the file (types as per kern/stat.h)
+ * Locking: not needed (the type of the vnode is fixed once it's created)
  */
 static
 int
@@ -232,21 +270,16 @@ sfs_gettype(struct vnode *v, uint32_t *ret)
 {
 	struct sfs_vnode *sv = v->vn_data;
 
-	vfs_biglock_acquire();
-
 	switch (sv->sv_type) {
 	case SFS_TYPE_FILE:
 		*ret = S_IFREG;
-		vfs_biglock_release();
 		return 0;
 	case SFS_TYPE_DIR:
 		*ret = S_IFDIR;
-		vfs_biglock_release();
 		return 0;
 	}
 	panic("sfs: gettype: Invalid inode type (inode %u, type %u)\n",
 	      sv->sv_ino, sv->sv_type);
-	vfs_biglock_release();
 	return EINVAL;
 }
 
@@ -256,6 +289,8 @@ sfs_gettype(struct vnode *v, uint32_t *ret)
  * file size our inode structure can support, but we don't - few
  * people ever bother to check lseek() for failure and having
  * read() or write() fail is sufficient.
+ *
+ * Locking: not needed
  */
 static
 int
@@ -276,6 +311,8 @@ sfs_tryseek(struct vnode *v, off_t pos)
  *
  * Since for now the buffer cache can't sync just one file, sync the
  * whole fs.
+ *
+ * Locking: gets/releases vnode lock. (XXX: really?)
  */
 static
 int
@@ -299,6 +336,10 @@ sfs_mmap(struct vnode *v   /* add stuff as needed */)
 
 /*
  * Truncate a file.
+ *
+ * Locking: gets/releases vnode lock.
+ *
+ * Requires up to 3 buffers.
  */
 static
 int
@@ -307,11 +348,13 @@ sfs_truncate(struct vnode *v, off_t len)
 	struct sfs_vnode *sv = v->vn_data;
 	int result;
 
+	lock_acquire(sv->sv_lock);
 	reserve_buffers(3, SFS_BLOCKSIZE);
 
 	result = sfs_itrunc(sv, len);
 
 	unreserve_buffers(3, SFS_BLOCKSIZE);
+	lock_release(sv->sv_lock);
 	return result;
 }
 
@@ -320,6 +363,8 @@ sfs_truncate(struct vnode *v, off_t len)
  * Since we don't support subdirectories, assume it's the root directory
  * and hand back the empty string. (The VFS layer takes care of the
  * device name, leading slash, etc.)
+ *
+ * Locking: none needed.
  */
 static
 int
@@ -339,6 +384,10 @@ sfs_namefile(struct vnode *vv, struct uio *uio)
  * Create a file. If EXCL is set, insist that the filename not already
  * exist; otherwise, if it already exists, just open it.
  *
+ * Locking: Gets/releases the vnode lock for v. Does not lock the new vnode,
+ * as nobody else can get to it except by searching the directory it's in,
+ * which is locked.
+ *
  * Requires up to 4 buffers as VOP_DECREF invocations may take 3.
  */
 static
@@ -353,21 +402,21 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 	uint32_t ino;
 	int result;
 
-	vfs_biglock_acquire();
+	lock_acquire(sv->sv_lock);
 	reserve_buffers(4, SFS_BLOCKSIZE);
 
 	/* Look up the name */
 	result = sfs_dir_findname(sv, name, &ino, NULL, NULL);
 	if (result!=0 && result!=ENOENT) {
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return result;
 	}
 
 	/* If it exists and we didn't want it to, fail */
 	if (result==0 && excl) {
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return EEXIST;
 	}
 
@@ -376,13 +425,13 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 		result = sfs_loadvnode(sfs, ino, SFS_TYPE_INVAL, &newguy);
 		if (result) {
 			unreserve_buffers(4, SFS_BLOCKSIZE);
-			vfs_biglock_release();
+			lock_release(sv->sv_lock);
 			return result;
 		}
 
 		*ret = &newguy->sv_v;
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return 0;
 	}
 
@@ -390,7 +439,7 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 	result = sfs_makeobj(sfs, SFS_TYPE_FILE, &newguy);
 	if (result) {
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return result;
 	}
 
@@ -405,8 +454,9 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 	if (result) {
 		sfs_dinode_unload(newguy);
 		unreserve_buffers(4, SFS_BLOCKSIZE);
+		lock_release(newguy->sv_lock);
 		VOP_DECREF(&newguy->sv_v);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return result;
 	}
 
@@ -420,7 +470,8 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 
 	sfs_dinode_unload(newguy);
 	unreserve_buffers(4, SFS_BLOCKSIZE);
-	vfs_biglock_release();
+	lock_release(newguy->sv_lock);
+	lock_release(sv->sv_lock);
 	return 0;
 }
 
@@ -428,6 +479,10 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
  * Make a hard link to a file.
  * The VFS layer should prevent this being called unless both
  * vnodes are ours.
+ *
+ * Locking: locks both vnodes, parent first. Since we aren't allowed
+ * to hardlink directories (even if we supported them), the target
+ * can't be an ancestor of the directory we're working in.
  *
  * Requires up to 4 buffers.
  */
@@ -442,13 +497,17 @@ sfs_link(struct vnode *dir, const char *name, struct vnode *file)
 
 	KASSERT(file->vn_fs == dir->vn_fs);
 
-	vfs_biglock_acquire();
 	reserve_buffers(4, SFS_BLOCKSIZE);
+
+	/* directory must be locked first */
+	lock_acquire(sv->sv_lock);
+	lock_acquire(f->sv_lock);
 
 	result = sfs_dinode_load(f);
 	if (result) {
+		lock_release(f->sv_lock);
+		lock_release(sv->sv_lock);
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-		vfs_biglock_release();
 		return result;
 	}
 
@@ -456,8 +515,9 @@ sfs_link(struct vnode *dir, const char *name, struct vnode *file)
 	result = sfs_dir_link(sv, name, f->sv_ino, NULL);
 	if (result) {
 		sfs_dinode_unload(f);
+		lock_release(f->sv_lock);
+		lock_release(sv->sv_lock);
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-		vfs_biglock_release();
 		return result;
 	}
 
@@ -467,13 +527,17 @@ sfs_link(struct vnode *dir, const char *name, struct vnode *file)
 	sfs_dinode_mark_dirty(f);
 
 	sfs_dinode_unload(f);
+	lock_release(f->sv_lock);
+	lock_release(sv->sv_lock);
 	unreserve_buffers(4, SFS_BLOCKSIZE);
-	vfs_biglock_release();
 	return 0;
 }
 
 /*
  * Delete a file.
+ *
+ * Locking: locks the directory, then the file. Unlocks both.
+ *   This follows the hierarchical locking order imposed by the directory tree.
  *
  * Requires up to 4 buffers.
  */
@@ -487,7 +551,12 @@ sfs_remove(struct vnode *dir, const char *name)
 	int slot;
 	int result;
 
-	vfs_biglock_acquire();
+	/* need to check this to avoid deadlock even in error condition */
+	if (!strcmp(name, ".") || !strcmp(name, "..")) {
+		return EISDIR;
+	}
+
+	lock_acquire(sv->sv_lock);
 	reserve_buffers(4, SFS_BLOCKSIZE);
 
 	/* Look for the file and fetch a vnode for it. */
@@ -496,8 +565,10 @@ sfs_remove(struct vnode *dir, const char *name)
 		goto out_buffers;
 	}
 
+	lock_acquire(victim->sv_lock);
 	result = sfs_dinode_load(victim);
 	if (result) {
+		lock_release(victim->sv_lock);
 		VOP_DECREF(&victim->sv_v);
 		goto out_buffers;
 	}
@@ -518,11 +589,12 @@ sfs_remove(struct vnode *dir, const char *name)
 out_reference:
 	/* Discard the reference that sfs_lookonce got us */
 	sfs_dinode_unload(victim);
+	lock_release(victim->sv_lock);
 	VOP_DECREF(&victim->sv_v);
 
 out_buffers:
+	lock_release(sv->sv_lock);
 	unreserve_buffers(4, SFS_BLOCKSIZE);
-	vfs_biglock_release();
 	return result;
 }
 
@@ -545,25 +617,27 @@ sfs_rename(struct vnode *d1, const char *n1,
 	int slot1, slot2;
 	int result, result2;
 
-	vfs_biglock_acquire();
 	reserve_buffers(4, SFS_BLOCKSIZE);
 
 	KASSERT(d1==d2);
 	KASSERT(sv->sv_ino == SFS_ROOT_LOCATION);
 
+	lock_acquire(sv->sv_lock);
+
 	/* Look up the old name of the file and get its inode and slot number*/
 	result = sfs_lookonce(sv, n1, &g1, &slot1);
 	if (result) {
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return result;
 	}
 
+	lock_acquire(g1->sv_lock);
 	result = sfs_dinode_load(g1);
 	if (result) {
 		VOP_DECREF(&g1->sv_v);
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return result;
 	}
 	g1_inodeptr = sfs_dinode_map(g1);
@@ -605,10 +679,12 @@ sfs_rename(struct vnode *d1, const char *n1,
 
 	/* Let go of the reference to g1 */
 	sfs_dinode_unload(g1);
+	lock_release(g1->sv_lock);
 	VOP_DECREF(&g1->sv_v);
 
+	lock_release(sv->sv_lock);
+
 	unreserve_buffers(4, SFS_BLOCKSIZE);
-	vfs_biglock_release();
 	return 0;
 
  puke_harder:
@@ -627,10 +703,12 @@ sfs_rename(struct vnode *d1, const char *n1,
  puke:
 	/* Let go of the reference to g1 */
 	sfs_dinode_unload(g1);
+	lock_release(g1->sv_lock);
 	VOP_DECREF(&g1->sv_v);
 
+	lock_release(sv->sv_lock);
+
 	unreserve_buffers(4, SFS_BLOCKSIZE);
-	vfs_biglock_release();
 	return result;
 }
 
@@ -648,15 +726,11 @@ sfs_lookparent(struct vnode *v, char *path, struct vnode **ret,
 {
 	struct sfs_vnode *sv = v->vn_data;
 
-	vfs_biglock_acquire();
-
 	if (sv->sv_type != SFS_TYPE_DIR) {
-		vfs_biglock_release();
 		return ENOTDIR;
 	}
 
 	if (strlen(path)+1 > buflen) {
-		vfs_biglock_release();
 		return ENAMETOOLONG;
 	}
 	strcpy(buf, path);
@@ -664,7 +738,6 @@ sfs_lookparent(struct vnode *v, char *path, struct vnode **ret,
 	VOP_INCREF(&sv->sv_v);
 	*ret = &sv->sv_v;
 
-	vfs_biglock_release();
 	return 0;
 }
 
@@ -684,10 +757,10 @@ sfs_lookup(struct vnode *v, char *path, struct vnode **ret)
 	struct sfs_vnode *final;
 	int result;
 
-	vfs_biglock_acquire();
+	lock_acquire(sv->sv_lock);
 
 	if (sv->sv_type != SFS_TYPE_DIR) {
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return ENOTDIR;
 	}
 
@@ -696,14 +769,14 @@ sfs_lookup(struct vnode *v, char *path, struct vnode **ret)
 	result = sfs_lookonce(sv, path, &final, NULL);
 	if (result) {
 		unreserve_buffers(3, SFS_BLOCKSIZE);
-		vfs_biglock_release();
+		lock_release(sv->sv_lock);
 		return result;
 	}
 
 	*ret = &final->sv_v;
 
 	unreserve_buffers(3, SFS_BLOCKSIZE);
-	vfs_biglock_release();
+	lock_release(sv->sv_lock);
 	return 0;
 }
 

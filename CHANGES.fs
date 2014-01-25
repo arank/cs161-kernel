@@ -16,6 +16,7 @@ code for 2.x. I am not even including its old changelog entries.)
 20140122 dholland	Make vn_countlock a spinlock.
 20140114 dholland	Reorganize SFS sources and revise the solutions.
 
+20130503 dholland	Fix missing error unlock in sfs_balloc, merge mistake.
 20130104 nmurphy	Merge doom-counter code into the buffer cache branch.
 20100108 dholland	Print buffer cache size during kernel startup.
 20090503 dholland	Fix double buffer_release on error branch.
