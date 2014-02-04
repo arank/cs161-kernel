@@ -1,0 +1,82 @@
+Ivan Sinyagin (40766340)
+
+Q1: when the processor raises an exception, mips assembly code is invoked by 
+    the exeption handler installed on booting the OS. The handler is in
+    kern/arch/mips/locore/exception-mips1.S; it initializes a trapframe and
+    calls mips_trap function (/kern/arch/mips/locore/trap.c), which determines
+    what type of exception happened and calls an appropriate handler: if it's a
+    system call (EX_SYS), it calls syscall function (arch/mips/syscall/syscall.c),
+    if it's an interrupt (EX_IRQ) - calls mainbus_interrupt (other exceptions can
+    be found in trap.c). NB: mips_trap function is neither the userland's, 
+    nor is kernel's code, it's invoked directly by the hardware 
+    (System/161 in our case). void syscall(struct trapframe *tf) from syscall.c 
+    is the first line of kernel-land code.
+
+Q2: all traps are invoked by the exception handler assembly code from exception-mips1.S
+
+Q3: since common/libc contains code used by both kernel and user-level programs
+    (mostly C libraries), there is no need to store a copy both in kernel and userland
+    
+Q4: ./config should be run from ~/cs161/os161/kern/conf with ASSTX argument to
+    configure the kernel for a particular assignment.
+
+Q5: every architecture is different, OS should have a way to know what to expect:
+    endianness could differ, types ban be of different size (long can be 4 or 8 bytes), 
+    register convention might vary (return register or spack-pointer), 32/64 bit
+    architecture. We're running on MIPS simulator, so there is a mips configuration
+    directory
+
+Q6: 37 registers: 148 bytes = 4 bytes * (32 MIPS registers + 5 additional contex 
+    registers, which include the cause of the exception, the instruction 
+    which caused the trap, program counter and some other contex information
+
+Q7: when you add new files (system calls) and need to reconfigure the kernel 
+    to recompile it (either somethind isn't working or you added new files). 
+    alternatively when you start a new assignment.
+
+Q8: 'bmake depend' should be run when you want to build a new kernel.  
+    When you add a new file, it should be added to the dependency list, 
+    but when you edit it, you can just run 'bmake' and 'bmake install' since 
+    the dependencies haven't changed.
+
+Q9: 'bmake' compiles the kernel and 'bmake install' installs the kernel (copies 
+    the newly built kernel in the /root directory as kernel-ASSTX file). This 
+    combination is the typical workflow to test your implementation of something
+
+Q10: To add a helloworld syscall, we need
+    - create a new file helloworld.c in kern/syscall directory
+    - add a dependency on this file to kern/conf/conf.kern 
+    - add a function prototype to the kern/include/syscall.h for the kernel to know about it
+    - add a function prototype to the user/include/unistd.h for the userland to know abou it
+    - add an index to the new system call in kern/include/kern/syscall.h so that C-wrapper
+        function for the new syscall are automatically generated and there are no 
+        undefined reference errors
+    - create a unittest file and add it to the SUBDIRS list in user/testbin/Makefile 
+
+    example testfile ofr a helloworld syscall
+    #include <unistd.h>
+
+    int main(void) {
+        helloworld();
+        return 0;
+    }
+
+Q11: To add a command to print "hello world" to the menu we need:
+    - add a new entry in to the cmdtable struct array (name, func_ptr)
+    - add a new string entry to the opsmenu
+    - implement a function, which kprints "hello world\n" and returns 0
+
+Q12: standard utilities are machine dependent and OS dependent (not all libraries are 
+    are available to us in the OS, no GNU for instance), so we need to write them
+    only using the libraries that we have and compile with gcc-161 compiler
+
+Q13: the return value is stored in register v0 (it's a mips convention, in a trapframe) 
+    with register a3 indicating whether an error has occured.
+
+Q14: see Q10; to build a new kernel we need to run: bmake depend & bmake & bmake install
+
+Q15: kmenu() from main.c calls menu from menu.c. menu() loops forever and prints the menu
+    prompt calling menu_execute to parse the input. menu_execute() tokenizes the command
+    and calls cmd_dispatch() for each token (command). cmd_dispatch() looks up the passed
+    argument in the cmdtable structure, which stores the function pointers for each cmd. 
+    Then you get to different parts of kernel depending on the input command
