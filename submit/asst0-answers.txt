@@ -24,7 +24,8 @@ Q5: every architecture is different, OS should have a way to know what to expect
     endianness could differ, types ban be of different size (long can be 4 or 8 bytes), 
     register convention might vary (return register or spack-pointer), 32/64 bit
     architecture. We're running on MIPS simulator, so there is a mips configuration
-    directory
+    directory, which gives flexibility to run OS on another hardware/simulator by
+    adding a new directory with configurations.
 
 Q6: 37 registers: 148 bytes = 4 bytes * (32 MIPS registers + 5 additional contex 
     registers, which include the cause of the exception, the instruction 
