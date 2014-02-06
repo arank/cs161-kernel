@@ -1,0 +1,7 @@
+build/*
+build
+defs.mk
+kern/compile/*
+*.swp
+.depend
+tags
