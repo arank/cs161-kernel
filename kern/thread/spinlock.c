@@ -85,8 +85,7 @@ spinlock_acquire(struct spinlock *splk)
 			panic("Deadlock on spinlock %p\n", splk);
 		}
 		mycpu->c_spinlocks++;
-	}
-	else {
+	} else {
 		mycpu = NULL;
 	}
 
