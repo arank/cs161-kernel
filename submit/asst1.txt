@@ -61,7 +61,7 @@ thread from the semaphore's waiting channel. wchan_wakeone() removes a thread
 from the channel and makes it runnable (it might be the thread went to sleep in
 a while loop waiting for count to be > 0.
 
-Both wchan_sleep or wchan_wake one both check that the semaphore
+Both wchan_sleep and wchan_wake check that the semaphore
 that called actually has the lock by doing do_i_have_lock() call (see next Q)
 
 Q2. I assume, different threads should not know about each other locks, which
