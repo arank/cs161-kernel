@@ -113,19 +113,18 @@
 unsigned num_deleted = 0; // number of deleted mappings
 
 struct capitol_slot {
+    struct semaphore *slot_lock;    /* mutx for every slot */
     unsigned district_index;
     bool is_mapped; // indicates this slot is still in use
 };
 
 struct district_slot {
+    struct semaphore *slot_lock;    /* mutex for every slot */
     unsigned capitol_index;
     bool is_mapped; // indicates this slot is still in use
 };
 
-struct semaphore *main;
-struct lock *lk_k;  /* lock for katniss threads */
-struct lock *lk_p;  /* lock for peetas threads */
-struct lock *lkkp;  /* lock for both types of threads */
+struct semaphore *main; /* semaphore for the main thread to exit */
 
 // Contains capitol <-> district mapping
 struct capitol_slot capitol_slots[NSLOTS];
@@ -192,29 +191,26 @@ katniss(void *data, unsigned long junk) {
         // generate random capitol index to delete
         unsigned capitol_index = random() % NSLOTS;
 
-        //lock_acquire(lk_k); /* lock katniss threads */
         if (!capitol_slots[capitol_index].is_mapped) {
-            //lock_release(lk_k); /* katniss slot is false; continue */
             continue;
         }
 
-        //lock_acquire(lkkp);         /* get global lock; all threads are waiting */
         unsigned district_index = capitol_slots[capitol_index].district_index;
-        /* check that the index is still true in the mapped districts' array */
-        if (!district_slots[district_index].is_mapped) { /* if not */
-            //lock_release(lkkp);     /* release global lock (= let peeta run) */
-            //lock_release(lk_k);     /* let other katniss run */
-            continue;
-        }
 
         /* if we are here, we hold both locks and do the work */
+        P(district_slots[district_index].slot_lock); /* get foreign lock */
+        P(capitol_slots[capitol_index].slot_lock);   /* get your lock */
+
+        // do modifications
         capitol_slots[capitol_index].is_mapped = false;
         district_slots[district_index].is_mapped = false;
         unsigned num_deleted_current = ++num_deleted;
+
+        V(capitol_slots[capitol_index].slot_lock);    /* release you lock */
+        V(district_slots[district_index].slot_lock);  /* release foreign lock */
+
         print_deleted_mapping(KATNISS, capitol_index, district_index,
                               num_deleted_current);
-        //lock_release(lkkp);         /* release global lock (= let peeta run) */
-        //lock_release(lk_k);         /* let other katniss run */
     }
     KASSERT (num_deleted == NSLOTS);    /* just to be sure */
     V(main);                            /* let main finish */
@@ -236,28 +232,24 @@ peeta(void *data, unsigned long junk) {
         // generate random district index to delete
         unsigned district_index = random() % NSLOTS;
 
-        //lock_acquire(lk_p);
         if (!district_slots[district_index].is_mapped) {
-            //lock_release(lk_p);
             continue;
         }
 
-        //lock_acquire(lkkp);
         unsigned capitol_index = district_slots[district_index].capitol_index;
-        if (!capitol_slots[capitol_index].is_mapped) {
-            //lock_release(lkkp); /* lock for both types of thread */
-            //lock_release(lk_p);
-            continue;
-        }
 
-        // actually do the deletion
+        P(capitol_slots[capitol_index].slot_lock);
+        P(district_slots[district_index].slot_lock);
+
         capitol_slots[capitol_index].is_mapped = false;
         district_slots[district_index].is_mapped = false;
+
+        V(district_slots[district_index].slot_lock);
+        V(capitol_slots[capitol_index].slot_lock);
+
         unsigned num_deleted_current = ++num_deleted;
         print_deleted_mapping(PEETA, capitol_index, district_index,
                               num_deleted_current);
-        //lock_release(lkkp);
-        //lock_release(lk_p);
     }
     KASSERT (num_deleted == NSLOTS);
     V(main);
@@ -271,9 +263,11 @@ deletiongames(int nargs, char **args) {
     num_deleted = 0;
 
     main = sem_create("main", 0);   /* sem for the main thread */
-    lk_k = lock_create("katniss");  /* lock for katniss threads */
-    lk_p = lock_create("peeta");    /* lock for peeta threads */
-    lkkp = lock_create("mutual");   /* lock for both threads */
+    for (int i = 0; i < NSLOTS; i++) {
+        district_slots[i].slot_lock = sem_create("district", 1);
+        capitol_slots[i].slot_lock = sem_create("district", 1);
+    }
+    
     // spawn Katniss's and Peeta's threads
     for (unsigned i = 0; i < NTHREADS; i++) {
         thread_fork_or_panic("katniss", NULL, katniss, NULL, 0);
@@ -283,9 +277,13 @@ deletiongames(int nargs, char **args) {
     /* wait for all threads to finish, clean up and return */
     for (int i = 0; i < 2*NTHREADS; i++)
         P(main);
-    lock_destroy(lk_k);
-    lock_destroy(lk_p);
-    lock_destroy(lkkp);
+
+    /* release memory for sems */
+    for (int i = 0; i < NSLOTS; i++) {
+        sem_destroy(district_slots[i].slot_lock);
+        sem_destroy(capitol_slots[i].slot_lock);
+    }
+
     sem_destroy(main);
     KASSERT (num_deleted == NSLOTS); /* just to be extra sure */
 
