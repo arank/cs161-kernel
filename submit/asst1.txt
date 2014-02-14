@@ -1,0 +1,69 @@
+Ivan Sinyagin
+
+THREAD QUESTIONS
+
+Q1. thread_exit() clears up parts of the thread structure that are no longer need
+but the thread is not finally destroyed until thread_destroy is called from
+exorcise(). The function doesn't return, but turns off interrupts and it changes 
+the state of the thread to zombie (S_ZOMBIE) by calling thread_switch() contex
+switcher. thread_switch() changes the name of the thread channel (t_wchan_name)
+to "ZOMBIE" and adds the thread to the tail of exited threads list of the current
+cpu (curcpu->c_zombies). Then the next thread from the waiting channel is run
+and before the function returns it calls exorcise(), where all zombie threads
+are subject to thread_destroy() call. thread_destoy frees the thread's stack,
+name and the thread itself.
+
+When the thread_switch() is called to change the threads status to sleep
+(S_SLEEP), two more arguments must be provided: a specified waiting channel to
+queue the thread on and a spinlock to protect it. thread_switch adds the
+current thread to the tail of the specified waiting channel and releases the
+spinlock.
+
+Q2. thread_switch(), which changes the status of the thread and calls 
+	switchframe_switch(&cur->t_context, &next->t_context), assembly function
+    that does the actual switching.
+
+Q3. it means to have t_state field set to one of these values: S_RUN (runnable), 
+    S_SLEEP (sleeping), S_READY(ready to run, probably yielded), S_ZOMB(exited,
+    but not destroyed yet).
+
+Q4. it means to adjust spl level, call splhigh() to disable interrupts, which
+calls internally splx, which changed a field in the thread's struct. It's
+important to turn off interrupts in context switching because you don't want to
+be interrupted (no pun intended) and threads can finish switching.
+
+Q5. when a thread wakes up, it should go into ready state (which it doesn't in
+this code), next it goes straight to the running state and continues it's
+instruction from the place where it was sent to sleep. A sleeping thread is
+either woken up be another thread or wakes up after the timer goes off.
+
+SCHEDULER QUESTIONS
+
+Q1/2. thread_switch() picks the next thread from the runqueue threadlist of the
+cpu by removing it from the head of the list (threadlist_remhead()). schedule
+(which currently does nothing) should reshuffle the threads in the queue.
+thread_consider_migration() migrates threads between CPU's
+
+Q3. hardclock() calls schedule() (which does nothing right now) every 4
+hardclocks and then calls thread_yield(), which calls thread_context to move 
+the current thread into ready state and run the next one from the queue.
+It also calls thread_consider_migration().
+
+SYNCHRONIZATION QUESTIONS
+
+Q1. 
+P() function when count == 0 calls wchan_sleep function to do a number of
+checks and call thread_switch to put this thread to sleep on the specified wait
+channel's tail. 
+
+V() function after decrementing a count calls wchan_wakeone() to wake the next
+thread from the semaphore's waiting channel. wchan_wakeone() removes a thread
+from the channel and makes it runnable (it might be the thread went to sleep in
+a while loop waiting for count to be > 0.
+
+Both wchan_sleep or wchan_wake one both check that the semaphore
+that called actually has the lock by doing do_i_have_lock() call (see next Q)
+
+Q2. I assume, different threads should not know about each other locks, which
+is accomplished by a function which returns a bool on the specified lock.
+lock_get_holder would've returned thread_id, which is poor encapsulation.

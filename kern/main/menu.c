@@ -502,6 +502,9 @@ static const char *testmenu[] = {
 	"[fs4] FS write stress 2             ",
 	"[fs5] FS long stress                ",
 	"[fs6] FS create stress              ",
+
+    "[lk] Lock unit test        (1)      ",
+    "[cv] CV unit test          (1)      ",
 	NULL
 };
 
@@ -565,7 +568,7 @@ static struct {
 	{ "s",		cmd_shell },
 	{ "p",		cmd_prog },
 	{ "mount",	cmd_mount },
-	{ "unmount",	cmd_unmount },
+	{ "unmount", cmd_unmount },
 	{ "bootfs",	cmd_bootfs },
 	{ "pf",		printfile },
 	{ "cd",		cmd_chdir },
@@ -606,6 +609,10 @@ static struct {
 	/* synchronization assignment tests */
 	{ "sy2",	locktest },
 	{ "sy3",	cvtest },
+    
+    /* synchronization unit tests */
+    { "lk",     lock_unittest },
+    { "cv",     cv_unittest },
 
 	/* file system assignment tests */
 	{ "fs1",	fstest },

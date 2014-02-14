@@ -56,7 +56,7 @@
  */
 struct spinlock {
 	volatile spinlock_data_t splk_lock; /* Memory word where we spin. */
-	struct cpu *splk_holder;	    /* CPU holding this lock. */
+	struct cpu *splk_holder;	        /* CPU holding this lock. */
 };
 
 /*

@@ -102,19 +102,19 @@ mips_general_end:
    .type common_exception,@function
    .ent common_exception
 common_exception:	
-   mfc0 k0, c0_status		/* Get status register */
-   andi k0, k0, CST_KUp		/* Check the we-were-in-user-mode bit */
-   beq	k0, $0, 1f		/* If clear, from kernel, already have stack */
-   nop				/* delay slot */
+   mfc0 k0, c0_status           /* Get status register */
+   andi k0, k0, CST_KUp         /* Check the we-were-in-user-mode bit */
+   beq	k0, $0, 1f              /* If clear, from kernel, already have stack */
+   nop                          /* delay slot */
 
    /* Coming from user mode - find kernel stack */
-   mfc0 k1, c0_context		/* we keep the CPU number here */
+   mfc0 k1, c0_context		    /* we keep the CPU number here */
    srl k1, k1, CTX_PTBASESHIFT	/* shift it to get just the CPU number */
-   sll k1, k1, 2		/* shift it back to make an array index */
-   lui k0, %hi(cpustacks)	/* get base address of cpustacks[] */
-   addu k0, k0, k1		/* index it */
-   move k1, sp			/* Save previous stack pointer in k1 */
-   b 2f				/* Skip to common code */
+   sll k1, k1, 2		        /* shift it back to make an array index */
+   lui k0, %hi(cpustacks)	    /* get base address of cpustacks[] */
+   addu k0, k0, k1		        /* index it */
+   move k1, sp			        /* Save previous stack pointer in k1 */
+   b 2f				            /* Skip to common code */
    lw sp, %lo(cpustacks)(k0)	/* Load kernel stack pointer (in delay slot) */
 1:
    /* Coming from kernel mode - just save previous stuff */
@@ -235,15 +235,15 @@ common_exception:
    /*
     * Load the curthread register if coming from user mode.
     */
-   andi k0, t2, CST_KUp		/* Check the we-were-in-user-mode bit */
-   beq	k0, $0, 3f		/* If clear, were in kernel, skip ahead */
-   nop				/* delay slot */
+   andi k0, t2, CST_KUp         /* Check the we-were-in-user-mode bit */
+   beq	k0, $0, 3f              /* If clear, were in kernel, skip ahead */
+   nop                          /* delay slot */
 
-   mfc0 k1, c0_context		/* we keep the CPU number here */
+   mfc0 k1, c0_context		    /* we keep the CPU number here */
    srl k1, k1, CTX_PTBASESHIFT	/* shift it to get just the CPU number */
-   sll k1, k1, 2		/* shift it back to make an array index */
-   lui k0, %hi(cputhreads)	/* get base address of cputhreads[] */
-   addu k0, k0, k1		/* index it */
+   sll k1, k1, 2		        /* shift it back to make an array index */
+   lui k0, %hi(cputhreads)	    /* get base address of cputhreads[] */
+   addu k0, k0, k1		        /* index it */
    lw s7, %lo(cputhreads)(k0)	/* Load curthread value */
 3:
 

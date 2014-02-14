@@ -72,6 +72,10 @@ int mallocstress(int, char **);
 int malloctest3(int, char **);
 int nettest(int, char **);
 
+/* Synchronizatin unit tests */
+int lock_unittest(int, char **);
+int cv_unittest(int, char**);
+
 /* Routine for running a user-level program. */
 int runprogram(char *progname);
 

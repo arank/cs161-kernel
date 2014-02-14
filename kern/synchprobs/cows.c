@@ -87,6 +87,7 @@ Baby   8 Cow: I wasn't looking for this
 #include <kern/errno.h>
 #include "common.h"
 
+
 #define NUM_LYRICS 16
 
 const char *LYRICS[NUM_LYRICS] = {
@@ -108,6 +109,53 @@ const char *LYRICS[NUM_LYRICS] = {
     "So call me, maybe!",
 };
 
+/* simple array Queue implementation */
+static int *q; /* pointer to a queue */
+static struct {
+    int head;
+    int tail;
+    int size;
+} q_data;
+
+static
+void qInit(int max) {
+    q = kmalloc((max+1) * sizeof *q);
+    if (q == NULL) panic("kmalloc failed");
+    q_data.size = max+1;
+    q_data.head = q_data.size;
+    q_data.tail = 0;
+}
+static void qDestory() {
+    kfree(q);
+}
+
+static
+int qEmpty() {
+    return q_data.head % q_data.size == q_data.tail;
+}
+
+static
+void qPut(int item) {
+    q[q_data.tail++] = item;
+    q_data.tail = q_data.tail % q_data.size;
+}
+
+static
+int qGet() {
+    q_data.head = q_data.head % q_data.size;
+    return q[q_data.head++];
+}
+
+/* Cows' singing */
+
+#define CONGR "Congratulations Baby"
+
+struct cv *cv;  /* both */
+struct lock *lk;/* both */
+struct semaphore *main; /* parent */
+struct semaphore *sem; /* parent */
+unsigned num_done;
+
 /*
  * Do not modify this!
  */
@@ -124,22 +172,28 @@ void sing(unsigned cow_num) {
 // One of these structs should be passed from the main driver thread
 // to the parent cow thread.
 struct parent_cow_args {
-    // Add stuff as necessary
+    unsigned total_babies;
 };
 
 // One of these structs should be passed from the parent cow thread
 // to each of the baby cow threads.
 struct baby_cow_args {
-    // Add stuff as necessary
+    unsigned cow_num;
 };
 
 static
 void
 baby_cow(void *args, unsigned long junk) {
     (void) junk; // suppress unused warnings
+
     struct baby_cow_args *bcargs = (struct baby_cow_args *) args;
-    (void) bcargs; // suppress unused warnings
-    // TODO
+    sing(bcargs->cow_num);
+
+    lock_acquire(lk);
+    qPut(bcargs->cow_num);    
+    //kprintf("\t Baby %u finished\n", bcargs->cow_num); /* for debugging */
+    cv_signal(cv, lk);
+    lock_release(lk);
 }
 
 static
@@ -147,8 +201,17 @@ void
 parent_cow(void *args, unsigned long junk) {
     (void) junk; // suppress unused warnings
     struct parent_cow_args *pcargs = (struct parent_cow_args *) args;
-    (void) pcargs; // suppress unused warnings
-    // TODO
+    unsigned finished = 0; 
+    
+    while (finished < pcargs->total_babies) {
+        lock_acquire(lk);
+        while(qEmpty()) cv_wait(cv, lk); /* cond wait for a signal from a child */
+        kprintf("Parent Cow: %s %d\n", CONGR, qGet());
+        finished++;
+        lock_release(lk);
+    } 
+    KASSERT(finished == pcargs->total_babies); /* congratulated all children */
+    V(main);    /* makes main function (cows) to wait */
 }
 
 int
@@ -158,12 +221,43 @@ cows(int nargs, char **args) {
     if (nargs == 2) {
         num_babies = atoi(args[1]);
     }
+    
+    cv = cv_create("cv");    
+    lk = lock_create("lk_for_cv");   /* lock for cv */
+    /* semaphore to synch children who finish before 
+       the parent has reaped the index of the first finished child */
+    main = sem_create("cows_fun", 0); /* sem to synch exit from the program */
+    qInit(num_babies);
 
-    // Suppress unused warnings. Remove these when finished.
-    (void) sing;
-    (void) parent_cow;
-    (void) baby_cow;
-    // TODO
+    struct parent_cow_args *pcargs = kmalloc(sizeof *pcargs);
+    if (args == NULL) panic("kmalloc failed");        
+    pcargs->total_babies = num_babies; 
+
+    int err = thread_fork("Parent thread", NULL, parent_cow, pcargs, 0);
+    if (err != 0) panic("cows: thread_fork failed: %s\n", strerror(err));
+    
+    struct baby_cow_args *bcarr[num_babies]; /* array of baby_cows ptrs */
+    struct baby_cow_args *bcargs;
+    for (unsigned b = 1; b <= num_babies; b++) {
+        bcargs = kmalloc(sizeof *bcargs);
+        if (bcargs == NULL) panic("kmalloc failed");        
+
+        bcarr[b-1] = bcargs;
+        bcarr[b-1]->cow_num = b;
+        
+        err = thread_fork("Baby thread", NULL, baby_cow, bcarr[b-1], 0);
+        if (err != 0) panic("cows: thread_fork failed: %s\n", strerror(err));
+    }
+
+    P(main);    /* wait till the parent is done to clean up and exit */
+
+    cv_destroy(cv);
+    lock_destroy(lk);
+    sem_destroy(main);
+    qDestory();        
+    kfree(pcargs);
+    for (unsigned i = 0; i < num_babies; i++) 
+        kfree(bcarr[i]);
 
     return 0;
 }
