@@ -111,6 +111,10 @@ const char *LYRICS[NUM_LYRICS] = {
 
 /* simple array Queue implementation */
 static int *q; /* pointer to a queue */
+struct cv *cv; /* cond var to notify the parent that a child is done */
+struct lock *lk; /* lock for the cond var */
+struct semaphore *main; /* sem for the main function to wait before exiting */
+
 static struct {
     int head;
     int tail;
@@ -125,7 +129,8 @@ void qInit(int max) {
     q_data.head = q_data.size;
     q_data.tail = 0;
 }
-static void qDestory() {
+static 
+void qDestory() {
     kfree(q);
 }
 
@@ -149,12 +154,6 @@ int qGet() {
 /* Cows' singing */
 
 #define CONGR "Congratulations Baby"
-
-struct cv *cv;  /* both */
-struct lock *lk;/* both */
-struct semaphore *main; /* parent */
-struct semaphore *sem; /* parent */
-unsigned num_done;
 
 /*
  * Do not modify this!
@@ -189,11 +188,11 @@ baby_cow(void *args, unsigned long junk) {
     struct baby_cow_args *bcargs = (struct baby_cow_args *) args;
     sing(bcargs->cow_num);
 
-    lock_acquire(lk);
-    qPut(bcargs->cow_num);    
+    lock_acquire(lk);   /* get the lock to signal the parent */
+    qPut(bcargs->cow_num);  /* add you num to the queue */
     //kprintf("\t Baby %u finished\n", bcargs->cow_num); /* for debugging */
-    cv_signal(cv, lk);
-    lock_release(lk);
+    cv_signal(cv, lk);  /* signal the parent */
+    lock_release(lk);   /* release the lock for the parent (or other children) to run */
 }
 
 static
@@ -201,14 +200,14 @@ void
 parent_cow(void *args, unsigned long junk) {
     (void) junk; // suppress unused warnings
     struct parent_cow_args *pcargs = (struct parent_cow_args *) args;
-    unsigned finished = 0; 
+    unsigned finished = 0;  /* counter to stop looking */
     
     while (finished < pcargs->total_babies) {
-        lock_acquire(lk);
+        lock_acquire(lk);   /* get the lock */
         while(qEmpty()) cv_wait(cv, lk); /* cond wait for a signal from a child */
-        kprintf("Parent Cow: %s %d\n", CONGR, qGet());
-        finished++;
-        lock_release(lk);
+        kprintf("Parent Cow: %s %d\n", CONGR, qGet()); /* print the baby_num from the queue */
+        finished++;         
+        lock_release(lk);   /* release the lock for others to contunie */
     } 
     KASSERT(finished == pcargs->total_babies); /* congratulated all children */
     V(main);    /* makes main function (cows) to wait */
@@ -223,30 +222,34 @@ cows(int nargs, char **args) {
     }
     
     cv = cv_create("cv");    
+    if (cv == NULL) panic ("cv_create failed");
+
     lk = lock_create("lk_for_cv");   /* lock for cv */
+    if (lk == NULL) panic ("lock_create failed");
+
     /* semaphore to synch children who finish before 
        the parent has reaped the index of the first finished child */
     main = sem_create("cows_fun", 0); /* sem to synch exit from the program */
-    qInit(num_babies);
+    if (main == NULL) panic ("sem_create failed");
+
+    qInit(num_babies); /* initialize the queue */
 
     struct parent_cow_args *pcargs = kmalloc(sizeof *pcargs);
-    if (args == NULL) panic("kmalloc failed");        
-    pcargs->total_babies = num_babies; 
+    if (args == NULL) panic("kmalloc failed");      
+    pcargs->total_babies = num_babies; /* let the parent know the num of babies */
 
-    int err = thread_fork("Parent thread", NULL, parent_cow, pcargs, 0);
-    if (err != 0) panic("cows: thread_fork failed: %s\n", strerror(err));
+    thread_fork_or_panic("Parent thread", NULL, parent_cow, pcargs, 0);
     
     struct baby_cow_args *bcarr[num_babies]; /* array of baby_cows ptrs */
     struct baby_cow_args *bcargs;
     for (unsigned b = 1; b <= num_babies; b++) {
         bcargs = kmalloc(sizeof *bcargs);
-        if (bcargs == NULL) panic("kmalloc failed");        
+        if (bcargs == NULL) panic("kmalloc failed"); 
 
-        bcarr[b-1] = bcargs;
-        bcarr[b-1]->cow_num = b;
+        bcargs->cow_num = b;     /* give each baby its number */
+        bcarr[b-1] = bcargs;    /* save pointer to the struct to free later */
         
-        err = thread_fork("Baby thread", NULL, baby_cow, bcarr[b-1], 0);
-        if (err != 0) panic("cows: thread_fork failed: %s\n", strerror(err));
+        thread_fork_or_panic("Baby thread", NULL, baby_cow, bcarr[b-1], 0);
     }
 
     P(main);    /* wait till the parent is done to clean up and exit */

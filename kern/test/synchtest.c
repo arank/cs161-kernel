@@ -48,9 +48,9 @@ static volatile unsigned long testval2;
 static volatile unsigned long testval3;
 static struct semaphore *testsem;
 static struct semaphore *testsem2;
+static struct semaphore *donesem;
 static struct lock *testlock;
 static struct cv *testcv;
-static struct semaphore *donesem;
 
 static
 void
@@ -248,7 +248,8 @@ test_relese_holder(){
     struct lock *lk = lock_create("testlock");
     lock_acquire(lk);
 
-    int err = thread_fork("test_holder_helper", NULL, test_holder_helper, (char *)lk, 0);
+    int err = thread_fork("test_holder_helper", NULL, test_holder_helper, 
+                                                            (void *)lk, 0);
     if (err) 
         panic("test_relese_holder: thread_fork failed: %s\n", strerror(err));
 
@@ -273,7 +274,7 @@ test_do_i_hold(){
     lock_acquire(lk);
     KASSERT(lock_do_i_hold(lk));
 
-    int err = thread_fork("test_do_i_hold_helper", NULL, test_do_i_hold_helper, (char *)lk, 0);
+    int err = thread_fork("test_do_i_hold_helper", NULL, test_do_i_hold_helper, (void *)lk, 0);
     if (err) 
         panic("test_do_i_hold: thread_fork failed: %s\n", strerror(err));
 
@@ -307,7 +308,7 @@ test_acquire_release(int td_num){
 
     // Fork 20 threads that all try to acquire, then release the lock
     for(i = 0; i < td_num; i++) {
-        int err = thread_fork("helper", NULL, acquire_release_helper, (char *)lk, i);
+        int err = thread_fork("helper", NULL, acquire_release_helper, (void *)lk, i);
         if (err) 
             panic("test_acquire_release: thread_fork failed: %s\n", strerror(err));
     }
@@ -427,63 +428,58 @@ cvtest(int nargs, char **args)
 	return 0;
 }
 
-#if 0
-static void
+static 
+void
 test_cv_create(){
-    struct cv *cv = cv_create("cv");
-
-    KASSERT(!strcmp(cv->cv_name, "cv"));
-    KASSERT(cv->cv_wchan != NULL);
-
-    cv_destroy(cv);
-
-    kprintf("test_cv_create: Passed.....\n");
+    testcv = cv_create("cv");
+    KASSERT(!strcmp(testcv->cv_name, "cv"));
+    KASSERT(testcv->cv_wchan != NULL);
+    cv_destroy(testcv);
+    kprintf("test_cv_create: Passed\n");
 }
 
 
-static void
+static 
+void
 test_cv_signal_helper(void *p, unsigned long i){
     (void)i;
     struct cv *cv = p;
 
-    lock_acquire(cv_lock);
-    V(channel_1);
-    cv_wait(cv, cv_lock);
-    kprintf("Signaled!\n");
-    lock_release(cv_lock);
+    lock_acquire(testlock);
+    V(testsem2);
+    cv_wait(cv, testlock);
+    kprintf("Sent a signal!\n");
+    lock_release(testlock);
 
-    V(channel_1);
+    V(testsem2);
 }
 
 static void
 test_cv_signal(){
     int i;
-    struct cv *cv = cv_create("cv");
-    cv_lock = lock_create("cv lock");
-    channel_1 = sem_create("channel 1", 0);
+    testcv = cv_create("cv");
+    testlock = lock_create("cv lock");
+    testsem2 = sem_create("helper semaphore", 0);
 
-    kprintf("Signal recieved should only print once:\n");
+    kprintf("'Sent a signal!' is expected to be printed once:\n");
 
-    // Fork 2 threads, only 1 of which should recieve the signal
-    for(i=0;i<2;i++){
-        int err = thread_fork("test_cv_signal_helper", test_cv_signal_helper, \
-            (char *)cv, 0, NULL);
-        if (err) {
-            panic("test_cv_signal_helper: thread_fork failed: %s\n", strerror(err));
-        }
+    // Fork 2 threads only one of which should recieve the signal
+    for(i = 0; i < 2; i++){
+        int err = thread_fork("test_cv_signal", NULL, test_cv_signal_helper, 
+                                    (void *)testcv, 0);
+        if (err) 
+            panic("test_cv_signal: thread_fork failed: %s\n", strerror(err));
     }
-    // Wait for threads to be ready
-    for(i=0;i<2;i++){
-        P(channel_1);
-    }
+    
+    for(i = 0; i < 2; i++)  /* wait for threads */
+        P(testsem2);
 
-    lock_acquire(cv_lock);
-    cv_signal(cv, cv_lock);
-    lock_release(cv_lock);
+    lock_acquire(testlock);
+    cv_signal(testcv, testlock);
+    lock_release(testlock);
 
-    // Clean up
-    P(channel_1);
-    sem_destroy(channel_1);
+    P(testsem2);
+    sem_destroy(testsem2);
 
     kprintf("test_cv_signal: Passed.....\n");
 }
@@ -492,75 +488,69 @@ static void
 test_cv_broadcast_helper(void *p, unsigned long i){
     struct cv *cv = p;
 
-    lock_acquire(cv_lock);
-    V(channel_1);
-    cv_wait(cv, cv_lock);
-    kprintf("Thread %d signaled!\n", (int) i);
-    lock_release(cv_lock);
-
-    V(channel_1);
+    lock_acquire(testlock);
+    V(testsem2);
+    cv_wait(cv, testlock);
+    kprintf("Thread %d got the signal!\n", (int) i+1);
+    lock_release(testlock);
+    V(testsem2);
 }
 
 static void
 test_cv_broadcast(){
     int i;
-    struct cv *cv = cv_create("cv");
-    cv_lock = lock_create("cv lock");
-    channel_1 = sem_create("channel 1", 0);
+    testcv = cv_create("cv");
+    testlock = lock_create("cv lock");
+    testsem2 = sem_create("helper sem", 0);
 
-    // Fork 10 threads; all should recieve the signal
-    for(i=0;i<10;i++){
-        int err = thread_fork("test_cv_broadcast_helper", test_cv_broadcast_helper, \
-            (char *)cv, i, NULL);
-        if (err) {
+    kprintf("8 Threads are expected to recieve signal:\n");
+    
+    // Fork 8 threads; all should recieve the signal
+    for(i = 0; i < 8; i++){
+        int err = thread_fork("test_cv_broadcast_helper", NULL, 
+                                test_cv_broadcast_helper, (void *)testcv, i);
+        if (err) 
             panic("test_cv_broadcast_helper: thread_fork failed: %s\n", strerror(err));
-        }
     }
-    // Wait for threads to be ready
-    for(i=0;i<10;i++){
-        P(channel_1);
-    }
+    
+    for(i = 0; i < 8; i++)
+        P(testsem2);
 
-    lock_acquire(cv_lock);
-    cv_broadcast(cv, cv_lock);
-    lock_release(cv_lock);
+    lock_acquire(testlock);
+    cv_broadcast(testcv, testlock);
+    lock_release(testlock);
 
-    // Clean up
-    for(i=0;i<10;i++){
-        P(channel_1);
+    for(i = 0; i < 8; i++){
+        P(testsem2);
     }
 
-    cv_destroy(cv);
-    lock_destroy(cv_lock);
-    sem_destroy(channel_1);
+    sem_destroy(testsem2);
+    cv_destroy(testcv);
+    lock_destroy(testlock);
 
-    kprintf("test_cv_broadcast: Passed.....\n");
+    kprintf("test_cv_broadcast: Passed\n");
 
-    V(driver); // Placed at the end of the last unit test
+    V(testsem); // Placed at the end of the last unit test
 }
 
-#endif
 int cv_unittest(int nargs, char **args){
-    (void)nargs;
-    (void)args;
-    return 0;
-#if 0
-    driver = sem_create("driver", 0);
+    (void) nargs;
+    (void) args;
+    testsem = sem_create("sem for testing", 0);
 
-    kprintf("Starting Unit Test Suite for CVs..........\n");
+    kprintf("Starting Unit Test for CVs...\n");
 
-    /* Test that cv_create() creates a cv with cv_name and cv_wchan properly
-       initialized. */
+    /* Tests that cv_create() works properly; also checks that destoy works */
     test_cv_create();
 
-    /* Test that cv_signal() signals 1 waiting thread and only 1. */
+    /* Tests that cv_signal() signals only one waiting thread */
     test_cv_signal();
 
-    /* Test that cv_broadcast signals all waiting threads. */
+    /* Tests that cv_broadcast signals all waiting threads. */
     test_cv_broadcast();
 
     // Synchronize with menu
-    P(driver);
-    sem_destroy(driver);
-#endif
+    P(testsem);
+    sem_destroy(testsem);
+    return 0;
 }
