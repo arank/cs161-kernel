@@ -70,19 +70,19 @@ struct thread {
 	 * These go up front so they're easy to get to even if the
 	 * debugger is messed up.
 	 */
-	char *t_name;			/* Name of this thread */
+	char *t_name;			    /* Name of this thread */
 	const char *t_wchan_name;	/* Name of wait channel, if sleeping */
 	threadstate_t t_state;		/* State this thread is in */
 
 	/*
 	 * Thread subsystem internal fields.
 	 */
-	struct thread_machdep t_machdep; /* Any machine-dependent goo */
-	struct threadlistnode t_listnode; /* Link for run/sleep/zombie lists */
-	void *t_stack;			/* Kernel-level stack */
-	struct switchframe *t_context;	/* Saved register context (on stack) */
-	struct cpu *t_cpu;		/* CPU thread runs on */
-	struct proc *t_proc;		/* Process thread belongs to */
+	struct thread_machdep t_machdep;    /* Any machine-dependent goo */
+	struct threadlistnode t_listnode;   /* Link for run/sleep/zombie lists */
+	void *t_stack;                      /* Kernel-level stack */
+	struct switchframe *t_context;      /* Saved register context (on stack) */
+	struct cpu *t_cpu;                  /* CPU thread runs on */
+	struct proc *t_proc;                /* Process thread belongs to */
 
 	/*
 	 * Interrupt state fields.
