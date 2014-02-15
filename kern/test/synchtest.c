@@ -413,7 +413,7 @@ cvtest(int nargs, char **args)
 
 	testval1 = NTHREADS-1;
 
-	for (i=0; i<NTHREADS; i++) {
+	for (i = 0; i < NTHREADS; i++) {
 		result = thread_fork("synchtest", NULL, cvtestthread, NULL, i);
 		if (result) {
 			panic("cvtest: thread_fork failed: %s\n", strerror(result));
