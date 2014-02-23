@@ -179,6 +179,7 @@ void
 proc_bootstrap(void)
 {
 	kproc = proc_create("[kernel]");
+    //init_pid_table();
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");
 	}

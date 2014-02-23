@@ -50,6 +50,7 @@
 #include <addrspace.h>
 #include <mainbus.h>
 #include <vnode.h>
+//#include <pid_table.h>
 
 #include "opt-synchprobs.h"
 
@@ -352,6 +353,7 @@ thread_shutdown(void)
 	 * on the system board.
 	 */
 	ipi_broadcast(IPI_OFFLINE);
+    //destroy_pid_table();
 }
 
 /*
