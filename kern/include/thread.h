@@ -109,7 +109,8 @@ struct thread {
 	unsigned t_inuse_buffers;	/* # of buffers currently using */
 	unsigned t_reserved_buffers;	/* # of buffers allowed to take */
 
-	/* add more here as needed */
+    int priority;
+    //TODO: add priority_t
 };
 
 /*

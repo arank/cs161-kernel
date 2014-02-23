@@ -36,6 +36,8 @@
  * Note: curproc is defined by <current.h>.
  */
 
+#include <fd.h>
+#include <limits.h>
 #include <spinlock.h>
 #include <thread.h> /* required for struct threadarray */
 
@@ -45,6 +47,16 @@ struct vnode;
 /*
  * Process structure.
  */
+struct proc_link {
+    unsigned ref_count;
+    int exit_code;
+    pid_t child_pid;
+    struct lock *lock;
+    struct cv *cv;
+};
+
+#define MAX_CLD 10
+
 struct proc {
 	char *p_name;			        /* Name of this process */
 	struct spinlock p_lock;		    /* Lock for this structure */
@@ -56,7 +68,12 @@ struct proc {
 	/* VFS */
 	struct vnode *p_cwd;		    /* current working directory */
 
-	/* add more material here as needed */
+    pid_t pid;
+    // TODO: change to dynamic array
+    struct file_desc *fd_table[OPEN_MAX];
+    // TODO: change to dynamic array
+    struct proc_link *children[MAX_CLD];
+    struct proc_link *parent;
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */

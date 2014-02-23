@@ -49,11 +49,16 @@
 #include <addrspace.h>
 #include <vnode.h>
 #include <pid_table.h>
+#include <fd.h>
+#include <synch.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
+
+static void cleanup_data(struct proc *proc);
+void shared_link_destroy(struct proc_link *link);
 
 /*
  * Create a proc structure.
@@ -73,6 +78,9 @@ proc_create(const char *name)
 		kfree(proc);
 		return NULL;
 	}
+
+    proc->parent = NULL;
+    proc->pid = 0;
 
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
@@ -166,11 +174,34 @@ proc_destroy(struct proc *proc)
 		as_destroy(as);
 	}
 
+    cleanup_data(proc);
 	threadarray_cleanup(&proc->p_threads);
 	spinlock_cleanup(&proc->p_lock);
 
 	kfree(proc->p_name);
 	kfree(proc);
+}
+
+
+void shared_link_destroy(struct proc_link *link) {
+    lock_acquire(link->lock);
+    if (link->ref_count == 1) {
+        lock_destroy(link->lock);
+        cv_destroy(link->cv);
+    } else {
+        link->ref_count--;
+    }
+    lock_release(link->lock);
+}
+
+// TODO: think once again where to do the clearing
+static void cleanup_data(struct proc *proc) {
+    int i;
+    for (i = 0; i < MAX_CLD; i++)
+        shared_link_destroy(proc->children[i]);
+
+    for (i = 0; i < OPEN_MAX; i++)
+        fd_destroy(proc->fd_table[i]);
 }
 
 /*
@@ -180,7 +211,11 @@ void
 proc_bootstrap(void)
 {
 	kproc = proc_create("[kernel]");
+
     init_pid_table();
+    extern struct lock *exec_lock;
+    exec_lock = lock_create("exec-lock");
+
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");
 	}

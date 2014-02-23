@@ -57,6 +57,7 @@
 
 /* Magic number used as a guard value on kernel thread stacks. */
 #define THREAD_STACK_MAGIC 0xbaadf00d
+#define MAX_PRIORITY 5
 
 /* Wait channel. A wchan is protected by an associated, passed-in spinlock. */
 struct wchan {
@@ -78,6 +79,8 @@ static struct wchanarray allwchans;
 
 /* Used to wait for secondary CPUs to come online. */
 static struct semaphore *cpu_startup_sem;
+
+struct threadlist *mlfq[MAX_PRIORITY];
 
 ////////////////////////////////////////////////////////////
 
