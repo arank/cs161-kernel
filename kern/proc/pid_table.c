@@ -29,20 +29,32 @@
 
 #include <types.h>
 #include <current.h>
+#include <bitmap.h>
+#include <synch.h>
+#include <pid_table.h>
+
 #define PID_MAX 512
 
 static struct {
     struct bitmap *pid_map;
     unsigned counter;
     struct lock *lock;
-} pid_table;
+} *pid_table;
+
+static pid_t pid_get(void);
+static void pid_destroy(pid_t pid);
+static int pid_in_use(pid_t pid);
 
 /* called in bootstrap */
 int init_pid_table(void) {
+    (void)pid_get;
+    (void)pid_destroy;
+    (void)pid_in_use;
+
     pid_table = kmalloc (sizeof *pid_table);
     if (pid_table == NULL) goto out;
 
-    pid_table->pid_map = pid_map_create(PID_MAX);
+    pid_table->pid_map = bitmap_create(PID_MAX);
     if (pid_table->pid_map == NULL) goto bm_out;
 
     pid_table->lock = lock_create("pid_table_lock");
@@ -53,7 +65,7 @@ int init_pid_table(void) {
     return 0;
 
 lk_out:
-    destoy_pid_map(pid_table->pid_map);
+    bitmap_destroy(pid_table->pid_map);
 bm_out:
     kfree(pid_table);
 out:
@@ -66,20 +78,21 @@ out:
 void destroy_pid_table(void) {
     lock_acquire(pid_table->lock);
 
-    pid_map_destroy(pid_table->pid_map);
+    bitmap_destroy(pid_table->pid_map);
     pid_table->pid_map = NULL;
 
     lock_release(pid_table->lock);
 
-    lock_destoy(pid_table->lock);
+    //TODO: failing to destroy, thread.c:1028 line, KASSERT
+    lock_destroy(pid_table->lock);
     kfree(pid_table); 
 }
 
-pid_t pid_get(void) {
+static pid_t pid_get(void) {
     lock_acquire(pid_table->lock);
     
     unsigned pid = pid_table->counter;
-    while(pid < pid_table->counter + MAX_PID) {
+    while(pid < pid_table->counter + PID_MAX) {
         unsigned index = pid % PID_MAX;
         // TODO: investigate bitmap_alloc, how does it work
         if (!bitmap_isset(pid_table->pid_map, index)) {
@@ -94,17 +107,17 @@ pid_t pid_get(void) {
     return (pid_t) -1;
 }
 
-void pid_destroy(pid_t pid) {
+static void pid_destroy(pid_t pid) {
     lock_acquire(pid_table->lock);
     
     // TODO: check that this threads holds the pid
-    assert(bitmap_isset(pid_table->pid_map, (unsigned)pid);
+    KASSERT(bitmap_isset(pid_table->pid_map, (unsigned)pid));
     bitmap_unmark(pid_table->pid_map, (unsigned)pid);
 
     lock_release(pid_table->lock);
 }
 
-int pid_in_use(pid_t pid) {
+static int pid_in_use(pid_t pid) {
     lock_acquire(pid_table->lock);
     if (bitmap_isset(pid_table->pid_map, (unsigned)pid)) {
         lock_release(pid_table->lock);
@@ -112,3 +125,4 @@ int pid_in_use(pid_t pid) {
     }
     return 0;
 }
+

@@ -48,6 +48,7 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
+#include <pid_table.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -179,7 +180,7 @@ void
 proc_bootstrap(void)
 {
 	kproc = proc_create("[kernel]");
-    //init_pid_table();
+    init_pid_table();
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");
 	}

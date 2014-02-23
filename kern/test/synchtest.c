@@ -221,12 +221,15 @@ locktest(int nargs, char **args) {
 static 
 void
 test_lock_create(){
-    struct lock *lk = lock_create("testlock");
+    for (int i = 0; i < 10; i++) {
+        struct lock *lk = lock_create("testlock");
 
-    KASSERT(!strcmp(lk->lk_name, "testlock"));
-    KASSERT(lk->lk_holder == NULL);
-
-    lock_destroy(lk);
+        KASSERT(!strcmp(lk->lk_name, "testlock"));
+        KASSERT(lk->lk_holder == NULL);
+        lock_acquire(lk);
+        lock_release(lk);
+        lock_destroy(lk);
+    }
 
     kprintf("test_lock_create: Passed\n");
 }

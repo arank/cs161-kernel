@@ -362,6 +362,7 @@ file      vfs/vfspath.c
 file      vfs/vnode.c
 
 file      vfs/buf.c
+file      vfs/fd.c
 
 #
 # VFS devices

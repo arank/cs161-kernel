@@ -42,6 +42,7 @@
 #include <sfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <pid_table.h>
 #include "opt-synchprobs.h"
 #include "opt-sfs.h"
 #include "opt-net.h"
