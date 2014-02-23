@@ -46,15 +46,15 @@ struct vnode;
  * Process structure.
  */
 struct proc {
-	char *p_name;			/* Name of this process */
-	struct spinlock p_lock;		/* Lock for this structure */
+	char *p_name;			        /* Name of this process */
+	struct spinlock p_lock;		    /* Lock for this structure */
 	struct threadarray p_threads;	/* Threads in this process */
 
 	/* VM */
 	struct addrspace *p_addrspace;	/* virtual address space */
 
 	/* VFS */
-	struct vnode *p_cwd;		/* current working directory */
+	struct vnode *p_cwd;		    /* current working directory */
 
 	/* add more material here as needed */
 };

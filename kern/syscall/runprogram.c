@@ -48,7 +48,7 @@
 /*
  * Load program "progname" and start running it in usermode.
  * Does not return except on error.
- *
+ * 'Exec' for kernel
  * Calls vfs_open on progname and thus may destroy it.
  */
 int

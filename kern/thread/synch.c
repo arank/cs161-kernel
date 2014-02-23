@@ -248,8 +248,8 @@ cv_wait(struct cv *cv, struct lock *lock) {
     KASSERT(cv != NULL);
     KASSERT(lock->lk_holder == curthread);    
 
-    lock_release(lock);
     spinlock_acquire(&cv->cv_spinlk);
+    lock_release(lock);
     wchan_sleep(cv->cv_wchan, &cv->cv_spinlk);
     spinlock_release(&cv->cv_spinlk);
     lock_acquire(lock);

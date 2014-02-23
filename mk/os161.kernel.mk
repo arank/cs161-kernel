@@ -82,6 +82,8 @@ TAGS_HEADERS=\
 
 # Default rule: link the kernel.
 all: includelinks .WAIT $(KERNEL)
+	#generate ctags file for vim
+	#cd $(TOP); ctags --extra=+f -R .; cd-
 
 #
 # Here's how we link the kernel. 
