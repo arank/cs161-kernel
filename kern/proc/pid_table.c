@@ -32,12 +32,13 @@
 #include <bitmap.h>
 #include <synch.h>
 #include <pid_table.h>
+#include <kern/errno.h>
 
 #define PID_MAX 512
 
 static struct {
     struct bitmap *pid_map;
-    unsigned counter;
+    //unsigned counter;
     struct lock *lock;
 } *pid_table;
 
@@ -60,7 +61,7 @@ int init_pid_table(void) {
     pid_table->lock = lock_create("pid_table_lock");
     if (pid_table->lock == NULL) goto lk_out;
 
-    pid_table->counter = 0;
+    //pid_table->counter = 0;
     
     return 0;
 
@@ -84,25 +85,17 @@ void destroy_pid_table(void) {
     lock_release(pid_table->lock);
 
     //TODO: failing to destroy, thread.c:1028 line, KASSERT
-    lock_destroy(pid_table->lock);
+    //lock_destroy(pid_table->lock);
     kfree(pid_table); 
 }
 
 static pid_t pid_get(void) {
     lock_acquire(pid_table->lock);
     
-    unsigned pid = pid_table->counter;
-    while(pid < pid_table->counter + PID_MAX) {
-        unsigned index = pid % PID_MAX;
-        // TODO: investigate bitmap_alloc, how does it work
-        if (!bitmap_isset(pid_table->pid_map, index)) {
-            bitmap_mark(pid_table->pid_map, index);
-            pid_table->counter = index;
-            lock_release(pid_table->lock);
-            return (pid_t) index;
-        }
-        pid++;
-    }
+    unsigned pid;
+    if (bitmap_alloc(pid_table->pid_map, &pid) != ENOSPC)
+        return (pid_t)pid;
+
     lock_release(pid_table->lock);
 
     return (pid_t) -1;
@@ -111,7 +104,7 @@ static pid_t pid_get(void) {
 static void pid_destroy(pid_t pid) {
     lock_acquire(pid_table->lock);
     
-    // TODO: check that this threads holds the pid
+    // TODO: check that this thread holds the pid
     KASSERT(bitmap_isset(pid_table->pid_map, (unsigned)pid));
     bitmap_unmark(pid_table->pid_map, (unsigned)pid);
 
@@ -126,4 +119,3 @@ static int pid_in_use(pid_t pid) {
     }
     return 0;
 }
-
