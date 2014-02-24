@@ -103,6 +103,7 @@ static pid_t pid_get(void) {
         }
         pid++;
     }
+    lock_release(pid_table->lock);
 
     return (pid_t) -1;
 }

@@ -147,6 +147,8 @@ boot(void)
 
 /*
  * Shutdown sequence. Opposite to boot().
+ * Don't edit this with cleaning up lock structure
+ * as there could be a potential recursive panic bugs
  */
 static
 void
