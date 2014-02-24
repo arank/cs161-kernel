@@ -20,6 +20,7 @@ struct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags) {
     fd->lock = lock_create("fd_lock");
     if (fd->lock == NULL) { 
         kfree(fd);
+        fd=NULL;
         return NULL;
     }
 

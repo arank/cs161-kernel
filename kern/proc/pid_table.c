@@ -93,8 +93,10 @@ static pid_t pid_get(void) {
     lock_acquire(pid_table->lock);
     
     unsigned pid;
-    if (bitmap_alloc(pid_table->pid_map, &pid) != ENOSPC)
-        return (pid_t)pid;
+    if (bitmap_alloc(pid_table->pid_map, &pid) != ENOSPC){
+    	lock_release(pid_table->lock);
+    	return (pid_t)pid;
+    }
 
     lock_release(pid_table->lock);
 
