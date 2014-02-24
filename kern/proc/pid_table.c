@@ -43,7 +43,7 @@ static struct {
 
 static pid_t pid_get(void);
 static void pid_destroy(pid_t pid);
-static int pid_in_use(pid_t pid);
+static bool pid_in_use(pid_t pid);
 
 /* called in bootstrap */
 int init_pid_table(void) {
@@ -118,12 +118,13 @@ static void pid_destroy(pid_t pid) {
     lock_release(pid_table->lock);
 }
 
-static int pid_in_use(pid_t pid) {
+static bool pid_in_use(pid_t pid) {
     lock_acquire(pid_table->lock);
     if (bitmap_isset(pid_table->pid_map, (unsigned)pid)) {
         lock_release(pid_table->lock);
-        return 1;
+        return true;
     }
-    return 0;
+    lock_release(pid_table->lock);
+    return false;
 }
 
