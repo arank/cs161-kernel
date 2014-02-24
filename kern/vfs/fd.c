@@ -15,14 +15,10 @@ struct file_desc {
 
 struct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags) {
     struct file_desc *fd = kmalloc(sizeof *fd);
-    if (fd == NULL) return NULL;
+    if (fd == NULL) goto out;
 
     fd->lock = lock_create("fd_lock");
-    if (fd->lock == NULL) { 
-        kfree(fd);
-        fd=NULL;
-        return NULL;
-    }
+    if (fd->lock == NULL) goto lk_out;
 
     fd->vn = vn;
     fd->offset = 0;
@@ -31,6 +27,11 @@ struct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags) {
     fd->flags = flags;
 
     return fd;
+
+lk_out:
+	kfree(fd);
+out:
+    return NULL;
 }
 
 void fd_destroy(struct file_desc *fd) {

@@ -73,7 +73,8 @@ out:
     return 1;
 }
 
-/* called in shutdown when there are no threads left except for the kernel
+/*
+ * called in shutdown when there are no threads left except for the kernel
  * thread
  */
 void destroy_pid_table(void) {
