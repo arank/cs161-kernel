@@ -185,12 +185,15 @@ proc_destroy(struct proc *proc)
 
 void shared_link_destroy(struct proc_link *link) {
     lock_acquire(link->lock);
+
     if (link->ref_count == 1) {
+        lock_release(link->lock);
         lock_destroy(link->lock);
         cv_destroy(link->cv);
     } else {
         link->ref_count--;
     }
+
     lock_release(link->lock);
 }
 

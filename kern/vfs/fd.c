@@ -37,6 +37,7 @@ out:
 void fd_destroy(struct file_desc *fd) {
     lock_acquire(fd->lock);
     if (fd->ref_count == 1) {
+        lock_release(fd->lock);
         lock_destroy(fd->lock);
         vfs_close(fd->vn);
         kfree(fd);
