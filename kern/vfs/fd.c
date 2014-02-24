@@ -35,6 +35,7 @@ struct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags) {
 void fd_destroy(struct file_desc *fd) {
     lock_acquire(fd->lock);
     if (fd->ref_count == 1) {
+        lock_release(fd->lock);
         lock_destroy(fd->lock);
         vfs_close(fd->vn);
         kfree(fd);
