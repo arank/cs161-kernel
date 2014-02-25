@@ -1,5 +1,5 @@
-int __getcwd(char *buf, size_t buflen);
 
-pid_t waitpid(pid_t pid, int *status, int options);
+pid_t sys_waitpid(pid_t pid, userptr_t status, int options);
 
-void _exit(int exitcode);
+void sys__exit(int exitcode);
+

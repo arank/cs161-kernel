@@ -66,5 +66,7 @@ int sys_close(int fd);
 int sys_dup2(int oldfd , int newfd);
 int sys_chdir ( const_userptr_t pathname);
 int sys___getcwd(userptr_t buf , size_t buflen);
+pid_t sys_waitpid(pid_t pid, userptr_t status, int options);
+void sys__exit(int exitcode);
 
 #endif /* _SYSCALL_H_ */
