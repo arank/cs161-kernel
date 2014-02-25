@@ -1,15 +1,15 @@
-int open(const char *filename , int flags);
+int sys_open(const_userptr_t filename , int flags);
 
-ssize_t read(int fd , void *buf , size_t buflen);
+ssize_t sys_read(int fd , userptr_t buf , size_t buflen);
 
-ssize_t write(int fd , const void *buf , size_t nbytes);
+ssize_t sys_write(int fd , const_userptr_t buf , size_t nbytes);
 
-off_t lseek (int fd , off_t pos , int whence);
+off_t sys_lseek (int fd , off_t pos , int whence);
 
-int close(int fd);
+int sys_close(int fd);
 
-int dup2(int oldfd , int newfd);
+int sys_dup2(int oldfd , int newfd);
 
-int chdir ( const char *pathname);
+int sys_chdir ( const_userptr_t pathname);
 
-int __getcwd(char *buf , size_t buflen);
+int sys___getcwd(userptr_t buf , size_t buflen);

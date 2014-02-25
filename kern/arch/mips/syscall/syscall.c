@@ -105,11 +105,45 @@ syscall(struct trapframe *tf)
 		break;
 
 	    case SYS___time:
-		err = sys___time((userptr_t)tf->tf_a0,
-				 (userptr_t)tf->tf_a1);
+		err = sys___time((userptr_t)tf->tf_a0, (userptr_t)tf->tf_a1);
 		break;
 
-	    /* Add stuff here */
+		/* Add stuff here */
+
+	    case SYS_open:
+	    err=sys_open((const_userptr_t)tf->tf_a0, tf->tf_a1);
+		break;
+
+	    case SYS_read:
+	    // TODO this returns a size_t not an int is this ok?
+		err=sys_read(tf->tf_a0 , (userptr_t) tf->tf_a1 , tf->tf_a2);
+		break;
+
+	    case SYS_write:
+		// TODO this returns a size_t not an int is this ok?
+		err=sys_write(tf->tf_a0, (const_userptr_t) tf->tf_a1, tf->tf_a2);
+		break;
+
+	    case SYS_lseek:
+	    // TODO this returns an off_t not an int is this ok?
+		err=sys_lseek (tf->tf_a0 , tf->tf_a1 , tf->tf_a2);
+		break;
+
+	    case SYS_close:
+		err=sys_close(tf->tf_a0);
+	    break;
+
+	    case SYS_dup2:
+		err=sys_dup2(tf->tf_a0 , tf->tf_a1);
+		break;
+
+	    case SYS_chdir:
+		err=sys_chdir ((const_userptr_t)tf->tf_a0);
+	    break;
+
+	    case SYS___getcwd:
+		err=sys___getcwd((userptr_t)tf->tf_a0 , tf->tf_a1);
+	    break;
 
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
