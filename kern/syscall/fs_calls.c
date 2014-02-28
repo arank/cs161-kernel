@@ -1,6 +1,5 @@
 #include <types.h>
 #include <limits.h>
-#include <fs_calls.h>
 #include <syscall.h>
 #include <fd.h>
 #include <current.h>
@@ -10,22 +9,23 @@
 #include <current.h>
 #include <proc.h>
 #include <vfs.h>
+#include <copyinout.h>
 
-int sys_open(const_userptr_t filename , int flags){
+int sys_open(const_userptr_t filename , int flags, mode_t mode){
     char *path;
     struct vnode *node;
-    // TODO what should max copyin size be
-    if(copyin(filename, path, 200)!=0||path==NULL){
+    // TODO what should the size be, is this right?
+    if(copyin(filename, path, sizeof(char*))!=0||path==NULL){
     	goto out;
     }
     // path and flags checked in vfs_open and fd_init
-    // TODO what mode_t should I use currently null
-    if(vfs_open(path, flags, NULL, node)!=0||node==NULL){
+    // TODO should we be derefing node?
+    if(vfs_open(path, flags, mode, &node)!=0||node==NULL){
     	goto path_out;
     }
 
-    // Lock the process and check that we haven't exceeded the number of open files
-    spinlock_acquire(curproc->p_lock);
+    // Don't lock the process and check that we haven't exceeded the number of open files
+    // as this is single threaded
     int i;
     for (i = 0; i < OPEN_MAX; i++){
     	if(curproc->fd_table[i]==NULL)
@@ -33,20 +33,15 @@ int sys_open(const_userptr_t filename , int flags){
     }
     // We looped around, max number of files are open
     if(i==OPEN_MAX){
-    	goto lock_out;
+    	goto node_out;
     }
-    // TODO what mode_t should I use currently null
-    struct file_desc *fd = fd_init(node, NULL, flags);
+    struct file_desc *fd = fd_init(node, mode, flags);
     if(fd==NULL){
-    	goto lock_out;
+    	goto node_out;
     }
     curproc->fd_table[i]=fd;
-    // Unlock after it is set
-    spinlock_release(curproc->p_lock);
     return i;
 
-lock_out:
-    spinlock_release(curproc->p_lock);
 node_out:
 	kfree(node);
 path_out:
