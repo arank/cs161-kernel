@@ -10,16 +10,19 @@
 #include <vfs.h>
 #include <copyinout.h>
 
-int sys_open(const_userptr_t filename , int flags, mode_t mode){
+int sys_open(const_userptr_t filename , int flags, mode_t mode, int *file_desc_pos){
     char *path;
     struct vnode *node;
+    int err;
     // TODO what should the size be, is this right?
-    if(copyin(filename, path, sizeof(char*))!=0||path==NULL){
+    err=copyin(filename, path, sizeof(char*));
+    if(err!=0||path==NULL){
     	goto out;
     }
     // path and flags checked in vfs_open and fd_init
     // TODO should we be derefing node?
-    if(vfs_open(path, flags, mode, &node)!=0||node==NULL){
+    err=vfs_open(path, flags, mode, &node);
+    if(err!=0||node==NULL){
     	goto path_out;
     }
 
@@ -32,25 +35,29 @@ int sys_open(const_userptr_t filename , int flags, mode_t mode){
     }
     // We looped around, max number of files are open
     if(i==OPEN_MAX){
+    	err = EMFILE;
     	goto node_out;
     }
     struct file_desc *fd = fd_init(node, mode, flags);
     if(fd==NULL){
+    	err=ENOMEM;
     	goto node_out;
     }
     curproc->fd_table[i]=fd;
-    return i;
+    *file_desc_pos = i;
+    return 0;
 
 node_out:
 	kfree(node);
 path_out:
 	kfree(path);
 out:
-	return 0;
+	return err;
 }
 
 ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
-    (void)fd;
+
+	(void)fd;
     (void)buf;
     (void)buflen;
     (void)bread;
