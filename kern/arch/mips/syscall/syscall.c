@@ -122,6 +122,13 @@ syscall(struct trapframe *tf)
 	    case SYS_write:
 		// TODO this returns a size_t not an int is this ok?
 		err=sys_write(tf->tf_a0, (const_userptr_t) tf->tf_a1, tf->tf_a2, (ssize_t *)&tf->tf_v0);
+        if (err)
+            switch(err) {
+                case EBADF:  tf->tf_v0 = EBADF;  break;
+                case EFAULT: tf->tf_v0 = EFAULT; break;
+                case ENOSPC: tf->tf_v0 = ENOSPC; break;
+                case EIO:    tf->tf_v0 = EIO;    break;
+            }
 		break;
 
 	    case SYS_lseek:

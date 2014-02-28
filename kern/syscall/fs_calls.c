@@ -3,7 +3,6 @@
 #include <syscall.h>
 #include <fd.h>
 #include <current.h>
-#include <limits.h>
 #include <synch.h>
 #include <kern/errno.h>
 #include <current.h>
@@ -50,7 +49,7 @@ out:
 	return 0;
 }
 
-ssize_t sys_read(int fd , userptr_t buf , size_t buflen, ssize_t *bread) {
+ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
     (void)fd;
     (void)buf;
     (void)buflen;
