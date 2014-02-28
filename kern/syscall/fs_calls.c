@@ -8,29 +8,37 @@
 #include <proc.h>
 #include <vfs.h>
 
-int sys_open(const_userptr_t filename , int flags){
+int sys_open(const_userptr_t filename , int flags, mode_t mode){
     (void)filename;
     (void)flags;
-
+    (void)mode;
     return 0;
 }
 
-ssize_t sys_read(int fd , userptr_t buf , size_t buflen) {
+ssize_t sys_read(int fd , userptr_t buf , size_t buflen, ssize_t *bread) {
     (void)fd;
     (void)buf;
     (void)buflen;
-
+    (void)bread;
     return 0;
 }
 
-ssize_t sys_write(int fd , const_userptr_t buf , size_t nbytes) {
+/**
+ *
+ * EBADF    fd is not a valid file descriptor, or was not opened for writing.
+ * EFAULT   Part or all of the address space pointed to by buf is invalid.
+ * ENOSPC   There is no free space remaining on the filesystem containing the file.
+ * EIO      A hardware I/O error occurred writing the data.
+ */
+ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten) {
     (void)fd;
     (void)buf;
     (void)nbytes;
+    (void)bwritten;
     return 0;
 }
 
-off_t sys_lseek ( int fd , off_t pos , int whence) {
+off_t sys_lseek (int fd, off_t pos, int whence) {
     (void)fd;
     (void)pos;
     (void)whence;
@@ -44,13 +52,13 @@ off_t sys_lseek ( int fd , off_t pos , int whence) {
  * this file_desc structure, free fd_table entry and set it to NULL to indicate
  * that the index is free to be reused.
  *
- * return 0 on success
+ * return 0 on success (either closed the file or just decremented the refcnt)
  *  EBADF   fd is not within the legal range or wasn't open
  *  EIO     hard IO error occured
  */
 int sys_close(int fd) {
-    if (fd < 0 || fd > OPEN_MAX) return EBADF;  
-    if (curproc->fd_table[fd] == NULL) return EBADF;    
+    if (fd < 0 || fd > OPEN_MAX) return EBADF;
+    if (curproc->fd_table[fd] == NULL) return EBADF; 
 
     lock_acquire(curproc->fd_table[fd]->lock);  
     if (--curproc->fd_table[fd]->ref_count != 0)    
