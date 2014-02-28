@@ -116,19 +116,12 @@ syscall(struct trapframe *tf)
 
 	    case SYS_read:
 	    // TODO this returns a size_t not an int is this ok?
-		err=sys_read(tf->tf_a0 , (userptr_t) tf->tf_a1 , tf->tf_a2, (ssize_t *)&tf->tf_v0);
+		err=sys_read(tf->tf_a0 , (userptr_t) tf->tf_a1 , tf->tf_a2, (ssize_t *)&retval);
 		break;
 
 	    case SYS_write:
 		// TODO this returns a size_t not an int is this ok?
-		err=sys_write(tf->tf_a0, (const_userptr_t) tf->tf_a1, tf->tf_a2, (ssize_t *)&tf->tf_v0);
-        if (err)
-            switch(err) {
-                case EBADF:  tf->tf_v0 = EBADF;  break;
-                case EFAULT: tf->tf_v0 = EFAULT; break;
-                case ENOSPC: tf->tf_v0 = ENOSPC; break;
-                case EIO:    tf->tf_v0 = EIO;    break;
-            }
+		err=sys_write(tf->tf_a0, (const_userptr_t) tf->tf_a1, tf->tf_a2, (ssize_t *)&retval);
 		break;
 
 	    case SYS_lseek:
@@ -175,8 +168,7 @@ syscall(struct trapframe *tf)
 		 */
 		tf->tf_v0 = err;
 		tf->tf_a3 = 1;      /* signal an error */
-	}
-	else {
+	} else {
 		/* Success. */
 		tf->tf_v0 = retval;
 		tf->tf_a3 = 0;      /* signal no error */
