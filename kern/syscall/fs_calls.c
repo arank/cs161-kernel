@@ -108,14 +108,10 @@ int sys_close(int fd) {
         vfs_close(curproc->fd_table[fd]->vn);
         lock_release(curproc->fd_table[fd]->lock);
         lock_destroy(curproc->fd_table[fd]->lock);
-        struct file_desc *cur = curproc->fd_table[fd];
-        for (unsigned i = 0; i < OPEN_MAX; i++)
-            if (curproc->fd_table[i] == cur)
-                curproc->fd_table[i] = NULL;
         kfree(curproc->fd_table[fd]);
-        curproc->fd_table[fd] = NULL;
     }
 
+    curproc->fd_table[fd] = NULL;
     return 0;
 }
 
