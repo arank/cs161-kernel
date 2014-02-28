@@ -1,6 +1,12 @@
 #include <types.h>
 #include <fs_calls.h>
 #include <syscall.h>
+#include <limits.h>
+#include <synch.h>
+#include <kern/errno.h>
+#include <current.h>
+#include <proc.h>
+#include <vfs.h>
 
 int sys_open(const_userptr_t filename , int flags){
     (void)filename;
@@ -31,8 +37,36 @@ off_t sys_lseek ( int fd , off_t pos , int whence) {
     return 0;
 }
 
+/**
+ * sys_close(fd) - closes file by getting the lock on the fd and decrementing 
+ * the reference counter; if the counter is 0, release and free the lock,
+ * iterate over other fds of the process and set to NULL those that point to
+ * this file_desc structure, free fd_table entry and set it to NULL to indicate
+ * that the index is free to be reused.
+ *
+ * return 0 on success
+ *  EBADF   fd is not within the legal range or wasn't open
+ *  EIO     hard IO error occured
+ */
 int sys_close(int fd) {
-    (void)fd;
+    if (fd < 0 || fd > OPEN_MAX) return EBADF;  
+    if (curproc->fd_table[fd] == NULL) return EBADF;    
+
+    lock_acquire(curproc->fd_table[fd]->lock);  
+    if (--curproc->fd_table[fd]->ref_count != 0)    
+        lock_release(curproc->fd_table[fd]->lock);  
+    else {                                          
+        vfs_close(curproc->fd_table[fd]->vn);
+        lock_release(curproc->fd_table[fd]->lock);
+        lock_destroy(curproc->fd_table[fd]->lock);
+        struct file_desc *cur = curproc->fd_table[fd];
+        for (unsigned i = 0; i < OPEN_MAX; i++)
+            if (curproc->fd_table[i] == cur)
+                curproc->fd_table[i] = NULL;
+        kfree(curproc->fd_table[fd]);
+        curproc->fd_table[fd] = NULL;
+    }
+
     return 0;
 }
 
