@@ -4,15 +4,6 @@
 #include <synch.h>
 #include <vfs.h>
 
-struct file_desc {
-    struct vnode *vn;
-    off_t offset;
-    unsigned ref_count;
-    mode_t mode;
-    int flags;
-    struct lock *lock;
-};
-
 struct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags) {
     struct file_desc *fd = kmalloc(sizeof *fd);
     if (fd == NULL) goto out;

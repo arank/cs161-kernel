@@ -1,3 +1,4 @@
+/*
 int sys_open(const_userptr_t filename , int flags);
 
 ssize_t sys_read(int fd , userptr_t buf , size_t buflen);
@@ -13,3 +14,4 @@ int sys_dup2(int oldfd , int newfd);
 int sys_chdir ( const_userptr_t pathname);
 
 int sys___getcwd(userptr_t buf , size_t buflen);
+*/
