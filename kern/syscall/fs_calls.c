@@ -9,12 +9,14 @@
 #include <proc.h>
 #include <vfs.h>
 #include <copyinout.h>
+#include <kern/iovec.h>
+#include <uio.h>
+#include <vnode.h>
 
 int sys_open(const_userptr_t filename , int flags, mode_t mode, int *file_desc_pos){
     char *path;
     struct vnode *node;
     int err;
-    // TODO what should the size be, is this right?
     err=copyin(filename, path, sizeof(char*));
     if(err!=0||path==NULL){
     	goto out;
@@ -26,7 +28,7 @@ int sys_open(const_userptr_t filename , int flags, mode_t mode, int *file_desc_p
     	goto path_out;
     }
 
-    // Don't lock the process and check that we haven't exceeded the number of open files
+    // Don't have to lock the process to check that we haven't exceeded the number of open files
     // as this is single threaded
     int i;
     for (i = 0; i < OPEN_MAX; i++){
@@ -47,6 +49,7 @@ int sys_open(const_userptr_t filename , int flags, mode_t mode, int *file_desc_p
     *file_desc_pos = i;
     return 0;
 
+// TODO translate err codes
 node_out:
 	kfree(node);
 path_out:
@@ -56,12 +59,39 @@ out:
 }
 
 ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
-
-	(void)fd;
-    (void)buf;
-    (void)buflen;
-    (void)bread;
+	int err;
+	struct iovec vec;
+	vec.iov_ubase=buf;
+	vec.iov_len = buflen;
+	struct file_desc *fd_ptr=curproc->fd_table[fd];
+	if(fd_ptr==NULL){
+		goto out;
+	}
+	lock_acquire(fd_ptr->lock);
+	struct uio io;
+	// TODO possibly check flags
+	io.uio_iov=&vec;
+	io.uio_iovcnt=1;
+	io.uio_offset=fd_ptr->offset;
+	io.uio_resid=buflen;
+	io.uio_segflg=UIO_USERSPACE;
+	io.uio_rw=UIO_READ;
+	io.uio_space=curproc->p_addrspace;
+	err = VOP_READ(fd_ptr->vn, &io);
+	if(err!=0){
+		goto lock_out;
+	}
+	// set offset to new value got by delta in offset
+	*bread = io.uio_offset-fd_ptr->offset;
+	fd_ptr->offset=io.uio_offset;
+	lock_release(fd_ptr->lock);
     return 0;
+
+// TODO translate err codes
+lock_out:
+	lock_release(fd_ptr->lock);
+out:
+	return err;
 }
 
 /**

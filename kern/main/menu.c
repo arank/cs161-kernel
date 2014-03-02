@@ -615,6 +615,10 @@ static struct {
     { "lk",     lock_unittest },
     { "cv",     cv_unittest },
 
+    /* TODO file descriptor unit tests */
+
+    /* TODO process unit tests */
+
 	/* file system assignment tests */
 	{ "fs1",	fstest },
 	{ "fs2",	readstress },
@@ -731,7 +735,11 @@ menu_execute(char *line, int isargs)
 void
 menu(char *args)
 {
+
 	char buf[64];
+
+	// Execute unit tests here linked kern/test folder
+
 
 	menu_execute(args, 1);
 
