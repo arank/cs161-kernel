@@ -443,6 +443,8 @@ file		test/threadlisttest.c
 file		test/threadtest.c
 file		test/tt3.c
 file		test/synchtest.c
+file		test/autotest.c
 file		test/malloctest.c
 file		test/fstest.c
+file		test/fdtest.c
 optfile net	test/nettest.c

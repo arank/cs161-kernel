@@ -738,8 +738,9 @@ menu(char *args)
 
 	char buf[64];
 
-	// Execute unit tests here linked kern/test folder
-
+	// Execute all unit tests here, to ensure a clean boot, if one is failed
+	// a panic occurs.
+	run_tests();
 
 	menu_execute(args, 1);
 

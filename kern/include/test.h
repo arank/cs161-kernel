@@ -76,6 +76,12 @@ int nettest(int, char **);
 int lock_unittest(int, char **);
 int cv_unittest(int, char**);
 
+/* File descriptor tests */
+int open_test(int, char **);
+
+/* Macro function to run all unit tests in dependency order */
+int run_tests(void);
+
 /* Routine for running a user-level program. */
 int runprogram(char *progname);
 
