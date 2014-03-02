@@ -9,6 +9,9 @@
 #include <proc.h>
 #include <vfs.h>
 #include <copyinout.h>
+#include <uio.h>
+#include <kern/iovec.h>
+#include <vnode.h>
 
 int sys_open(const_userptr_t filename , int flags, mode_t mode){
     char *path;
@@ -62,13 +65,33 @@ ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
  * EBADF    fd is not a valid file descriptor, or was not opened for writing.
  * EFAULT   Part or all of the address space pointed to by buf is invalid.
  * ENOSPC   There is no free space remaining on the filesystem containing the file.
- * EIO      A hardware I/O error occurred writing the data.
+ * EIO      doesn't return this (mentioned in manpages)
  */
 ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten) {
-    (void)fd;
-    (void)buf;
-    (void)nbytes;
-    (void)bwritten;
+    if (fd < 0 || fd > OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
+     
+    lock_acquire(curproc->fd_table[fd]->lock);
+
+    struct iovec iov;
+    iov.iov_kbase = buf;
+    iov.iov_len = nbytes;
+
+    struct uio uio;
+    uio.uio_iov = &iov;
+    uio.uio_iovcnt = 1;
+    uio.uio_segflg = UIO_USERSPACE;
+    uio.uio_offset = curproc->fd_table[fd]->offset;
+    uio.uio_resid = nbytes;
+    uio.uio_rw = UIO_WRITE; 
+    uio.uio_space = curthread->a_addrspace;
+
+    int rv = VOP_WRITE(curproc->fd_table[fd]->vn, &uio)
+    if (rv == ENOSPC || rv == EIO || rv == EFAULT) return rv;
+    
+    *bwritten = uio.uio_offset - curproc->fd_table[fd]->offset;
+    // need to take in account console devices
+    lock_release(curproc->fd_table[fd]->lock);
+
     return 0;
 }
 
@@ -88,11 +111,10 @@ off_t sys_lseek (int fd, off_t pos, int whence) {
  *
  * return 0 on success (either closed the file or just decremented the refcnt)
  *  EBADF   fd is not within the legal range or wasn't open
- *  EIO     hard IO error occured
+ *  EIO     doesn't return (mentioned in manpages)
  */
 int sys_close(int fd) {
-    if (fd < 0 || fd > OPEN_MAX) return EBADF;
-    if (curproc->fd_table[fd] == NULL) return EBADF; 
+    if (fd < 0 || fd > OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
 
     lock_acquire(curproc->fd_table[fd]->lock);  
     if (--curproc->fd_table[fd]->ref_count != 0)    

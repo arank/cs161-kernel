@@ -29,7 +29,7 @@
 
 /*
  * High-level VFS operations on pathnames.
- */
+ */ 
 
 #include <types.h>
 #include <kern/errno.h>

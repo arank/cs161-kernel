@@ -22,7 +22,7 @@ struct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags) {
 lk_out:
 	kfree(fd);
 out:
-    return NULL;
+    return NULL;    /* effectively it means ENOMEM */
 }
 
 void fd_destroy(struct file_desc *fd) {
