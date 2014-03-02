@@ -615,6 +615,10 @@ static struct {
     { "lk",     lock_unittest },
     { "cv",     cv_unittest },
 
+    /* TODO file descriptor unit tests */
+
+    /* TODO process unit tests */
+
 	/* file system assignment tests */
 	{ "fs1",	fstest },
 	{ "fs2",	readstress },
@@ -731,7 +735,12 @@ menu_execute(char *line, int isargs)
 void
 menu(char *args)
 {
+
 	char buf[64];
+
+	// Execute all unit tests here, to ensure a clean boot, if one is failed
+	// a panic occurs.
+	run_tests();
 
 	menu_execute(args, 1);
 

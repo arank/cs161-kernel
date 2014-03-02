@@ -13,20 +13,22 @@
 #include <kern/iovec.h>
 #include <vnode.h>
 
-int sys_open(const_userptr_t filename , int flags, mode_t mode){
+int sys_open(const_userptr_t filename , int flags, mode_t mode, int *file_desc_pos){
     char *path;
     struct vnode *node;
-    // TODO what should the size be, is this right?
-    if(copyin(filename, path, sizeof(char*))!=0||path==NULL){
+    int err;
+    err=copyin(filename, path, sizeof(char*));
+    if(err!=0||path==NULL){
     	goto out;
     }
     // path and flags checked in vfs_open and fd_init
     // TODO should we be derefing node?
-    if(vfs_open(path, flags, mode, &node)!=0||node==NULL){
+    err=vfs_open(path, flags, mode, &node);
+    if(err!=0||node==NULL){
     	goto path_out;
     }
 
-    // Don't lock the process and check that we haven't exceeded the number of open files
+    // Don't have to lock the process to check that we haven't exceeded the number of open files
     // as this is single threaded
     int i;
     for (i = 0; i < OPEN_MAX; i++){
@@ -35,29 +37,61 @@ int sys_open(const_userptr_t filename , int flags, mode_t mode){
     }
     // We looped around, max number of files are open
     if(i==OPEN_MAX){
+    	err = EMFILE;
     	goto node_out;
     }
     struct file_desc *fd = fd_init(node, mode, flags);
     if(fd==NULL){
+    	err=ENOMEM;
     	goto node_out;
     }
     curproc->fd_table[i]=fd;
-    return i;
+    *file_desc_pos = i;
+    return 0;
 
+// TODO translate err codes
 node_out:
 	kfree(node);
 path_out:
 	kfree(path);
 out:
-	return 0;
+	return err;
 }
 
 ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
-    (void)fd;
-    (void)buf;
-    (void)buflen;
-    (void)bread;
+	int err;
+	struct iovec vec;
+	vec.iov_ubase=buf;
+	vec.iov_len = buflen;
+	struct file_desc *fd_ptr=curproc->fd_table[fd];
+	if(fd_ptr==NULL){
+		goto out;
+	}
+	lock_acquire(fd_ptr->lock);
+	struct uio io;
+	// TODO possibly check flags
+	io.uio_iov=&vec;
+	io.uio_iovcnt=1;
+	io.uio_offset=fd_ptr->offset;
+	io.uio_resid=buflen;
+	io.uio_segflg=UIO_USERSPACE;
+	io.uio_rw=UIO_READ;
+	io.uio_space=curproc->p_addrspace;
+	err = VOP_READ(fd_ptr->vn, &io);
+	if(err!=0){
+		goto lock_out;
+	}
+	// set offset to new value got by delta in offset
+	*bread = io.uio_offset-fd_ptr->offset;
+	fd_ptr->offset=io.uio_offset;
+	lock_release(fd_ptr->lock);
     return 0;
+
+// TODO translate err codes
+lock_out:
+	lock_release(fd_ptr->lock);
+out:
+	return err;
 }
 
 /**
