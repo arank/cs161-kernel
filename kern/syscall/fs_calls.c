@@ -19,7 +19,7 @@ int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_po
 	char path[PATH_MAX];
     struct vnode *node;
     int err;
-    err = copyinstr(filename, path, sizeof *path, NULL);
+    err = copyinstr(filename, path, sizeof(char) * PATH_MAX, NULL);
     if (err != 0) goto out;
     
     // path and flags checked in vfs_open and fd_init

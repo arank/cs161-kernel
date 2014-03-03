@@ -46,6 +46,7 @@
 int
 main(int argc, char *argv[])
 {
+	// TODO change sometest to argv[1] when exec implemented
 	printf("Started filetest.\n");
 	static char writebuf[40] = "Twiddle dee dee, Twiddle dum dum.......\n";
 	static char readbuf[41];
@@ -70,20 +71,29 @@ main(int argc, char *argv[])
 		err(1, "%s: write", argv[1]);
 	}
 
+	printf("File written.\n");
+
 	rv = close(fd);
 	if (rv<0) {
 		err(1, "%s: close (1st time)", argv[1]);
 	}
 
-	fd = open(argv[1], O_RDONLY);
+	printf("File closed.\n");
+
+	fd = open("sometest", O_RDONLY);
 	if (fd<0) {
 		err(1, "%s: open for read", argv[1]);
 	}
+
+	printf("File opened.\n");
 
 	rv = read(fd, readbuf, 40);
 	if (rv<0) {
 		err(1, "%s: read", argv[1]);
 	}
+
+	printf("File read.\n");
+
 	rv = close(fd);
 	if (rv<0) {
 		err(1, "%s: close (2nd time)", argv[1]);
@@ -91,11 +101,13 @@ main(int argc, char *argv[])
 	/* ensure null termination */
 	readbuf[40] = 0;
 
+	printf("File closed.\n");
+
 	if (strcmp(readbuf, writebuf)) {
 		errx(1, "Buffer data mismatch!");
 	}
 
-	rv = remove(argv[1]);
+	rv = remove("sometest");
 	if (rv<0) {
 		err(1, "%s: remove", argv[1]);
 	}
