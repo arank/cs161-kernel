@@ -15,11 +15,13 @@
 #include <lib.h>
 
 int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_pos) {
-    char path[PATH_MAX];
+    // Could walk off the end of the user world
+	char path[PATH_MAX];
     struct vnode *node;
     int err;
-    err = copyin(filename, path, sizeof *path);
-    if (err != 0 /*|| path == NULL*/) goto out;
+    // TODO use copyinstr
+    err = copyinstr(filename, path, sizeof *path, NULL);
+    if (err != 0) goto out;
     
     // path and flags checked in vfs_open and fd_init
     // TODO should we be derefing node?
@@ -44,7 +46,6 @@ int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_po
     	goto node_out;
     }
     curproc->fd_table[i]=fd;
-    kfree(node);
     *file_desc_pos = i;
     return 0;
 
