@@ -176,24 +176,16 @@ int sys_close(int fd) {
 
 int sys_dup2(int oldfd , int newfd, int *retval) {
 	int err;
-	if(oldfd < 0 || oldfd >= OPEN_MAX || newfd < 0 || newfd >= OPEN_MAX ){
+	struct file_desc *old = curproc->fd_table[oldfd];
+	if(oldfd < 0 || oldfd >= OPEN_MAX || newfd < 0 || newfd >= OPEN_MAX || old == NULL ){
 		err = EBADF;
 		goto out;
 	}
-	struct file_desc *new = curproc->fd_table[newfd];
-	struct file_desc *old = curproc->fd_table[oldfd];
-	// TODO possible race condition on new being null here
-	if(new!=NULL){
-		lock_acquire(new->lock);
-		if(--new->ref_count==0){
-			fd_destroy(new);
-		}else{
-			// TODO is it safe to free here?
-			lock_release(new->lock);
-		}
+	if(curproc->fd_table[newfd]!=NULL){
+		fd_dec_or_destroy(newfd);
 	}
 	lock_acquire(old->lock);
-	new=old;
+	curproc->fd_table[newfd]=old;
 	lock_release(old->lock);
 
 	*retval=newfd;

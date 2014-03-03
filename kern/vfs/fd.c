@@ -1,5 +1,6 @@
 #include <types.h>
 #include <fd.h>
+#include <proc.h>
 #include <current.h>
 #include <synch.h>
 #include <vfs.h>
@@ -25,13 +26,18 @@ out:
     return NULL;    /* effectively it means ENOMEM */
 }
 
-void fd_destroy(struct file_desc *fd) {
+void fd_dec_or_destroy(int index) {
+	struct file_desc *fd = curproc->fd_table[index];
+	if(fd==NULL){
+		return;
+	}
     lock_acquire(fd->lock);
     if (fd->ref_count == 1) {
         lock_release(fd->lock);
         lock_destroy(fd->lock);
         vfs_close(fd->vn);
         kfree(fd);
+        curproc->fd_table[index]=NULL;
     } else {
         fd->ref_count--;
     }
