@@ -107,7 +107,7 @@ ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten)
     lock_acquire(curproc->fd_table[fd]->lock);
 
     struct iovec iov;
-    iov.iov_kbase = buf;
+    iov.iov_ubase = (userptr_t)buf;
     iov.iov_len = nbytes;
 
     struct uio uio;
@@ -117,9 +117,9 @@ ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten)
     uio.uio_offset = curproc->fd_table[fd]->offset;
     uio.uio_resid = nbytes;
     uio.uio_rw = UIO_WRITE; 
-    uio.uio_space = curthread->a_addrspace;
+    uio.uio_space = curproc->p_addrspace;
 
-    int rv = VOP_WRITE(curproc->fd_table[fd]->vn, &uio)
+    int rv = VOP_WRITE(curproc->fd_table[fd]->vn, &uio);
     if (rv == ENOSPC || rv == EIO || rv == EFAULT) return rv;
     
     *bwritten = uio.uio_offset - curproc->fd_table[fd]->offset;
