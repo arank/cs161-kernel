@@ -98,7 +98,7 @@ void proc_remthread(struct thread *t);
 void cleanup_data(struct proc *proc);
 
 /* Clean up any shared struct, safely checking if drefed */
-void shared_link_destroy(struct proc_link *link);
+void shared_link_destroy(int index);
 
 /* Fetch the address space of the current process. */
 struct addrspace *proc_getas(void);

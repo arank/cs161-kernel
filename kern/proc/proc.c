@@ -242,13 +242,31 @@ proc_destroy(struct proc *proc)
 }
 
 
-void shared_link_destroy(struct proc_link *link) {
+void shared_link_destroy(int index) {
+	struct proc_link *link;
+	if(0>index || index>=MAX_CLD){
+		return;
+	}
+	// TODO Special case for parent is -1 define elsewhere
+	if(index == -1){
+		link = curproc->parent;
+	}else{
+		link = curproc->children[index];
+	}
+	if(link==NULL){
+		return;
+	}
     lock_acquire(link->lock);
 
     if (link->ref_count == 1) {
         lock_release(link->lock);
         lock_destroy(link->lock);
         cv_destroy(link->cv);
+        if(index == -1){
+        	curproc->parent = NULL;
+        }else{
+        	curproc->children[index] = NULL;
+        }
     } else {
         link->ref_count--;
     }
@@ -258,10 +276,10 @@ void shared_link_destroy(struct proc_link *link) {
 
 // TODO: think once again where to do the clearing
 void cleanup_data(struct proc *proc) {
+	(void) proc;
     int i;
     for (i = 0; i < MAX_CLD; i++)
-    	// TODO do we set the children i to null when clearing it
-        shared_link_destroy(proc->children[i]);
+    	shared_link_destroy(i);
 
     for (i = 0; i < OPEN_MAX; i++)
         fd_dec_or_destroy(i);
