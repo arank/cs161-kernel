@@ -55,7 +55,7 @@
 #include <kern/errno.h>
 #include <vfs.h>
 #include <uio.h>
-
+#include <fd.h>
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -113,7 +113,7 @@ static int init_and_open(struct proc *proc, int fd, char *console) {
 
     int rv = vfs_open(console, flags, mode, &proc->fd_table[fd]->vn);
     if (rv) { 
-        fd_destroy(proc->fd_table[fd]);
+        fd_dec_or_destroy(fd);
         return rv;
     }
 

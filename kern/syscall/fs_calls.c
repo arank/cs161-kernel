@@ -14,19 +14,8 @@
 #include <vnode.h>
 #include <lib.h>
 
-<<<<<<< HEAD
 int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_pos) {
     char path[PATH_MAX];
-=======
-/*
- * Note that the mode argument is currently voided at the lowest level, so it is purely passed to keep in line with
- * posix API
- *
- */
-
-int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_pos){
-	char *path;
->>>>>>> 8a55fb03cd64bb35e593050755bcc1641c253255
     struct vnode *node;
     int err;
     err = copyin(filename, path, sizeof *path);
@@ -54,14 +43,9 @@ int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_po
     	err = ENOMEM;
     	goto node_out;
     }
-<<<<<<< HEAD
-
-    curproc->fd_table[i] = fd;
-=======
     curproc->fd_table[i]=fd;
     kfree(node);
     kfree(path);
->>>>>>> 8a55fb03cd64bb35e593050755bcc1641c253255
     *file_desc_pos = i;
     return 0;
 
@@ -79,15 +63,10 @@ ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
 	struct iovec vec;
 	vec.iov_ubase = buf;
 	vec.iov_len = buflen;
-<<<<<<< HEAD
 
-	struct file_desc *fd_ptr = curproc->fd_table[fd];
-	if (fd_ptr == NULL) {
-=======
 	struct file_desc *fd_ptr=curproc->fd_table[fd];
 	if(fd_ptr==NULL){
 		err = EBADF;
->>>>>>> 8a55fb03cd64bb35e593050755bcc1641c253255
 		goto out;
 	}
 
