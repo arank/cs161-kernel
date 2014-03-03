@@ -35,10 +35,10 @@
 
 int
 run_tests(void){
-	char** null;
-	//  TODO without virtual memory the semtest causes an overflow of the kernel
-	//	semtest(0, null);
-	lock_unittest(0, null);
-	cv_unittest(0, null);
+	//char** null;
+	// Test Synch Problems
+//	semtest(0, null);
+//	cvtest(0, null);
+//	locktest(0, null);
 	return 0;
 }

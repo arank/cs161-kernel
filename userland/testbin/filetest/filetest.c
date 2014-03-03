@@ -46,6 +46,7 @@
 int
 main(int argc, char *argv[])
 {
+	printf("Started filetest.\n");
 	static char writebuf[40] = "Twiddle dee dee, Twiddle dum dum.......\n";
 	static char readbuf[41];
 
@@ -60,6 +61,7 @@ main(int argc, char *argv[])
 		err(1, "%s: open for write", argv[1]);
 	}
 
+	printf("File opened.\n");
 
 	rv = write(fd, writebuf, 40);
 	if (rv<0) {
