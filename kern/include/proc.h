@@ -94,6 +94,12 @@ int proc_addthread(struct proc *proc, struct thread *t);
 /* Detach a thread from its process. */
 void proc_remthread(struct thread *t);
 
+/* Clean up all data for a proc, minus the parent */
+void cleanup_data(struct proc *proc);
+
+/* Clean up any shared struct, safely checking if drefed */
+void shared_link_destroy(struct proc_link *link);
+
 /* Fetch the address space of the current process. */
 struct addrspace *proc_getas(void);
 

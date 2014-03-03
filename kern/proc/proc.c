@@ -60,10 +60,7 @@
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
-
-static void cleanup_data(struct proc *proc);
 static int console_init(struct proc *proc);
-void shared_link_destroy(struct proc_link *link);
 
 /*
  * Create a proc structure.
@@ -84,7 +81,6 @@ proc_create(const char *name)
 		return NULL;
 	}
     
-    console_init(proc);
     proc->parent = NULL;
     proc->pid = 0;
 
@@ -102,8 +98,8 @@ proc_create(const char *name)
 
 static int init_and_open(struct proc *proc, int fd, char *console) {
     struct vnode *vn;
-    int flags = 0;  /* ASK what's the default flags and mode */
-    mode_t mode = 0;    /* ASK */
+    int flags = 0;  /* TODO ASK what's the default flags and mode */
+    mode_t mode = 0;    /* TODO ASK */
 
     proc->fd_table[fd] = fd_init(vn, mode, flags);
     if(!proc->fd_table[fd]) {
@@ -237,9 +233,10 @@ void shared_link_destroy(struct proc_link *link) {
 }
 
 // TODO: think once again where to do the clearing
-static void cleanup_data(struct proc *proc) {
+void cleanup_data(struct proc *proc) {
     int i;
     for (i = 0; i < MAX_CLD; i++)
+    	// TODO do we set the children i to null when clearing it
         shared_link_destroy(proc->children[i]);
 
     for (i = 0; i < OPEN_MAX; i++)
