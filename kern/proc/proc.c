@@ -98,39 +98,6 @@ proc_create(const char *name)
 	return proc;
 }
 
-<<<<<<< HEAD
-static int init_and_open(struct proc *proc, int fd, char *console) {
-    struct vnode *vn;
-    int flags = 0;  /* TODO ASK what's the default flags and mode */
-    mode_t mode = 0;    /* TODO ASK */
-
-    proc->fd_table[fd] = fd_init(vn, mode, flags);
-    if(!proc->fd_table[fd]) {
-        kfree(console);
-        return ENOMEM;
-    }
-
-    int rv = vfs_open(console, flags, mode, &proc->fd_table[fd]->vn);
-    if (rv) { 
-        fd_dec_or_destroy(fd);
-        return rv;
-    }
-
-    return 0;
-}
-
-static int console_init(struct proc *proc) {
-    char *console = kstrdup("con:");
-    if (!console) return ENOMEM;
-
-    int rv = 0;
-    if ((rv = init_and_open(proc, STDIN_FILENO, console))) return rv;
-    if ((rv = init_and_open(proc, STDOUT_FILENO, console))) return rv;
-    if ((rv = init_and_open(proc, STDERR_FILENO, console))) return rv;
-
-    kfree(console);
-    return rv;
-=======
 static void console_init(struct proc *proc) {
     char *con_read = kstrdup("con:");                                                  
     char *con_write = kstrdup("con:");                                                  
@@ -183,8 +150,7 @@ static void console_init(struct proc *proc) {
 
     proc->fd_table[STDIN_FILENO] = stdin;                                    
     proc->fd_table[STDOUT_FILENO] = stdout;                                  
-    proc->fd_table[STDERR_FILENO] = stderr;                                  
->>>>>>> e53f37d744aa4bb9ed8200b74b58799a4a2bc5e0
+    proc->fd_table[STDERR_FILENO] = stderr;
 }
 
 /*
