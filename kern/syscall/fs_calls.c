@@ -19,13 +19,13 @@ int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_po
 	char path[PATH_MAX];
     struct vnode *node;
     int err;
-    err = copyinstr(filename, path, sizeof(*path), NULL);
+    err = copyinstr(filename, path, sizeof *path, NULL);
     if (err != 0) goto out;
     
     // path and flags checked in vfs_open and fd_init
     // TODO should we be derefing node?
     err = vfs_open(path, flags, mode, &node);
-    if (err != 0 || node == NULL) goto path_out;
+    if (err != 0 || node == NULL) goto out;
 
     // Don't have to lock the process to check that we haven't exceeded the number of open files
     // as this is single threaded
@@ -51,8 +51,6 @@ int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_po
 // TODO translate err codes
 node_out:
 	kfree(node);
-path_out:
-	kfree(path);
 out:
 	return err;
 }
