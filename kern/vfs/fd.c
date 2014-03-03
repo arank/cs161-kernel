@@ -38,6 +38,7 @@ void fd_dec_or_destroy(int index) {
         vfs_close(fd->vn);
         kfree(fd);
         curproc->fd_table[index]=NULL;
+        return;
     } else {
         fd->ref_count--;
     }
