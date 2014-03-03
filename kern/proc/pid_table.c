@@ -42,10 +42,6 @@ static struct {
     struct lock *lock;
 } *pid_table;
 
-static pid_t pid_get(void);
-static void pid_destroy(pid_t pid);
-static bool pid_in_use(pid_t pid);
-
 /* called in bootstrap */
 int init_pid_table(void) {
     (void)pid_get;
@@ -90,7 +86,7 @@ void destroy_pid_table(void) {
     kfree(pid_table); 
 }
 
-static pid_t pid_get(void) {
+pid_t pid_get(void) {
     lock_acquire(pid_table->lock);
     
     unsigned pid;
@@ -104,7 +100,7 @@ static pid_t pid_get(void) {
     return (pid_t) -1;
 }
 
-static void pid_destroy(pid_t pid) {
+void pid_destroy(pid_t pid) {
     lock_acquire(pid_table->lock);
     
     // TODO: check that this thread holds the pid
@@ -114,7 +110,7 @@ static void pid_destroy(pid_t pid) {
     lock_release(pid_table->lock);
 }
 
-static bool pid_in_use(pid_t pid) {
+bool pid_in_use(pid_t pid) {
     lock_acquire(pid_table->lock);
     if (bitmap_isset(pid_table->pid_map, (unsigned)pid)) {
         lock_release(pid_table->lock);
