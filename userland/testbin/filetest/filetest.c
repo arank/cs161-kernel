@@ -51,12 +51,14 @@ main(int argc, char *argv[])
 	static char readbuf[41];
 
 	int fd, rv;
-
+    (void)argc;
+    /*
 	if (argc!=2) {
 		errx(1, "Usage: filetest <filename>");
 	}
+    */
 
-	fd = open(argv[1], O_WRONLY|O_CREAT|O_TRUNC, 0664);
+	fd = open("sometest", O_WRONLY|O_CREAT|O_TRUNC, 0664);
 	if (fd<0) {
 		err(1, "%s: open for write", argv[1]);
 	}
