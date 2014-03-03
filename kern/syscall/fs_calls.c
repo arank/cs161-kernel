@@ -12,9 +12,21 @@
 #include <uio.h>
 #include <kern/iovec.h>
 #include <vnode.h>
+#include <lib.h>
 
+<<<<<<< HEAD
 int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_pos) {
     char path[PATH_MAX];
+=======
+/*
+ * Note that the mode argument is currently voided at the lowest level, so it is purely passed to keep in line with
+ * posix API
+ *
+ */
+
+int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_pos){
+	char *path;
+>>>>>>> 8a55fb03cd64bb35e593050755bcc1641c253255
     struct vnode *node;
     int err;
     err = copyin(filename, path, sizeof *path);
@@ -42,8 +54,14 @@ int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_po
     	err = ENOMEM;
     	goto node_out;
     }
+<<<<<<< HEAD
 
     curproc->fd_table[i] = fd;
+=======
+    curproc->fd_table[i]=fd;
+    kfree(node);
+    kfree(path);
+>>>>>>> 8a55fb03cd64bb35e593050755bcc1641c253255
     *file_desc_pos = i;
     return 0;
 
@@ -61,9 +79,15 @@ ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
 	struct iovec vec;
 	vec.iov_ubase = buf;
 	vec.iov_len = buflen;
+<<<<<<< HEAD
 
 	struct file_desc *fd_ptr = curproc->fd_table[fd];
 	if (fd_ptr == NULL) {
+=======
+	struct file_desc *fd_ptr=curproc->fd_table[fd];
+	if(fd_ptr==NULL){
+		err = EBADF;
+>>>>>>> 8a55fb03cd64bb35e593050755bcc1641c253255
 		goto out;
 	}
 
@@ -185,19 +209,73 @@ int sys_close(int fd) {
     return 0;
 }
 
-int sys_dup2(int oldfd , int newfd) {
-    (void)oldfd;
-    (void)newfd;
+int sys_dup2(int oldfd , int newfd, int *retval) {
+	int err;
+	struct file_desc *old = curproc->fd_table[oldfd];
+	if(oldfd < 0 || oldfd >= OPEN_MAX || newfd < 0 || newfd >= OPEN_MAX || old == NULL ){
+		err = EBADF;
+		goto out;
+	}
+	if(curproc->fd_table[newfd]!=NULL){
+		fd_dec_or_destroy(newfd);
+	}
+	lock_acquire(old->lock);
+	curproc->fd_table[newfd]=old;
+	lock_release(old->lock);
+
+	*retval=newfd;
+
     return 0;
+
+out:
+	return err;
 }
 
 int sys_chdir (const_userptr_t pathname) {
-    (void)pathname;
+	char *path;
+    int err;
+    err=copyin(pathname, path, sizeof(char*));
+    if(err!=0||path==NULL){
+    	goto out;
+    }
+    err=vfs_chdir(path);
+    if(err!=0){
+    	goto path_out;
+    }
+
+    kfree(path);
     return 0;
+
+// TODO translate error codes for vfs_chdir
+path_out:
+	kfree(path);
+out:
+	return err;
 }
 
-int sys___getcwd(userptr_t buf , size_t buflen) {
-    (void)buf;
-    (void)buflen;
+int sys___getcwd(userptr_t buf , size_t buflen, int *bwritten) {
+	int err;
+	struct iovec iov;
+	iov.iov_ubase = (userptr_t)buf;
+	iov.iov_len = buflen;
+
+	struct uio io;
+	io.uio_iov=&iov;
+	io.uio_iovcnt=1;
+	io.uio_offset=0;
+	io.uio_resid=buflen;
+	io.uio_segflg=UIO_USERSPACE;
+	io.uio_rw=UIO_WRITE;
+	io.uio_space=curproc->p_addrspace;
+
+	err=vfs_getcwd(&io);
+	if(err!=0){
+		goto out;
+	}
+	*bwritten=io.uio_offset;
     return 0;
+
+// TODO translate error codes
+out:
+	return err;
 }

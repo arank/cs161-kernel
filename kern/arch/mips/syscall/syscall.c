@@ -131,7 +131,7 @@ syscall(struct trapframe *tf)
 	    break;
 
 	    case SYS_dup2:
-		err = sys_dup2(tf->tf_a0 , tf->tf_a1);
+		err=sys_dup2(tf->tf_a0 , tf->tf_a1, (int *)&retval);
 		break;
 
 	    case SYS_chdir:
@@ -139,11 +139,16 @@ syscall(struct trapframe *tf)
 	    break;
 
 	    case SYS___getcwd:
-		err = sys___getcwd((userptr_t)tf->tf_a0 , tf->tf_a1);
+		err=sys___getcwd((userptr_t)tf->tf_a0 , tf->tf_a1, (int *)&retval);
 	    break;
 
 	    case SYS_waitpid:
 	    err = sys_waitpid(tf->tf_a0, (userptr_t) tf->tf_a1, tf->tf_a2);
+	    break;
+
+	    // Special case as getpid can't fail in POSIX
+	    case SYS_getpid:
+	    retval=sys_getpid();
 	    break;
 
 	    case SYS__exit:

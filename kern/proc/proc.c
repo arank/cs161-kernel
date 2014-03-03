@@ -243,7 +243,7 @@ static void cleanup_data(struct proc *proc) {
         shared_link_destroy(proc->children[i]);
 
     for (i = 0; i < OPEN_MAX; i++)
-        fd_destroy(proc->fd_table[i]);
+        fd_dec_or_destroy(i);
 }
 
 /*

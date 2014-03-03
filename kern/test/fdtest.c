@@ -32,13 +32,14 @@
  */
 
 #include <test.h>
+#include <types.h>
+#include <lib.h>
+#include <syscall.h>
+#include <kern/fcntl.h>
 
-//TODO write this
+//TODO write this fully, with real files
 int open_test(int nargs, char **args){
 	(void)nargs;
 	(void)args;
-
-
-
 	return 0;
 }

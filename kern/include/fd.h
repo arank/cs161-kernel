@@ -13,6 +13,6 @@ struct file_desc {
 };
 
 struct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags);
-void fd_destroy(struct file_desc *fd);
+void fd_dec_or_destroy(int index);
 
 #endif /* _FD_H_ */
