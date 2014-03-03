@@ -20,9 +20,11 @@ pid_t sys_getpid(){
 
 
 void sys__exit(int exitcode) {
-	curproc->parent->exit_code=exitcode;
-	// TODO Special case for parent is -1 define elsewhere
-	shared_link_destroy(-1);
+	if(curproc->parent != NULL){
+		curproc->parent->exit_code=exitcode;
+		// TODO Special case for parent is -1 define elsewhere
+		shared_link_destroy(-1);
+	}
 	cleanup_data(curproc);
 	thread_exit();
 }
