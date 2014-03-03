@@ -111,42 +111,39 @@ syscall(struct trapframe *tf)
 		/* Add stuff here */
 
 	    case SYS_open:
-	    err=sys_open((const_userptr_t)tf->tf_a0, tf->tf_a1, tf->tf_a2, (int *)&retval);
+	    err = sys_open((const_userptr_t)tf->tf_a0, tf->tf_a1, tf->tf_a2, (int *)&retval);
 		break;
 
 	    case SYS_read:
-	    // TODO this returns a size_t not an int is this ok?
-		err=sys_read(tf->tf_a0 , (userptr_t) tf->tf_a1 , tf->tf_a2, (ssize_t *)&retval);
+		err = sys_read(tf->tf_a0 , (userptr_t) tf->tf_a1 , tf->tf_a2, (ssize_t *)&retval);
 		break;
 
 	    case SYS_write:
-		// TODO this returns a size_t not an int is this ok?
-		err=sys_write(tf->tf_a0, (const_userptr_t) tf->tf_a1, tf->tf_a2, (ssize_t *)&retval);
+		err = sys_write(tf->tf_a0, (const_userptr_t) tf->tf_a1, tf->tf_a2, (ssize_t *)&retval);
 		break;
 
 	    case SYS_lseek:
-	    // TODO this returns an off_t not an int is this ok?
-		err=sys_lseek (tf->tf_a0 , tf->tf_a1 , tf->tf_a2);
+		err = sys_lseek (tf->tf_a0 , tf->tf_a1 , tf->tf_a2, (off_t *)&retval);
 		break;
 
 	    case SYS_close:
-		err=sys_close(tf->tf_a0);
+		err = sys_close(tf->tf_a0);
 	    break;
 
 	    case SYS_dup2:
-		err=sys_dup2(tf->tf_a0 , tf->tf_a1);
+		err = sys_dup2(tf->tf_a0 , tf->tf_a1);
 		break;
 
 	    case SYS_chdir:
-		err=sys_chdir ((const_userptr_t)tf->tf_a0);
+		err = sys_chdir ((const_userptr_t)tf->tf_a0);
 	    break;
 
 	    case SYS___getcwd:
-		err=sys___getcwd((userptr_t)tf->tf_a0 , tf->tf_a1);
+		err = sys___getcwd((userptr_t)tf->tf_a0 , tf->tf_a1);
 	    break;
 
 	    case SYS_waitpid:
-	    err=sys_waitpid(tf->tf_a0, (userptr_t) tf->tf_a1, tf->tf_a2);
+	    err = sys_waitpid(tf->tf_a0, (userptr_t) tf->tf_a1, tf->tf_a2);
 	    break;
 
 	    case SYS__exit:

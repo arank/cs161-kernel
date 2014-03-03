@@ -51,6 +51,10 @@
 #include <pid_table.h>
 #include <fd.h>
 #include <synch.h>
+#include <kern/unistd.h>
+#include <kern/errno.h>
+#include <vfs.h>
+#include <uio.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -58,6 +62,7 @@
 struct proc *kproc;
 
 static void cleanup_data(struct proc *proc);
+static int console_init(struct proc *proc);
 void shared_link_destroy(struct proc_link *link);
 
 /*
@@ -78,7 +83,8 @@ proc_create(const char *name)
 		kfree(proc);
 		return NULL;
 	}
-
+    
+    console_init(proc);
     proc->parent = NULL;
     proc->pid = 0;
 
@@ -92,6 +98,39 @@ proc_create(const char *name)
 	proc->p_cwd = NULL;
 
 	return proc;
+}
+
+static int init_and_open(struct proc *proc, int fd, char *console) {
+    struct vnode *vn;
+    int flags = 0;  /* ASK what's the default flags and mode */
+    mode_t mode = 0;    /* ASK */
+
+    proc->fd_table[fd] = fd_init(vn, mode, flags);
+    if(!proc->fd_table[fd]) {
+        kfree(console);
+        return ENOMEM;
+    }
+
+    int rv = vfs_open(console, flags, mode, &proc->fd_table[fd]->vn);
+    if (rv) { 
+        fd_destroy(proc->fd_table[fd]);
+        return rv;
+    }
+
+    return 0;
+}
+
+static int console_init(struct proc *proc) {
+    char *console = kstrdup("con:");
+    if (!console) return ENOMEM;
+
+    int rv = 0;
+    if ((rv = init_and_open(proc, STDIN_FILENO, console))) return rv;
+    if ((rv = init_and_open(proc, STDOUT_FILENO, console))) return rv;
+    if ((rv = init_and_open(proc, STDERR_FILENO, console))) return rv;
+
+    kfree(console);
+    return rv;
 }
 
 /*

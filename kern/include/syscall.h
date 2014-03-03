@@ -61,7 +61,7 @@ int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 int sys_open(const_userptr_t filename , int flags, mode_t mode, int *file_desc_pos);
 ssize_t sys_read(int fd , userptr_t buf , size_t buflen, ssize_t *rbytes);
 ssize_t sys_write(int fd , const_userptr_t buf , size_t nbytes, ssize_t *wbytes);
-off_t sys_lseek (int fd , off_t pos , int whence);
+off_t sys_lseek (int fd , off_t pos , int whence, off_t *ret_pos);
 int sys_close(int fd);
 int sys_dup2(int oldfd , int newfd);
 int sys_chdir ( const_userptr_t pathname);

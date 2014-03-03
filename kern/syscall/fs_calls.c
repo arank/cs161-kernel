@@ -13,39 +13,37 @@
 #include <kern/iovec.h>
 #include <vnode.h>
 
-int sys_open(const_userptr_t filename , int flags, mode_t mode, int *file_desc_pos){
-    char *path;
+int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_pos) {
+    char path[PATH_MAX];
     struct vnode *node;
     int err;
-    err=copyin(filename, path, sizeof(char*));
-    if(err!=0||path==NULL){
-    	goto out;
-    }
+    err = copyin(filename, path, sizeof *path);
+    if (err != 0 /*|| path == NULL*/) goto out;
+    
     // path and flags checked in vfs_open and fd_init
     // TODO should we be derefing node?
-    err=vfs_open(path, flags, mode, &node);
-    if(err!=0||node==NULL){
-    	goto path_out;
-    }
+    err = vfs_open(path, flags, mode, &node);
+    if (err != 0 || node == NULL) goto path_out;
 
     // Don't have to lock the process to check that we haven't exceeded the number of open files
     // as this is single threaded
     int i;
-    for (i = 0; i < OPEN_MAX; i++){
-    	if(curproc->fd_table[i]==NULL)
-    		break;
-    }
+    for (i = 0; i < OPEN_MAX; i++) 
+    	if(curproc->fd_table[i] == NULL) break;
+    
     // We looped around, max number of files are open
-    if(i==OPEN_MAX){
+    if (i == OPEN_MAX) {
     	err = EMFILE;
     	goto node_out;
     }
+
     struct file_desc *fd = fd_init(node, mode, flags);
-    if(fd==NULL){
-    	err=ENOMEM;
+    if (fd == NULL) {
+    	err = ENOMEM;
     	goto node_out;
     }
-    curproc->fd_table[i]=fd;
+
+    curproc->fd_table[i] = fd;
     *file_desc_pos = i;
     return 0;
 
@@ -61,28 +59,30 @@ out:
 ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
 	int err;
 	struct iovec vec;
-	vec.iov_ubase=buf;
+	vec.iov_ubase = buf;
 	vec.iov_len = buflen;
-	struct file_desc *fd_ptr=curproc->fd_table[fd];
-	if(fd_ptr==NULL){
+
+	struct file_desc *fd_ptr = curproc->fd_table[fd];
+	if (fd_ptr == NULL) {
 		goto out;
 	}
+
 	lock_acquire(fd_ptr->lock);
 	struct uio io;
 	// TODO possibly check flags
-	io.uio_iov=&vec;
-	io.uio_iovcnt=1;
-	io.uio_offset=fd_ptr->offset;
-	io.uio_resid=buflen;
-	io.uio_segflg=UIO_USERSPACE;
-	io.uio_rw=UIO_READ;
-	io.uio_space=curproc->p_addrspace;
+	io.uio_iov = &vec;
+	io.uio_iovcnt = 1;
+	io.uio_offset = fd_ptr->offset;
+	io.uio_resid = buflen;
+	io.uio_segflg = UIO_USERSPACE;
+	io.uio_rw = UIO_READ;
+	io.uio_space = curproc->p_addrspace;
 	err = VOP_READ(fd_ptr->vn, &io);
-	if(err!=0){
+	if (err != 0) {
 		goto lock_out;
 	}
 	// set offset to new value got by delta in offset
-	*bread = io.uio_offset-fd_ptr->offset;
+	*bread = io.uio_offset - fd_ptr->offset;
 	fd_ptr->offset=io.uio_offset;
 	lock_release(fd_ptr->lock);
     return 0;
@@ -120,19 +120,40 @@ ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten)
     uio.uio_space = curproc->p_addrspace;
 
     int rv = VOP_WRITE(curproc->fd_table[fd]->vn, &uio);
-    if (rv == ENOSPC || rv == EIO || rv == EFAULT) return rv;
-    
+    if (rv == ENOSPC || rv == EIO || rv == EFAULT) { 
+        lock_release(curproc->fd_table[fd]->lock);
+        return rv;
+    } 
+
     *bwritten = uio.uio_offset - curproc->fd_table[fd]->offset;
-    // need to take in account console devices
     lock_release(curproc->fd_table[fd]->lock);
 
     return 0;
 }
 
-off_t sys_lseek (int fd, off_t pos, int whence) {
-    (void)fd;
+off_t sys_lseek (int fd, off_t pos, int whence, off_t *ret_pos) {
+    if (fd < 0 || fd > OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
     (void)pos;
+    (void)ret_pos;
     (void)whence;
+#if 0
+    
+    if (whence != SEEK_SET || whence != SEEK_CUR || whence != SEEK_END) 
+        return EINVAL;
+    lock_acquire(curproc->fd_table[fd]->lock);
+
+    struct stat stat;
+    if (VOP_STAT(curproc->fd_table[fd]->vn, &stat)) /* get the end of file */
+        return -1;  /* ASK David about VOP_STAT return value */
+
+    int new_pos;
+    if (whence == SEEK_SET) new_pos = pos;
+    else if (whence == SEEK_CUR) new_pos = curproc->fd_table[fd]->offset + pos;
+    else new_pos = stat.st_size + pos;
+
+    int rv = VOP_TRYSEEK(curproc->fd_table[fd]->vn, pos);
+    if (rv == ESPIPE) return rv;
+#endif
     return 0;
 }
 
