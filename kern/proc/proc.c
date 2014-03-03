@@ -56,11 +56,13 @@
 #include <vfs.h>
 #include <uio.h>
 #include <fd.h>
+#include <kern/fcntl.h>
+
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
-static int console_init(struct proc *proc);
+static void console_init(struct proc *proc);
 
 /*
  * Create a proc structure.
@@ -96,6 +98,7 @@ proc_create(const char *name)
 	return proc;
 }
 
+<<<<<<< HEAD
 static int init_and_open(struct proc *proc, int fd, char *console) {
     struct vnode *vn;
     int flags = 0;  /* TODO ASK what's the default flags and mode */
@@ -127,6 +130,61 @@ static int console_init(struct proc *proc) {
 
     kfree(console);
     return rv;
+=======
+static void console_init(struct proc *proc) {
+    char *con_read = kstrdup("con:");                                                  
+    char *con_write = kstrdup("con:");                                                  
+    char *con_error = kstrdup("con:");                                                  
+    if (con_read == NULL || con_write == NULL || con_error == NULL)           
+        panic("proc init: could not connect to console\n");      
+
+    struct vnode *out;                                                      
+    struct vnode *in;                                                       
+    struct vnode *err;                                                      
+    int rv1 = vfs_open(con_read, O_RDONLY, 0, &in);                          
+    int rv2 = vfs_open(con_write, O_WRONLY, 0, &out);                         
+    int rv3 = vfs_open(con_error, O_WRONLY, 0, &err);                         
+    if (rv1 | rv2 | rv3)                                                       
+        panic("proc init: could not connect to console\n");      
+
+    kfree(con_read);                                                        
+    kfree(con_write);                                                        
+    kfree(con_error);                                                        
+
+    struct file_desc *stdin = kmalloc(sizeof *stdin);          
+    struct file_desc *stdout = kmalloc(sizeof *stdout);         
+    struct file_desc *stderr = kmalloc(sizeof *stderr);         
+    if (stdin == NULL || stdout == NULL || stderr == NULL)                  
+        panic("proc init: out of memory\n");                     
+
+    stdin->flags = O_RDONLY;                                               
+    stdin->ref_count = 1;                                                      
+    stdin->offset = 0;                                                      
+    stdin->vn = in;                                                   
+    stdin->mode = 0;
+    stdin->lock = lock_create("stdin");                                    
+
+    stdout->flags = O_WRONLY;                                              
+    stdout->ref_count = 1;                                                     
+    stdout->offset = 0;                                                     
+    stdout->vn = out;                                                     
+    stdout->mode = 0;
+    stdout->lock = lock_create("stdout");
+
+    stderr->flags = O_WRONLY;
+    stderr->ref_count = 1;
+    stderr->offset = 0;
+    stderr->vn = err;                                       
+    stderr->mode = 0;
+    stderr->lock = lock_create("stderr");                                  
+
+    if (stdin->lock == NULL || stdout->lock == NULL || stderr->lock == NULL)
+        panic("thread_bootstrap: stdin, stdout, or stderr lock couldn't be initialized\n");
+
+    proc->fd_table[STDIN_FILENO] = stdin;                                    
+    proc->fd_table[STDOUT_FILENO] = stdout;                                  
+    proc->fd_table[STDERR_FILENO] = stderr;                                  
+>>>>>>> e53f37d744aa4bb9ed8200b74b58799a4a2bc5e0
 }
 
 /*
@@ -277,8 +335,10 @@ proc_create_runprogram(const char *name)
 	}
 
 	/* VM fields */
-
 	proc->p_addrspace = NULL;
+
+    /* Console devices */
+    console_init(proc);
 
 	/* VFS fields */
 
@@ -289,7 +349,6 @@ proc_create_runprogram(const char *name)
 		proc->p_cwd = curproc->p_cwd;
 	}
 	spinlock_release(&curproc->p_lock);
-
 	return proc;
 }
 

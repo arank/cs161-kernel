@@ -45,7 +45,6 @@ int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_po
     }
     curproc->fd_table[i]=fd;
     kfree(node);
-    kfree(path);
     *file_desc_pos = i;
     return 0;
 

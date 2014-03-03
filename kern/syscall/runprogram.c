@@ -44,8 +44,62 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <kern/unistd.h>
+#include <synch.h>
 
 struct lock *exec_lock;
+
+static void console_init(struct proc *proc) {
+    char *con_read = kstrdup("con:");                                                  
+    char *con_write = kstrdup("con:");                                                  
+    char *con_error = kstrdup("con:");                                                  
+    if (con_read == NULL || con_write == NULL || con_error == NULL)           
+        panic("proc init: could not connect to console\n");      
+
+    struct vnode *out;                                                      
+    struct vnode *in;                                                       
+    struct vnode *err;                                                      
+    int rv1 = vfs_open(con_read, O_RDONLY, 0664, &in);                          
+    int rv2 = vfs_open(con_write, O_WRONLY, 0664, &out);                         
+    int rv3 = vfs_open(con_error, O_WRONLY, 0664, &err);                         
+    if (rv1 | rv2 | rv3)                                                       
+        panic("proc init: could not connect to console\n");      
+
+    kfree(con_read);                                                        
+    kfree(con_write);                                                        
+    kfree(con_error);                                                        
+
+    struct file_desc *stdin = kmalloc(sizeof *stdin);          
+    struct file_desc *stdout = kmalloc(sizeof *stdout);         
+    struct file_desc *stderr = kmalloc(sizeof *stderr);         
+    if (stdin == NULL || stdout == NULL || stderr == NULL)                  
+        panic("proc init: out of memory\n");                     
+
+    stdin->flags = O_RDONLY;                                               
+    stdin->ref_count = 1;                                                      
+    stdin->offset = 0;                                                      
+    stdin->vn = in;                                                   
+    stdin->lock = lock_create("stdin");                                    
+
+    stdout->flags = O_WRONLY;                                              
+    stdout->ref_count = 1;                                                     
+    stdout->offset = 0;                                                     
+    stdout->vn = out;                                                     
+    stdout->lock = lock_create("stdout");                                  
+
+    stderr->flags = O_WRONLY;                                              
+    stderr->ref_count = 1;                                                     
+    stderr->offset = 0;                                                     
+    stderr->vn = err;                                                     
+    stderr->lock = lock_create("stderr");                                  
+
+    if (stdin->lock == NULL || stdout->lock == NULL || stderr->lock == NULL)
+        panic("thread_bootstrap: stdin, stdout, or stderr lock couldn't be initialized\n");
+
+    proc->fd_table[STDIN_FILENO] = stdin;                                    
+    proc->fd_table[STDOUT_FILENO] = stdout;                                  
+    proc->fd_table[STDERR_FILENO] = stderr;                                  
+}
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -56,56 +110,57 @@ struct lock *exec_lock;
 int
 runprogram(char *progname)
 {
-	struct addrspace *as;
-	struct vnode *v;
-	vaddr_t entrypoint, stackptr;
-	int result;
+    (void)console_init;
+    struct addrspace *as;
+    struct vnode *v;
+    vaddr_t entrypoint, stackptr;
+    int result;
 
-	/* Open the file. */
-	result = vfs_open(progname, O_RDONLY, 0, &v);
-	if (result) {
-		return result;
-	}
+    /* Open the file. */
+    result = vfs_open(progname, O_RDONLY, 0, &v);
+    if (result) {
+        return result;
+    }
 
-	/* We should be a new process. */
-	KASSERT(proc_getas() == NULL);
+    /* We should be a new process. */
+    KASSERT(proc_getas() == NULL);
 
-	/* Create a new address space. */
-	as = as_create();
-	if (as == NULL) {
-		vfs_close(v);
-		return ENOMEM;
-	}
+    /* Create a new address space. */
+    as = as_create();
+    if (as == NULL) {
+        vfs_close(v);
+        return ENOMEM;
+    }
 
-	/* Switch to it and activate it. */
-	proc_setas(as);
-	as_activate();
+    /* Switch to it and activate it. */
+    proc_setas(as);
+    as_activate();
 
-	/* Load the executable. */
-	result = load_elf(v, &entrypoint);
-	if (result) {
-		/* p_addrspace will go away when curproc is destroyed */
-		vfs_close(v);
-		return result;
-	}
+    /* Load the executable. */
+    result = load_elf(v, &entrypoint);
+    if (result) {
+        /* p_addrspace will go away when curproc is destroyed */
+        vfs_close(v);
+        return result;
+    }
 
-	/* Done with the file now. */
-	vfs_close(v);
+    /* Done with the file now. */
+    vfs_close(v);
 
-	/* Define the user stack in the address space */
-	result = as_define_stack(as, &stackptr);
-	if (result) {
-		/* p_addrspace will go away when curproc is destroyed */
-		return result;
-	}
+    /* Define the user stack in the address space */
+    result = as_define_stack(as, &stackptr);
+    if (result) {
+        /* p_addrspace will go away when curproc is destroyed */
+        return result;
+    }
 
-	/* Warp to user mode. */
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
-			  NULL /*userspace addr of environment*/,
-			  stackptr, entrypoint);
+    /* Warp to user mode. */
+    enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+            NULL /*userspace addr of environment*/,
+            stackptr, entrypoint);
 
-	/* enter_new_process does not return. */
-	panic("enter_new_process returned\n");
-	return EINVAL;
+    /* enter_new_process does not return. */
+    panic("enter_new_process returned\n");
+    return EINVAL;
 }
 
