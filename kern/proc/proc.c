@@ -247,8 +247,7 @@ void shared_link_destroy(int index) {
 	if(0>index || index>=MAX_CLD){
 		return;
 	}
-	// TODO Special case for parent is -1 define elsewhere
-	if(index == -1){
+	if(index == PARENT){
 		link = curproc->parent;
 	}else{
 		link = curproc->children[index];
@@ -257,21 +256,24 @@ void shared_link_destroy(int index) {
 		return;
 	}
     lock_acquire(link->lock);
-
+    if(index == PARENT){
+    	cv_signal(link->cv, link->lock);
+    }
+    // In this state of the world there is no parent or
+    // other entity referencing the shared struct
     if (link->ref_count == 1) {
         lock_release(link->lock);
         lock_destroy(link->lock);
         cv_destroy(link->cv);
-        if(index == -1){
+        if(index == PARENT){
         	curproc->parent = NULL;
         }else{
         	curproc->children[index] = NULL;
         }
     } else {
         link->ref_count--;
+        lock_release(link->lock);
     }
-
-    lock_release(link->lock);
 }
 
 // TODO: think once again where to do the clearing
