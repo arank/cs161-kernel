@@ -57,9 +57,8 @@ void sys__exit(int exitcode) {
 	// Check if init thread with no parent
 	if(curproc->parent != NULL){
 		curproc->parent->exit_code=exitcode;
-		shared_link_destroy(PARENT);
+		shared_link_destroy(PARENT, curproc);
 	}
-	cleanup_data(curproc);
 	pid_t pid = curproc->pid;
 	proc_destroy(curproc);
 	pid_destroy(pid);

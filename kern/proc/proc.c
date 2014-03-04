@@ -233,6 +233,7 @@ proc_destroy(struct proc *proc)
 		as_destroy(as);
 	}
 
+
     cleanup_data(proc);
 	threadarray_cleanup(&proc->p_threads);
 	spinlock_cleanup(&proc->p_lock);
@@ -242,15 +243,15 @@ proc_destroy(struct proc *proc)
 }
 
 
-void shared_link_destroy(int index) {
+void shared_link_destroy(int index, struct proc* proc) {
 	struct proc_link *link;
 	if(0>index || index>=MAX_CLD){
 		return;
 	}
 	if(index == PARENT){
-		link = curproc->parent;
+		link = proc->parent;
 	}else{
-		link = curproc->children[index];
+		link = proc->children[index];
 	}
 	if(link==NULL){
 		return;
@@ -266,9 +267,9 @@ void shared_link_destroy(int index) {
         lock_destroy(link->lock);
         cv_destroy(link->cv);
         if(index == PARENT){
-        	curproc->parent = NULL;
+        	proc->parent = NULL;
         }else{
-        	curproc->children[index] = NULL;
+        	proc->children[index] = NULL;
         }
     } else {
         link->ref_count--;
@@ -278,13 +279,12 @@ void shared_link_destroy(int index) {
 
 // TODO: think once again where to do the clearing
 void cleanup_data(struct proc *proc) {
-	(void) proc;
     int i;
     for (i = 0; i < MAX_CLD; i++)
-    	shared_link_destroy(i);
+    	shared_link_destroy(i, proc);
 
     for (i = 0; i < OPEN_MAX; i++)
-        fd_dec_or_destroy(i);
+        fd_dec_or_destroy(i, proc);
 }
 
 /*
