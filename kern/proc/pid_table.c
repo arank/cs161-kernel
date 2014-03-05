@@ -44,9 +44,6 @@ static struct {
 
 /* called in bootstrap */
 int init_pid_table(void) {
-    (void)pid_get;
-    (void)pid_destroy;
-    (void)pid_in_use;
 
     pid_table = kmalloc (sizeof *pid_table);
     if (pid_table == NULL) goto out;
@@ -58,6 +55,8 @@ int init_pid_table(void) {
     if (pid_table->lock == NULL) goto lk_out;
 
     //pid_table->counter = 0;
+    // Set kernel proc's pid
+    bitmap_mark(pid_table->pid_map, 0);
     
     return 0;
 

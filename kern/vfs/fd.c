@@ -26,8 +26,8 @@ out:
     return NULL;    /* effectively it means ENOMEM */
 }
 
-void fd_dec_or_destroy(int index) {
-	struct file_desc *fd = curproc->fd_table[index];
+void fd_dec_or_destroy(int index, struct proc *proc) {
+	struct file_desc *fd = proc->fd_table[index];
 	if(fd==NULL){
 		return;
 	}
@@ -37,7 +37,7 @@ void fd_dec_or_destroy(int index) {
         lock_destroy(fd->lock);
         vfs_close(fd->vn);
         kfree(fd);
-        curproc->fd_table[index]=NULL;
+        proc->fd_table[index]=NULL;
         return;
     } else {
         fd->ref_count--;

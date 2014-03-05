@@ -21,7 +21,7 @@ int sys_open(const_userptr_t filename, int flags, mode_t mode, int *file_desc_po
 	char path[PATH_MAX];
     struct vnode *node;
     int err;
-    err = copyinstr(filename, path, sizeof(char) * PATH_MAX, NULL);
+    err = copyinstr(filename, path, sizeof path, NULL);
     if (err != 0) goto out;
     
     // path and flags checked in vfs_open and fd_init
@@ -113,6 +113,7 @@ ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten)
     iov.iov_ubase = (userptr_t)buf;
     iov.iov_len = nbytes;
 
+    // TODO use uio_kinit
     struct uio uio;
     uio.uio_iov = &iov;
     uio.uio_iovcnt = 1;
@@ -210,9 +211,10 @@ int sys_dup2(int oldfd , int newfd, int *retval) {
     }
 
 	if(curproc->fd_table[newfd] != NULL)
-		fd_dec_or_destroy(newfd);
+		fd_dec_or_destroy(newfd, curproc);
 
 	curproc->fd_table[newfd] = curproc->fd_table[oldfd];
+
 	lock_acquire(curproc->fd_table[newfd]->lock);
     curproc->fd_table[newfd]->ref_count++;
 	lock_release(curproc->fd_table[newfd]->lock);

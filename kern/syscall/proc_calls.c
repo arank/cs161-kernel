@@ -53,16 +53,19 @@ pid_t sys_getpid(){
 
 
 void sys__exit(int exitcode) {
-	proc_remthread(curthread);
-	// Check if init thread with no parent
-	if(curproc->parent != NULL){
-		curproc->parent->exit_code=exitcode;
-		shared_link_destroy(PARENT);
+	struct proc *proc = curproc;
+	// If there is a parent, set the exit code in the parent
+	if(proc->parent != NULL){
+		proc->parent->exit_code=exitcode;
+		shared_link_destroy(PARENT, proc);
 	}
-	cleanup_data(curproc);
-	pid_t pid = curproc->pid;
-	proc_destroy(curproc);
-	pid_destroy(pid);
+	// TODO is it safe to free pid here
+	pid_destroy(proc->pid);
+	// Add thread to the kernel
+	proc_remthread(curthread);
+	proc_addthread(kproc, curthread);
+	// Destroy the old process
+	proc_destroy(proc);
 	thread_exit();
 }
 

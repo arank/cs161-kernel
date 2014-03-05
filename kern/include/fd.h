@@ -3,6 +3,8 @@
 
 #include <vnode.h>
 
+struct proc;
+
 struct file_desc {
     struct vnode *vn;
     off_t offset;
@@ -13,6 +15,6 @@ struct file_desc {
 };
 
 struct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags);
-void fd_dec_or_destroy(int index);
+void fd_dec_or_destroy(int index, struct proc *proc);
 
 #endif /* _FD_H_ */
