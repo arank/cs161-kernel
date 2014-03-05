@@ -35,7 +35,8 @@
 #include <thread.h>
 #include <current.h>
 #include <syscall.h>
-
+#include <endian.h>
+#include <copyinout.h>
 
 /*
  * System call dispatcher.
@@ -82,6 +83,10 @@ syscall(struct trapframe *tf)
 	int32_t retval;
 	int err;
 
+    /* vars for lseek */
+    uint64_t offset_in;
+    uint64_t offset_out;
+    int whence;
 	KASSERT(curthread != NULL);
 	KASSERT(curthread->t_curspl == 0);
 	KASSERT(curthread->t_iplhigh_count == 0);
@@ -123,7 +128,12 @@ syscall(struct trapframe *tf)
 		break;
 
 	    case SYS_lseek:
-		err = sys_lseek (tf->tf_a0 , tf->tf_a1 , tf->tf_a2, (off_t *)&retval);
+        join32to64(tf->tf_a2, tf->tf_a3, &offset_in);    /* join pos argument */
+        /* get whence from the stack */
+        err = copyin((const_userptr_t)(tf->tf_sp + 16), &whence, sizeof (uint32_t)); 
+        if (err) break;
+		err = sys_lseek (tf->tf_a0, (off_t)offset_in, (int)whence, (off_t *)&offset_out);
+        split64to32(offset_out, (uint32_t *)&retval, &tf->tf_v1);
 		break;
 
 	    case SYS_close:
@@ -131,7 +141,7 @@ syscall(struct trapframe *tf)
 	    break;
 
 	    case SYS_dup2:
-		err=sys_dup2(tf->tf_a0 , tf->tf_a1, (int *)&retval);
+		err = sys_dup2(tf->tf_a0 , tf->tf_a1, (int *)&retval);
 		break;
 
 	    case SYS_chdir:

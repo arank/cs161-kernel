@@ -77,6 +77,7 @@ proc_create(const char *name)
 	if (proc == NULL) {
 		return NULL;
 	}
+    memset(proc, 0, sizeof *proc);
 	proc->p_name = kstrdup(name);
 	if (proc->p_name == NULL) {
 		kfree(proc);
