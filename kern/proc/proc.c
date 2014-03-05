@@ -83,7 +83,12 @@ proc_create(const char *name)
 		return NULL;
 	}
     
+	// Parent is always NULL as this is the init thread created by the kernel
     proc->parent = NULL;
+
+    // Nullify all children initially
+    for(int i =0; i<MAX_CLD; i++)
+    	proc->children[i] = NULL;
 
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
