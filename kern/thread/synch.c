@@ -177,6 +177,7 @@ lock_acquire(struct lock *lock) {
     KASSERT(lock != NULL);
 
     spinlock_acquire(&lock->lk_spinlk);
+    // TODO curthread is broken is at 0x0 during get_pid
     KASSERT(lock->lk_holder != curthread);  /* the thread doesn't hold the lock */
     while (lock->lk_holder != NULL) 
         wchan_sleep(lock->lk_wchan, &lock->lk_spinlk);

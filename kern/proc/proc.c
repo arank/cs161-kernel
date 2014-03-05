@@ -84,7 +84,6 @@ proc_create(const char *name)
 	}
     
     proc->parent = NULL;
-    proc->pid = 0;
 
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
@@ -95,6 +94,16 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
+	// TODO figure out better way to assign pid
+	// checks if thread macro has been loaded, if not we are still in the kernel
+	if(curthread){
+		proc->pid = pid_get();
+		// TODO change to gracefully handle lack of pid
+		KASSERT(proc->pid != -1);
+	}else{
+		// we are the kernel
+		proc->pid = 0;
+	}
 	return proc;
 }
 
@@ -293,9 +302,8 @@ void cleanup_data(struct proc *proc) {
 void
 proc_bootstrap(void)
 {
+	init_pid_table();
 	kproc = proc_create("[kernel]");
-
-    init_pid_table();
     extern struct lock *exec_lock;
     exec_lock = lock_create("exec-lock");
 

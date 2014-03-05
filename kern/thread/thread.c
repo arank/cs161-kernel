@@ -672,7 +672,7 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	curcpu->c_curthread = next;
 	curthread = next;
 
-	/* do the switch (in assembler in switch.S) */
+//	/* do the switch (in assembler in switch.S) TODO there may be an error here?*/
 	switchframe_switch(&cur->t_context, &next->t_context);
 
 	/*
