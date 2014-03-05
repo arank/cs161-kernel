@@ -77,6 +77,7 @@ proc_create(const char *name)
 	if (proc == NULL) {
 		return NULL;
 	}
+    memset(proc, 0, sizeof *proc);
 	proc->p_name = kstrdup(name);
 	if (proc->p_name == NULL) {
 		kfree(proc);
@@ -94,12 +95,6 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
-    for (int i = 0; i < OPEN_MAX; i++)
-        proc->fd_table[i] = NULL;
-    for (int i = 0; i < MAX_CLD; i++)
-        proc->children[i] = NULL;
-    proc->parent = NULL; 
-    
 	// TODO figure out better way to assign pid
 	// checks if thread macro has been loaded, if not we are still in the kernel
 	if(curthread){
