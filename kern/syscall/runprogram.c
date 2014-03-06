@@ -170,7 +170,7 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 
 	}
 
-	lock_release(exec_lock);
+	lock_release(exec_lock);sdasd
 
 	// TODO is this the right addr for argv???
 	enter_new_process(argc, (userptr_t)stackptr+offset /*userspace addr of argv*/,
