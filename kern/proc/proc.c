@@ -67,7 +67,6 @@ static void console_init(struct proc *proc);
 /*
  * Create a proc structure.
  */
-static
 struct proc *
 proc_create(const char *name)
 {
@@ -252,6 +251,32 @@ proc_destroy(struct proc *proc)
 	kfree(proc);
 }
 
+
+struct 
+proc_link * 
+shared_link_create(pid_t pid) {
+    struct proc_link *link = kmalloc(sizeof *link);
+    if (link == NULL) goto out;
+
+    link->lock = lock_create("shared_lock");;
+    if (link->lock == NULL) goto link_out;
+
+    link->cv = cv_create("shared_cv");
+    if (link->cv == NULL) goto cv_out;
+
+    link->ref_count = 0;
+    link->exit_code = -1;
+    link->child_pid = pid;
+    
+    return link;
+
+cv_out:
+    lock_destroy(link->lock);
+link_out:
+    kfree(link);
+out:
+    return NULL;
+}
 
 void shared_link_destroy(int index, struct proc* proc) {
 	struct proc_link *link;

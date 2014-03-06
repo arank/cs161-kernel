@@ -107,5 +107,10 @@ struct addrspace *proc_getas(void);
 /* Change the address space of the current process, and return the old one. */
 struct addrspace *proc_setas(struct addrspace *);
 
+/* create a shared structure for parent and child in fork */
+struct proc_link *shared_link_create(pid_t pid);
+
+/* create a process for fork */
+struct proc *proc_create(const char *name);
 
 #endif /* _PROC_H_ */

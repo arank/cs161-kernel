@@ -381,6 +381,7 @@ file      syscall/runprogram.c
 file      syscall/time_syscalls.c
 file      syscall/fs_calls.c
 file      syscall/proc_calls.c
+file      syscall/fork.c
 
 #
 # Startup and initialization

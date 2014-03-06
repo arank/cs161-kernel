@@ -134,6 +134,7 @@ test(int nowait)
 {
 	int pid0, pid1, pid2, pid3;
 
+    (void)nowait;
 	/*
 	 * Caution: This generates processes geometrically.
 	 *
@@ -158,11 +159,12 @@ test(int nowait)
 	 * These must be called in reverse order to avoid waiting
 	 * improperly.
 	 */
+    /*
 	dowait(nowait, pid3);
 	dowait(nowait, pid2);
 	dowait(nowait, pid1);
 	dowait(nowait, pid0);
-
+    */
 	putchar('\n');
 }
 
@@ -170,7 +172,7 @@ int
 main(int argc, char *argv[])
 {
 	int nowait=0;
-
+    (void)dowait;
 	if (argc==2 && !strcmp(argv[1], "-w")) {
 		nowait=1;
 	}
