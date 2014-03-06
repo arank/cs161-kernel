@@ -64,10 +64,11 @@ ssize_t sys_write(int fd , const_userptr_t buf , size_t nbytes, ssize_t *wbytes)
 off_t sys_lseek (int fd , off_t pos , int whence, off_t *ret_pos);
 int sys_close(int fd);
 int sys_dup2(int oldfd , int newfd, int *retval);
-int sys_chdir ( const_userptr_t pathname);
+int sys_chdir (const_userptr_t pathname);
 int sys___getcwd(userptr_t buf , size_t buflen, int *bwritten);
 pid_t sys_waitpid(pid_t pid, userptr_t status, int options);
 pid_t sys_getpid(void);
 void sys__exit(int exitcode);
+int sys_execv(const_userptr_t program, const_userptr_t *args);
 
 #endif /* _SYSCALL_H_ */

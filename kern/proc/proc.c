@@ -77,6 +77,7 @@ proc_create(const char *name)
 	if (proc == NULL) {
 		return NULL;
 	}
+	// Set memory to deadbeef after free, but we need to reset to NULL
     memset(proc, 0, sizeof *proc);
 	proc->p_name = kstrdup(name);
 	if (proc->p_name == NULL) {
@@ -84,13 +85,6 @@ proc_create(const char *name)
 		return NULL;
 	}
     
-	// Parent is always NULL as this is the init thread created by the kernel
-    proc->parent = NULL;
-
-    // Nullify all children initially
-    for(int i =0; i<MAX_CLD; i++)
-    	proc->children[i] = NULL;
-
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
 
