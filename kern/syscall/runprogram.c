@@ -46,60 +46,154 @@
 #include <test.h>
 #include <kern/unistd.h>
 #include <synch.h>
+#include <copyinout.h>
+#include <limits.h>
 
 struct lock *exec_lock;
 
-static void console_init(struct proc *proc) {
-    char *con_read = kstrdup("con:");                                                  
-    char *con_write = kstrdup("con:");                                                  
-    char *con_error = kstrdup("con:");                                                  
-    if (con_read == NULL || con_write == NULL || con_error == NULL)           
-        panic("proc init: could not connect to console\n");      
+int sys_execv(const_userptr_t program, const_userptr_t *args){
+	int err;
+	char kprogram[NAME_MAX];
+	int argc;
+	struct addrspace *as;
+	struct addrspace *old_as;
+	struct vnode *v;
+	vaddr_t entrypoint, stackptr;
 
-    struct vnode *out;                                                      
-    struct vnode *in;                                                       
-    struct vnode *err;                                                      
-    int rv1 = vfs_open(con_read, O_RDONLY, 0664, &in);                          
-    int rv2 = vfs_open(con_write, O_WRONLY, 0664, &out);                         
-    int rv3 = vfs_open(con_error, O_WRONLY, 0664, &err);                         
-    if (rv1 | rv2 | rv3)                                                       
-        panic("proc init: could not connect to console\n");      
+	// Read in number of arguments
+	argc = 0;
+	while(args[argc] != NULL){
+		argc++;
+	}
+	// Add one more for the program name
+	argc++;
+	// Declare and nullify the argument array
+	char *kargs[argc];
+	for(int i = 0; i < argc; i++)
+		kargs[i] = NULL;
 
-    kfree(con_read);                                                        
-    kfree(con_write);                                                        
-    kfree(con_error);                                                        
+	// Open the program
+	err = copyinstr(program, kprogram, sizeof kprogram, NULL);
+	if (err != 0) goto out;
 
-    struct file_desc *stdin = kmalloc(sizeof *stdin);          
-    struct file_desc *stdout = kmalloc(sizeof *stdout);         
-    struct file_desc *stderr = kmalloc(sizeof *stderr);         
-    if (stdin == NULL || stdout == NULL || stderr == NULL)                  
-        panic("proc init: out of memory\n");                     
+    /* Open the file. */
+	err = vfs_open(kprogram, O_RDONLY, 0, &v);
+	if (err != 0) goto out;
 
-    stdin->flags = O_RDONLY;                                               
-    stdin->ref_count = 1;                                                      
-    stdin->offset = 0;                                                      
-    stdin->vn = in;                                                   
-    stdin->lock = lock_create("stdin");                                    
+	// To save the kernel acquire a lock before allocating a huge chunk of memory for copied strings
+	lock_acquire(exec_lock);
 
-    stdout->flags = O_WRONLY;                                              
-    stdout->ref_count = 1;                                                     
-    stdout->offset = 0;                                                     
-    stdout->vn = out;                                                     
-    stdout->lock = lock_create("stdout");                                  
+	// Add the null terminator and all pointers
+	unsigned limit, offset = (argc*4)+4;
 
-    stderr->flags = O_WRONLY;                                              
-    stderr->ref_count = 1;                                                     
-    stderr->offset = 0;                                                     
-    stderr->vn = err;                                                     
-    stderr->lock = lock_create("stderr");                                  
+	// copy in program string
+	size_t len =strlen(kprogram)+1;
+	kargs[0] = kmalloc(len);
+	strcpy(kprogram, kargs[0]);
+	limit += (len + (len % 4));
 
-    if (stdin->lock == NULL || stdout->lock == NULL || stderr->lock == NULL)
-        panic("thread_bootstrap: stdin, stdout, or stderr lock couldn't be initialized\n");
+	// Fill in the rest of the arguments
+	for(int i = 1; i < argc; i++){
+		// Plus one because of the null terminator which is also copied
+	    len = strlen((const char *)args[i-1])+1;
 
-    proc->fd_table[STDIN_FILENO] = stdin;                                    
-    proc->fd_table[STDOUT_FILENO] = stdout;                                  
-    proc->fd_table[STDERR_FILENO] = stderr;                                  
+		// Calulate how much space it will use up on the user stack and check if it blows arg max
+		limit += (len + (len % 4));
+		if(limit > ARG_MAX){
+			err = E2BIG;
+			goto vfs_out;
+		}
+
+	    // Malloc our argument
+		kargs[i] = kmalloc(len);
+
+		// Copy into kernel
+		err = copyinstr(args[i-1], kargs[i], len, NULL);
+		if(err != 0) goto vfs_out;
+
+	}
+
+	/* Create a new address space. */
+	as = as_create();
+	if (as == NULL) {
+		err = ENOMEM;
+		goto vfs_out;
+	}
+
+	/* Switch to it and activate it, while clearing the old address space */
+	old_as = proc_setas(as);
+	as_destroy(old_as);
+	as_activate();
+
+	/* Load the executable. */
+	err = load_elf(v, &entrypoint);
+	if (err != 0) goto vfs_out;
+
+	/* Done with the file now. */
+	vfs_close(v);
+
+	/* Set stack pointer */
+	err = as_define_stack(as, &stackptr);
+	if (err != 0) goto args_out;
+
+	// Write a Null separator first
+	// TODO is this type right for temp?
+	userptr_t temp = NULL;
+	err = copyout(&temp, (userptr_t)stackptr+(argc*4), sizeof(userptr_t));
+	if (err != 0) goto args_out;
+
+	// Copy out the pointers and arguments
+	for(int i = 0; i < argc; i++){
+		// TODO I am re-calculating str len
+		len = strlen(kargs[i])+1;
+		size_t real_len = len + (len % 4);
+
+		// Copy into local buffer
+		char buf[real_len];
+		strcpy(buf, kargs[i]);
+
+		// Write object at offset, with correct buffer
+		err = copyout(buf, (userptr_t)stackptr+offset, real_len);
+		if (err != 0) goto args_out;
+
+		// Free the pointer after copying out
+		kfree(kargs[i]);
+		kargs[i] = NULL;
+
+		// Write pointer to object at offset
+		temp = (userptr_t)(stackptr+offset);
+		err = copyout(&temp, (userptr_t)stackptr+(i*4), sizeof(userptr_t));
+		if (err != 0) goto args_out;
+
+		// Augment offset
+		offset += real_len;
+
+	}
+
+	lock_release(exec_lock);
+
+	// TODO is this the right addr for argv??
+	enter_new_process(argc, (userptr_t)stackptr+offset /*userspace addr of argv*/,
+	            NULL /*userspace addr of environment*/,
+	            stackptr, entrypoint);
+
+    /* enter_new_process does not return. */
+    panic("enter_new_process returned\n");
+    return EINVAL;
+
+vfs_out:
+    	vfs_close(v);
+args_out:
+	for(int i = 0; i < argc; i++){
+		if(kargs[i] != NULL){
+			kfree(kargs[i]);
+		}
+	}
+	lock_release(exec_lock);
+out:
+	return err;
 }
+
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -110,7 +204,6 @@ static void console_init(struct proc *proc) {
 int
 runprogram(char *progname)
 {
-    (void)console_init;
     struct addrspace *as;
     struct vnode *v;
     vaddr_t entrypoint, stackptr;
