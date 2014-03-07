@@ -129,6 +129,16 @@ common_prog(int nargs, char **args)
 		return ENOMEM;
 	}
 
+    struct proc_link *link = shared_link_create(proc->pid);
+    if (link == NULL) {
+        proc_destroy(proc);
+        return ENOMEM;
+    }
+
+    link->ref_count = 2;
+    proc->parent = link;
+    kproc->children[0] = link;
+
 	result = thread_fork(args[0] /* thread name */,
 			proc /* new process */,
 			cmd_progthread /* thread function */,
@@ -139,10 +149,12 @@ common_prog(int nargs, char **args)
 		return result;
 	}
 
-	/*
-	 * The new process will be destroyed when the program exits...
-	 * once you write the code for handling that.
-	 */
+    if (sys_waitpid(proc->pid, NULL, 0) != 0)
+        panic("Waitpid on runprogram failed");
+
+    /* child exited, decremented the ref_count, expected to be destroyed */
+    shared_link_destroy(0, kproc);  
+    kproc->children[0] = NULL;
 
 	return 0;
 }

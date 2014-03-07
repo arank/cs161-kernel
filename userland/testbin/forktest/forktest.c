@@ -112,7 +112,7 @@ dowait(int nowait, int pid)
 		exit(0);
 	}
 
-	if (nowait) {
+	if (!nowait) {
 		if (waitpid(pid, &x, 0)<0) {
 			warn("waitpid");
 		}

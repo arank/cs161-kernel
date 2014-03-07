@@ -104,7 +104,6 @@ void pid_destroy(pid_t pid) {
     // TODO: check that this thread holds the pid
     KASSERT(bitmap_isset(pid_table->pid_map, (unsigned)pid));
     bitmap_unmark(pid_table->pid_map, (unsigned)pid);
-
     lock_release(pid_table->lock);
 }
 

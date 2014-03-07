@@ -42,7 +42,7 @@ pid_t sys_waitpid(pid_t pid, userptr_t status, int options) {
     	err = EINVAL;
     	goto out;
     }
-    if(pid_in_use(pid)){
+    if(!pid_in_use(pid)){
     	err = ESRCH;
     	goto out;
     }
@@ -81,7 +81,6 @@ pid_t sys_getpid(pid_t *pid){
     return 0;
 }
 
-
 void sys__exit(int exitcode) {
 	struct proc *proc = curproc;
 	// If there is a parent, set the exit code in the parent
@@ -89,13 +88,11 @@ void sys__exit(int exitcode) {
 		proc->parent->exit_code=exitcode;
 		shared_link_destroy(PARENT, proc);
 	}
-	// TODO is it safe to free pid here
-	pid_destroy(proc->pid);
 	// Add thread to the kernel
 	proc_remthread(curthread);
 	proc_addthread(kproc, curthread);
 	// Destroy the old process
-	proc_destroy(proc);
+	proc_destroy(proc); /* calls cleanup_data, which calls shared_link_destroy */
 	thread_exit();
 }
 
