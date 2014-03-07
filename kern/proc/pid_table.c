@@ -91,7 +91,7 @@ pid_t pid_get(void) {
     unsigned pid;
     if (bitmap_alloc(pid_table->pid_map, &pid) != ENOSPC){
     	lock_release(pid_table->lock);
-    	return (pid_t)pid;
+    	return pid;
     }
 
     lock_release(pid_table->lock);
@@ -104,7 +104,6 @@ void pid_destroy(pid_t pid) {
     // TODO: check that this thread holds the pid
     KASSERT(bitmap_isset(pid_table->pid_map, (unsigned)pid));
     bitmap_unmark(pid_table->pid_map, (unsigned)pid);
-
     lock_release(pid_table->lock);
 }
 
@@ -117,3 +116,4 @@ bool pid_in_use(pid_t pid) {
     lock_release(pid_table->lock);
     return false;
 }
+

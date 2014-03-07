@@ -161,12 +161,16 @@ syscall(struct trapframe *tf)
 
 	    // Special case as getpid can't fail in POSIX
 	    case SYS_getpid:
-	    retval=sys_getpid();
+	    err = sys_getpid(&retval);
 	    break;
 
 	    case SYS__exit:
 	    sys__exit(tf->tf_a0);
 	    break;
+
+        case SYS_fork:
+        err = sys_fork(tf, &retval);
+        break;
 
 	    default:
 		kprintf("Unknown syscall %d\n", callno);

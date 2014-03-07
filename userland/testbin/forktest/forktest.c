@@ -162,7 +162,6 @@ test(int nowait)
 	dowait(nowait, pid2);
 	dowait(nowait, pid1);
 	dowait(nowait, pid0);
-
 	putchar('\n');
 }
 

@@ -67,7 +67,6 @@ static void console_init(struct proc *proc);
 /*
  * Create a proc structure.
  */
-static
 struct proc *
 proc_create(const char *name)
 {
@@ -77,8 +76,9 @@ proc_create(const char *name)
 	if (proc == NULL) {
 		return NULL;
 	}
-	// Set memory to deadbeef after free, but we need to reset to NULL
+	// memory is set to deadbeef after free, but we need to reset to NULL
     memset(proc, 0, sizeof *proc);
+
 	proc->p_name = kstrdup(name);
 	if (proc->p_name == NULL) {
 		kfree(proc);
@@ -94,72 +94,16 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
-	// TODO figure out better way to assign pid
-	// checks if thread macro has been loaded, if not we are still in the kernel
 	if(curthread){
 		proc->pid = pid_get();
-		// TODO change to gracefully handle lack of pid
-		KASSERT(proc->pid != -1);
+        if (proc->pid == -1) {      /* ran out of pids */
+            proc_destroy(proc);     
+            return NULL;
+        }
 	}else{
-		// we are the kernel
-		proc->pid = 0;
+		proc->pid = 0;  /* kernel thread, 0 is set in pid_table in pid_init */
 	}
 	return proc;
-}
-
-static void console_init(struct proc *proc) {
-    char *con_read = kstrdup("con:");                                                  
-    char *con_write = kstrdup("con:");                                                  
-    char *con_error = kstrdup("con:");                                                  
-    if (con_read == NULL || con_write == NULL || con_error == NULL)           
-        panic("proc init: could not connect to console\n");      
-
-    struct vnode *out;                                                      
-    struct vnode *in;                                                       
-    struct vnode *err;                                                      
-    int rv1 = vfs_open(con_read, O_RDONLY, 0, &in);                          
-    int rv2 = vfs_open(con_write, O_WRONLY, 0, &out);                         
-    int rv3 = vfs_open(con_error, O_WRONLY, 0, &err);                         
-    if (rv1 | rv2 | rv3)                                                       
-        panic("proc init: could not connect to console\n");      
-
-    kfree(con_read);                                                        
-    kfree(con_write);                                                        
-    kfree(con_error);                                                        
-
-    struct file_desc *stdin = kmalloc(sizeof *stdin);          
-    struct file_desc *stdout = kmalloc(sizeof *stdout);         
-    struct file_desc *stderr = kmalloc(sizeof *stderr);         
-    if (stdin == NULL || stdout == NULL || stderr == NULL)                  
-        panic("proc init: out of memory\n");                     
-
-    stdin->flags = O_RDONLY;                                               
-    stdin->ref_count = 1;                                                      
-    stdin->offset = 0;                                                      
-    stdin->vn = in;                                                   
-    stdin->mode = 0;
-    stdin->lock = lock_create("stdin");                                    
-
-    stdout->flags = O_WRONLY;                                              
-    stdout->ref_count = 1;                                                     
-    stdout->offset = 0;                                                     
-    stdout->vn = out;                                                     
-    stdout->mode = 0;
-    stdout->lock = lock_create("stdout");
-
-    stderr->flags = O_WRONLY;
-    stderr->ref_count = 1;
-    stderr->offset = 0;
-    stderr->vn = err;                                       
-    stderr->mode = 0;
-    stderr->lock = lock_create("stderr");                                  
-
-    if (stdin->lock == NULL || stdout->lock == NULL || stderr->lock == NULL)
-        panic("thread_bootstrap: stdin, stdout, or stderr lock couldn't be initialized\n");
-
-    proc->fd_table[STDIN_FILENO] = stdin;                                    
-    proc->fd_table[STDOUT_FILENO] = stdout;                                  
-    proc->fd_table[STDERR_FILENO] = stderr;
 }
 
 /*
@@ -252,9 +196,35 @@ proc_destroy(struct proc *proc)
 }
 
 
+struct 
+proc_link * 
+shared_link_create(pid_t pid) {
+    struct proc_link *link = kmalloc(sizeof *link);
+    if (link == NULL) goto out;
+
+    link->lock = lock_create("shared_lock");;
+    if (link->lock == NULL) goto link_out;
+
+    link->cv = cv_create("shared_cv");
+    if (link->cv == NULL) goto cv_out;
+
+    link->ref_count = 0;
+    link->exit_code = -1;
+    link->child_pid = pid;
+    
+    return link;
+
+cv_out:
+    lock_destroy(link->lock);
+link_out:
+    kfree(link);
+out:
+    return NULL;
+}
+
 void shared_link_destroy(int index, struct proc* proc) {
 	struct proc_link *link;
-	if(0>index || index>=MAX_CLD){
+	if(-1 > index || index >= MAX_CLD){
 		return;
 	}
 	if(index == PARENT){
@@ -272,9 +242,12 @@ void shared_link_destroy(int index, struct proc* proc) {
     // In this state of the world there is no parent or
     // other entity referencing the shared struct
     if (link->ref_count == 1) {
+        // TODO is it safe to free pid here
+        pid_destroy(link->child_pid);
         lock_release(link->lock);
         lock_destroy(link->lock);
         cv_destroy(link->cv);
+        kfree(link);
         if(index == PARENT){
         	proc->parent = NULL;
         }else{
@@ -310,6 +283,61 @@ proc_bootstrap(void)
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");
 	}
+}
+
+static void console_init(struct proc *proc) {
+    char *con_read = kstrdup("con:");                                                  
+    char *con_write = kstrdup("con:");                                                  
+    char *con_error = kstrdup("con:");                                                  
+    if (con_read == NULL || con_write == NULL || con_error == NULL)           
+        panic("proc init: could not connect to console\n");      
+
+    struct vnode *out;                                                      
+    struct vnode *in;                                                       
+    struct vnode *err;                                                      
+    int rv1 = vfs_open(con_read, O_RDONLY, 0, &in);                          
+    int rv2 = vfs_open(con_write, O_WRONLY, 0, &out);                         
+    int rv3 = vfs_open(con_error, O_WRONLY, 0, &err);                         
+    if (rv1 | rv2 | rv3)                                                       
+        panic("proc init: could not connect to console\n");      
+
+    kfree(con_read);                                                        
+    kfree(con_write);                                                        
+    kfree(con_error);                                                        
+
+    struct file_desc *stdin = kmalloc(sizeof *stdin);          
+    struct file_desc *stdout = kmalloc(sizeof *stdout);         
+    struct file_desc *stderr = kmalloc(sizeof *stderr);         
+    if (stdin == NULL || stdout == NULL || stderr == NULL)                  
+        panic("proc init: out of memory\n");                     
+
+    stdin->flags = O_RDONLY;                                               
+    stdin->ref_count = 1;                                                      
+    stdin->offset = 0;                                                      
+    stdin->vn = in;                                                   
+    stdin->mode = 0;
+    stdin->lock = lock_create("stdin");                                    
+
+    stdout->flags = O_WRONLY;                                              
+    stdout->ref_count = 1;                                                     
+    stdout->offset = 0;                                                     
+    stdout->vn = out;                                                     
+    stdout->mode = 0;
+    stdout->lock = lock_create("stdout");
+
+    stderr->flags = O_WRONLY;
+    stderr->ref_count = 1;
+    stderr->offset = 0;
+    stderr->vn = err;                                       
+    stderr->mode = 0;
+    stderr->lock = lock_create("stderr");                                  
+
+    if (stdin->lock == NULL || stdout->lock == NULL || stderr->lock == NULL)
+        panic("proc init: stdin, stdout, or stderr lock couldn't be allocated\n");
+
+    proc->fd_table[STDIN_FILENO] = stdin;                                    
+    proc->fd_table[STDOUT_FILENO] = stdout;                                  
+    proc->fd_table[STDERR_FILENO] = stderr;
 }
 
 /*
