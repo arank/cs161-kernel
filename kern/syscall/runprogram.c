@@ -61,27 +61,27 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 
+	// To save the kernel acquire a lock before allocating a huge chunk of memory for copied strings
+	lock_acquire(exec_lock);
+
+	// Read in program name
+	err = copyinstr(program, kprogram, sizeof kprogram, NULL);
+	if (err != 0) goto out;
+
 	// Read in number of arguments
 	argc = 0;
+	// TODO figure out some way to check if pointer is in user space, as it is
+	// currently failing the test
+	if (args == NULL || (vaddr_t)args >= (vaddr_t)USERSPACETOP) goto out;
 	while(args[argc] != NULL){
 		argc++;
 	}
+
 	// Declare and nullify the argument array
 	char **kargs = kmalloc((argc+1) * sizeof(char*));
 	if(kargs == NULL) goto out;
 	for(int i = 0; i < (argc + 1); i++)
 		kargs[i] = NULL;
-
-	// Open the program
-	err = copyinstr(program, kprogram, sizeof kprogram, NULL);
-	if (err != 0) goto out;
-
-    /* Open the file. */
-	err = vfs_open(kprogram, O_RDONLY, 0, &v);
-	if (err != 0) goto out;
-
-	// To save the kernel acquire a lock before allocating a huge chunk of memory for copied strings
-	lock_acquire(exec_lock);
 
 	// Add the null terminator and all pointers
 	vaddr_t offset = (argc*4)+4;
@@ -95,39 +95,46 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 		offset += (len + 4 - (len % 4));
 		if(offset > ARG_MAX){
 			err = E2BIG;
-			goto vfs_out;
+			goto args_out;
 		}
 
 	    // Malloc our argument
 		kargs[i] = kmalloc(len);
+		if(kargs[i] == NULL) goto args_out;
 
 		// Copy into kernel
 		err = copyinstr(args[i], kargs[i], len, NULL);
-		if(err != 0) goto vfs_out;
+		if(err != 0) goto args_out;
 	}
 
 	/* Create a new address space. */
 	as = as_create();
 	if (as == NULL) {
 		err = ENOMEM;
-		goto vfs_out;
+		goto args_out;
 	}
 
 	/* Switch to it and activate it, while clearing the old address space */
 	old_as = proc_setas(as);
-	as_destroy(old_as);
 	as_activate();
+
+    /* Open the file. */
+	err = vfs_open(kprogram, O_RDONLY, 0, &v);
+	if (err != 0) goto addr_out;
 
 	/* Load the executable. */
 	err = load_elf(v, &entrypoint);
-	if (err != 0) goto vfs_out;
+	if (err != 0) {
+	    vfs_close(v);
+	    goto addr_out;
+	}
 
 	/* Done with the file now. */
 	vfs_close(v);
 
 	/* Set stack pointer */
 	err = as_define_stack(as, &stackptr);
-	if (err != 0) goto args_out;
+	if (err != 0) goto addr_out;
 
 	vaddr_t stack = stackptr-offset;
 	// Plus 4 because of the null2 terminator
@@ -135,7 +142,7 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 
 	// Write a Null separator first
 	userptr_t *temp = kmalloc(sizeof(userptr_t));
-	if(temp == NULL) goto args_out;
+	if(temp == NULL) goto addr_out;
 
 	// Copy out the pointers and arguments
 	for(int i = 0; i < argc; i++){
@@ -147,7 +154,7 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 		char* buf = kmalloc(real_len);
 		if(buf == NULL){
 			kfree(temp);
-			goto args_out;
+			goto addr_out;
 		}
 		strcpy(buf, kargs[i]);
 
@@ -156,7 +163,7 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 		if (err != 0){
 			kfree(buf);
 			kfree(temp);
-			goto args_out;
+			goto addr_out;
 		}
 
 		// Free the pointer after copying out
@@ -169,7 +176,7 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 		err = copyout(temp, (userptr_t)(stack), sizeof(userptr_t));
 		if (err != 0) {
 			kfree(temp);
-			goto args_out;
+			goto addr_out;
 		}
 
 		// Augment heap
@@ -182,11 +189,14 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 	err = copyout(temp, (userptr_t)(stack), sizeof(userptr_t));
 	if (err != 0) {
 		kfree(temp);
-		goto args_out;
+		goto addr_out;
 	}
+	kfree(kargs);
 	kfree(temp);
 
 	lock_release(exec_lock);
+
+	as_destroy(old_as);
 
 	// TODO is this the right addr for argv???
 	enter_new_process(argc, (userptr_t)(stackptr-offset) /*userspace addr of argv*/,
@@ -197,17 +207,19 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
     panic("enter_new_process returned\n");
     return EINVAL;
 
-vfs_out:
-    vfs_close(v);
+
+addr_out:
+    as_destroy(proc_setas(old_as));
+    as_activate();
 args_out:
 	for(int i = 0; i < argc; i++){
 		if(kargs[i] != NULL){
 			kfree(kargs[i]);
 		}
 	}
-	lock_release(exec_lock);
 out:
 	kfree(kargs);
+	lock_release(exec_lock);
 	return err;
 }
 

@@ -186,7 +186,8 @@ proc_destroy(struct proc *proc)
 		as_destroy(as);
 	}
 
-
+	// TODO this design choice allows for memory waste, consider a proc
+	// that forks 1M children and one exits, its shared struct won't be cleared
     cleanup_data(proc);
 	threadarray_cleanup(&proc->p_threads);
 	spinlock_cleanup(&proc->p_lock);

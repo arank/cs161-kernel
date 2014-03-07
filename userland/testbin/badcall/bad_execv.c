@@ -98,7 +98,6 @@ exec_emptyprog(void)
 	if (exec_common_fork() != 0) {
 		return;
 	}
-
 	rv = execv("", args);
 	report_test2(rv, errno, EINVAL, EISDIR, "exec the empty string");
 	exit(MAGIC_STATUS);
