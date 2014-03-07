@@ -71,8 +71,8 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
 	// Read in number of arguments
 	argc = 0;
 	// TODO figure out some way to check if pointer is in user space, as it is
-	// currently failing the test
-	if (args == NULL || (vaddr_t)args >= (vaddr_t)USERSPACETOP) goto out;
+	// currently failing the test, how to do copy in on args?
+	if (args == NULL) goto out;
 	while(args[argc] != NULL){
 		argc++;
 	}
