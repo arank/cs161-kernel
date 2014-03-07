@@ -35,5 +35,6 @@ void destroy_pid_table(void);
 pid_t pid_get(void);
 void pid_destroy(pid_t pid);
 bool pid_in_use(pid_t pid);
+void set_kernel_pid(unsigned index);
 
 #endif /* _H_PID_TABLE_H_ */

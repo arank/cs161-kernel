@@ -154,7 +154,7 @@ static void console_init(struct proc *proc) {
     stderr->lock = lock_create("stderr");                                  
 
     if (stdin->lock == NULL || stdout->lock == NULL || stderr->lock == NULL)
-        panic("thread_bootstrap: stdin, stdout, or stderr lock couldn't be initialized\n");
+        panic("proc init: stdin, stdout, or stderr lock couldn't be allocated\n");
 
     proc->fd_table[STDIN_FILENO] = stdin;                                    
     proc->fd_table[STDOUT_FILENO] = stdout;                                  

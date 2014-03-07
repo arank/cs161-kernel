@@ -76,8 +76,9 @@ out:
 	return err;
 }
 
-pid_t sys_getpid(){
-	return curproc->pid;
+pid_t sys_getpid(pid_t *pid){
+	*pid = curproc->pid;
+    return 0;
 }
 
 

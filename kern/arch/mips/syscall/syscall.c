@@ -161,7 +161,7 @@ syscall(struct trapframe *tf)
 
 	    // Special case as getpid can't fail in POSIX
 	    case SYS_getpid:
-	    retval=sys_getpid();
+	    err = sys_getpid(&retval);
 	    break;
 
 	    case SYS__exit:
