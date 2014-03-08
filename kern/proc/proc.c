@@ -224,38 +224,37 @@ out:
 }
 
 void shared_link_destroy(int index, struct proc* proc) {
-	struct proc_link *link;
 	if(-1 > index || index >= MAX_CLD){
 		return;
 	}
-	if(index == PARENT){
-		link = proc->parent;
-	}else{
-		link = proc->children[index];
-	}
-	if(link==NULL){
-		return;
-	}
+
+	struct proc_link *link = (index == PARENT) 
+                                ? proc->parent 
+                                : proc->children[index];
+	if (link == NULL) return;
+
     lock_acquire(link->lock);
-    if(index == PARENT){
+    if (index == PARENT)
     	cv_signal(link->cv, link->lock);
-    }
-    // In this state of the world there is no parent or
-    // other entity referencing the shared struct
+    
+    // In this state of the world there is no parent
     if (link->ref_count == 1) {
-        // TODO is it safe to free pid here
         pid_destroy(link->child_pid);
         lock_release(link->lock);
         lock_destroy(link->lock);
         cv_destroy(link->cv);
         kfree(link);
-        if(index == PARENT){
-        	proc->parent = NULL;
-        }else{
-        	proc->children[index] = NULL;
-        }
+        if (index == PARENT) 
+            proc->parent = NULL;
+        else 
+            proc->children[index] = NULL;
     } else {
         link->ref_count--;
+        /*
+        for (int i = 0; i < MAX_CLD; i++)
+            if (proc->children[i] != NULL)
+                proc->children[i]->ref_count--;
+        */
         lock_release(link->lock);
     }
 }

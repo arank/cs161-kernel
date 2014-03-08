@@ -35,6 +35,8 @@
 #include <current.h>
 #include <limits.h>
 #include <pid_table.h>
+#include <copyinout.h>
+#include <kern/wait.h>
 
 pid_t sys_waitpid(pid_t pid, userptr_t status, int options) {
     int err;
@@ -42,10 +44,17 @@ pid_t sys_waitpid(pid_t pid, userptr_t status, int options) {
     	err = EINVAL;
     	goto out;
     }
+
     if(!pid_in_use(pid)){
     	err = ESRCH;
     	goto out;
     }
+
+    if ((int)status % ALIGN != 0) {
+        err = EFAULT;
+        goto out;
+    }
+
     int i;
     struct proc_link *shared;
     for(i = 0; i < MAX_CLD; i++){
@@ -66,9 +75,14 @@ pid_t sys_waitpid(pid_t pid, userptr_t status, int options) {
     	}
     }
     lock_release(shared->lock);
+
     // Handle child has already exited
-    if(status != NULL)
-    	*(int*)status = shared->exit_code;
+    if (status == NULL) return 0;
+
+    if(copyout(&shared->exit_code, (userptr_t)status, sizeof(userptr_t))) {
+        err = EFAULT;
+        goto out;
+    }
 
     return 0;
 
@@ -84,15 +98,17 @@ pid_t sys_getpid(pid_t *pid){
 void sys__exit(int exitcode) {
 	struct proc *proc = curproc;
 	// If there is a parent, set the exit code in the parent
-	if(proc->parent != NULL){
-		proc->parent->exit_code=exitcode;
+	if (proc->parent != NULL) {
+		proc->parent->exit_code = (exitcode == -1) 
+                                    ? _MKWAIT_SIG(exitcode) 
+                                    : _MKWAIT_EXIT(exitcode);
 		shared_link_destroy(PARENT, proc);
 	}
 	// Add thread to the kernel
 	proc_remthread(curthread);
 	proc_addthread(kproc, curthread);
-	// Destroy the old process
-	proc_destroy(proc); /* calls cleanup_data, which calls shared_link_destroy */
+    /* calls cleanup_data, which calls shared_link_destroy to destroy children */
+	proc_destroy(proc); 
 	thread_exit();
 }
 
