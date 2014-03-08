@@ -1,0 +1,45 @@
+kern/arch/mips/vm/dumbvm.c:163:	KASSERT(as->as_vbase1 != 0);
+kern/arch/mips/vm/dumbvm.c:164:	KASSERT(as->as_pbase1 != 0);
+kern/arch/mips/vm/dumbvm.c:165:	KASSERT(as->as_npages1 != 0);
+kern/arch/mips/vm/dumbvm.c:166:	KASSERT(as->as_vbase2 != 0);
+kern/arch/mips/vm/dumbvm.c:167:	KASSERT(as->as_pbase2 != 0);
+kern/arch/mips/vm/dumbvm.c:168:	KASSERT(as->as_npages2 != 0);
+kern/arch/mips/vm/dumbvm.c:169:	KASSERT(as->as_stackpbase != 0);
+kern/arch/mips/vm/dumbvm.c:170:	KASSERT((as->as_vbase1 & PAGE_FRAME) == as->as_vbase1);
+kern/arch/mips/vm/dumbvm.c:171:	KASSERT((as->as_pbase1 & PAGE_FRAME) == as->as_pbase1);
+kern/arch/mips/vm/dumbvm.c:172:	KASSERT((as->as_vbase2 & PAGE_FRAME) == as->as_vbase2);
+kern/arch/mips/vm/dumbvm.c:173:	KASSERT((as->as_pbase2 & PAGE_FRAME) == as->as_pbase2);
+kern/arch/mips/vm/dumbvm.c:174:	KASSERT((as->as_stackpbase & PAGE_FRAME) == as->as_stackpbase);
+kern/arch/mips/vm/dumbvm.c:176:	vbase1 = as->as_vbase1;
+kern/arch/mips/vm/dumbvm.c:177:	vtop1 = vbase1 + as->as_npages1 * PAGE_SIZE;
+kern/arch/mips/vm/dumbvm.c:178:	vbase2 = as->as_vbase2;
+kern/arch/mips/vm/dumbvm.c:179:	vtop2 = vbase2 + as->as_npages2 * PAGE_SIZE;
+kern/arch/mips/vm/dumbvm.c:184:		paddr = (faultaddress - vbase1) + as->as_pbase1;
+kern/arch/mips/vm/dumbvm.c:187:		paddr = (faultaddress - vbase2) + as->as_pbase2;
+kern/arch/mips/vm/dumbvm.c:190:		paddr = (faultaddress - stackbase) + as->as_stackpbase;
+kern/arch/mips/vm/dumbvm.c:228:	as->as_vbase1 = 0;
+kern/arch/mips/vm/dumbvm.c:229:	as->as_pbase1 = 0;
+kern/arch/mips/vm/dumbvm.c:230:	as->as_npages1 = 0;
+kern/arch/mips/vm/dumbvm.c:231:	as->as_vbase2 = 0;
+kern/arch/mips/vm/dumbvm.c:232:	as->as_pbase2 = 0;
+kern/arch/mips/vm/dumbvm.c:233:	as->as_npages2 = 0;
+kern/arch/mips/vm/dumbvm.c:234:	as->as_stackpbase = 0;
+kern/arch/mips/vm/dumbvm.c:292:	if (as->as_vbase1 == 0) {
+kern/arch/mips/vm/dumbvm.c:293:		as->as_vbase1 = vaddr;
+kern/arch/mips/vm/dumbvm.c:294:		as->as_npages1 = npages;
+kern/arch/mips/vm/dumbvm.c:298:	if (as->as_vbase2 == 0) {
+kern/arch/mips/vm/dumbvm.c:299:		as->as_vbase2 = vaddr;
+kern/arch/mips/vm/dumbvm.c:300:		as->as_npages2 = npages;
+kern/arch/mips/vm/dumbvm.c:321:	KASSERT(as->as_pbase1 == 0);
+kern/arch/mips/vm/dumbvm.c:322:	KASSERT(as->as_pbase2 == 0);
+kern/arch/mips/vm/dumbvm.c:323:	KASSERT(as->as_stackpbase == 0);
+kern/arch/mips/vm/dumbvm.c:325:	as->as_pbase1 = getppages(as->as_npages1);
+kern/arch/mips/vm/dumbvm.c:326:	if (as->as_pbase1 == 0) {
+kern/arch/mips/vm/dumbvm.c:330:	as->as_pbase2 = getppages(as->as_npages2);
+kern/arch/mips/vm/dumbvm.c:331:	if (as->as_pbase2 == 0) {
+kern/arch/mips/vm/dumbvm.c:335:	as->as_stackpbase = getppages(DUMBVM_STACKPAGES);
+kern/arch/mips/vm/dumbvm.c:336:	if (as->as_stackpbase == 0) {
+kern/arch/mips/vm/dumbvm.c:340:	as_zero_region(as->as_pbase1, as->as_npages1);
+kern/arch/mips/vm/dumbvm.c:341:	as_zero_region(as->as_pbase2, as->as_npages2);
+kern/arch/mips/vm/dumbvm.c:342:	as_zero_region(as->as_stackpbase, DUMBVM_STACKPAGES);
+kern/arch/mips/vm/dumbvm.c:357:	KASSERT(as->as_stackpbase != 0);
