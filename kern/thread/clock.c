@@ -50,8 +50,9 @@
  * Timing constants. These should be tuned along with any work done on
  * the scheduler.
  */
-#define SCHEDULE_HARDCLOCKS	4	/* Reschedule every 4 hardclocks. */
-#define MIGRATE_HARDCLOCKS	16	/* Migrate every 16 hardclocks. */
+#define SCHEDULE_HARDCLOCKS	4	    /* Reschedule every 4 hardclocks. */
+#define MIGRATE_HARDCLOCKS	16	    /* Migrate every 16 hardclocks. */
+#define RESET_PRIORITIES	1024	/* Put all threads to 0 priority */
 
 /*
  * Once a second, everything waiting on lbolt is awakened by CPU 0.
@@ -103,6 +104,9 @@ hardclock(void)
 	if ((curcpu->c_hardclocks % SCHEDULE_HARDCLOCKS) == 0) {
 		schedule();
 	}
+    if ((curcpu->c_hardclocks % RESET_PRIORITIES) == 0) {
+        reset_priorities();
+    }
 	thread_yield();
 }
 

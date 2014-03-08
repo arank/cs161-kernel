@@ -161,7 +161,7 @@ thread_create(const char *name)
 	thread->t_reserved_buffers = 0;
 
 	/* If you add to struct thread, be sure to initialize here */
-
+    thread->t_priority = 0;
 	return thread;
 }
 
@@ -234,6 +234,7 @@ cpu_create(unsigned hardware_number)
 		}
 		thread_checkstack_init(c->c_curthread);
 	}
+    c->c_curthread->t_cpu = c;
 
     /* Aran's code, no need I think
 	if(mlfq_lock == NULL){
@@ -633,7 +634,7 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 		thread_make_runnable(cur, true /*have lock*/);
 		break;
 	    case S_SLEEP:
-        if (cur->priority > 0) cur->priority--;
+        if (cur->t_priority > 0) cur->t_priority--;
 		cur->t_wchan_name = wc->wc_name;
 		/*
 		 * Add the thread to the list in the wait channel, and
@@ -693,7 +694,7 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	curcpu->c_curthread = next;
 	curthread = next;
 
-//	/* do the switch (in assembler in switch.S) TODO there may be an error here?*/
+	/* do the switch (in assembler in switch.S) TODO there may be an error here?*/
 	switchframe_switch(&cur->t_context, &next->t_context);
 
 	/*
@@ -759,7 +760,6 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	/* Turn interrupts back on. */
 	splx(spl);
 
-	// TODO revamp current thread priority level
 }
 
 /*
@@ -855,11 +855,20 @@ thread_exit(void)
 void
 thread_yield(void)
 {
-    if (curthread->priority < MAX_PRIORITY - 1) curthread->priority++;
+    if (curthread->t_priority < MAX_PRIORITY - 1) curthread->t_priority++;
 	thread_switch(S_READY, NULL, NULL);
 }
 
 ////////////////////////////////////////////////////////////
+
+void
+reset_priorities(void) {
+    while (!(mlfq_isempty(&curcpu->c_mlfq))) {
+        struct thread *th = mlfq_remtail(&curcpu->c_mlfq);
+        th->t_priority = 0;
+        mlfq_add(&curcpu->c_mlfq, th);
+    } 
+}
 
 /*
  * Scheduler.
@@ -874,22 +883,9 @@ schedule(void)
 	/*
 	 * You can write this. If we do nothing, threads will run in
 	 * round-robin fashion.
+     *
+     * Scheduling is done in thread_consider_migration
 	 */
-	// remove and run 5 from the top queue, then 4 from the next etc.
-    /*
-	lock_acquire(mlfq_lock);
-	for(int j = 0; j < MAX_PRIORITY; j++){
-		for(int i =0; i < (MAX_PRIORITY-j); i++){
-			struct thread* to_run = threadlist_remhead(mlfq[j]);
-			// queue is empty
-			if (to_run == NULL)
-				break;
-			// TODO run the thread for a timeslice on the cpu
-
-		}
-	}
-	lock_release(mlfq_lock);
-    */
 }
 
 /*

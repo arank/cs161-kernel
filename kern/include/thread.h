@@ -109,7 +109,7 @@ struct thread {
 	unsigned t_inuse_buffers;	/* # of buffers currently using */
 	unsigned t_reserved_buffers;	/* # of buffers allowed to take */
 
-    int priority;
+    int t_priority;
 };
 
 /*
@@ -172,5 +172,9 @@ void schedule(void);
  */
 void thread_consider_migration(void);
 
+/*
+ * Reset priorities of all threads in the mlfq of curcpu every
+ */
+void reset_priorities(void);
 
 #endif /* _THREAD_H_ */
