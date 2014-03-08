@@ -1,0 +1,427 @@
+Script started on Sat Mar  8 15:59:38 2014
+[?1034h[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for menu]: ptest     testbin/badcll  all
+[a-|, 1-4, *, ?=menu, !=quit]
+[a] execv                   [b] waitpid                 
+[c] open                    [d] read                    
+[e] write                   [f] close                   
+[g] reboot                  [h] sbrk                    
+[i] ioctl                   [j] lseek                   
+[k] fsync                   [l] ftruncate               
+[m] fstat                   [n] remove                  
+[o] rename                  [p] link                    
+[q] mkdir                   [r] rmdir                   
+[s] chdir                   [t] getdirentry             
+[u] symlink                 [v] readlink                
+[w] dup2                    [x] pipe                    
+[y] __time                  [z] __getcwd                
+[{] stat                    [|] lstat                   
+[1] asst1                   [2] asst2                   
+[3] asst3                   [4] asst4                   
+[*] all                     [!] quit                    
+Choose: b
+(program name unknown): passed: wait for pid -8
+(program name unknown): passed: wait for pid -1
+(program name unknown): passed: pid zero
+(program name unknown): passed: nonexistent pid
+(program name unknown): passed: wait with NULL status
+(program name unknown): passed: wait with invalid pointer status
+(program name unknown): passed: wait with kernel pointer status
+(program name unknown): passed: wait with unaligned status: Bad memory reference
+(program name unknown): passed: wait with bad flags
+(program name unknown): passed: wait for self: No child processes
+(program name unknown): passed: wait for parent (from child): No child processes
+(program name unknown): passed: wait for parent test (from parent): Operation succeeded
+(program name unknown): passed: sibling wait: No child processes
+(program name unknown): passed: sibling wait: No child processes
+(program name unknown): passed: siblings wait for each other
+Unknown syscall 68
+Choose: 
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m krexit[2Pkrexit[2Pkrexitcd -diff sys161.conf sys161.conf.copy cd -[Kexit[2Pkrexit[2Pkrexit[2Pkr[Kls
+badcall  badcall_waitpid.script  cat.script  cp.script  design_document.txt  pwd.script  sys161.conf  tt1.script  tt2.script  tt3.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m scirpt [K[K[K[K[Kript badcall_lseek.script
+Script started, file is badcall_lseek.script
+[?1034h[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for menu]: p testbin/badcall
+[a-|, 1-4, *, ?=menu, !=quit]
+[a] execv                   [b] waitpid                 
+[c] open                    [d] read                    
+[e] write                   [f] close                   
+[g] reboot                  [h] sbrk                    
+[i] ioctl                   [j] lseek                   
+[k] fsync                   [l] ftruncate               
+[m] fstat                   [n] remove                  
+[o] rename                  [p] link                    
+[q] mkdir                   [r] rmdir                   
+[s] chdir                   [t] getdirentry             
+[u] symlink                 [v] readlink                
+[w] dup2                    [x] pipe                    
+[y] __time                  [z] __getcwd                
+[{] stat                    [|] lstat                   
+[1] asst1                   [2] asst2                   
+[3] asst3                   [4] asst4                   
+[*] all                     [!] quit                    
+Choose: j
+(program name unknown): passed: lseek using fd -1
+(program name unknown): passed: lseek using fd -5
+(program name unknown): passed: lseek using closed fd
+(program name unknown): passed: lseek using impossible fd
+(program name unknown): passed: lseek using fd OPEN_MAX
+(program name unknown): passed: lseek on device
+(program name unknown): passed: lseek stdin when open on file (try 1)
+(program name unknown): passed: lseek stdin when open on file (try 2)
+Unknown syscall 68
+(program name unknown): passed: lseek to negative offset
+Unknown syscall 68
+(program name unknown): passed: seek past/to EOF
+Unknown syscall 68
+(program name unknown): passed: lseek with invalid whence code
+Unknown syscall 68
+Choose: 
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m exit
+exit
+Script done, file is badcall_lseek.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m script te[K[Kforktest.script
+Script started, file is forktest.script
+[?1034h[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for menu]: p testbin/forktest
+(program name unknown): Starting.
+001111222222223333333333333333
+(program name unknown): Complete.
+Operation took 0.752804600 seconds
+OS/161 kernel [? for menu]: 
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m exit
+exit
+Script done, file is forktest.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m p[Kscript forkbomb.script
+Script started, file is forkbomb.script
+[?1034h[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for menu]: p testbin/forkbomb
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc: Subpage allocator couldn't get a page
+kmalloc
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m exit
+exit
+Script done, file is forkbomb.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m script filetest.script
+Script started, file is filetest.script
+[?1034h[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for menu]: p testbin/filetest
+Started filetest.
+(program name unknown): Usage: filetest <filename>
+Operation took 0.106001600 seconds
+OS/161 kernel [? for menu]: 
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m ls
+badcall               badcall_waitpid.script  cp.script            filetest.script  forktest.script  sys161.conf  tt2.script
+badcall_lseek.script  cat.script              design_document.txt  forkbomb.script  pwd.script       tt1.script   tt3.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m rm filetest.script 
+rm: remove regular empty file ‘filetest.script’? y
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m p [K[Kkr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for menu]: p add
+Running program add failed: No such file or directory
+panic: Assertion failed: cur->t_proc == kproc, at ../../thread/thread.c:835 (thread_exit)
+sys161: 214748364858851663 cycles (6125965 run, 214748364852725698 global-idle)
+sys161:   cpu0: 5999065 kern, 0 user, 126900 idle; 9891 ll, 9891/0 sc, 27022 sync
+sys161:   cpu1: 427780 kern, 0 user, 5698185 idle; 317 ll, 317/0 sc, 724 sync
+sys161:   cpu2: 429365 kern, 0 user, 5696600 idle; 322 ll, 321/1 sc, 733 sync
+sys161:   cpu3: 429317 kern, 0 user, 5696648 idle; 322 ll, 320/2 sc, 730 sync
+sys161: 1591 irqs 0 exns 0r/0w disk 6r/881w console 0r/0w/1m emufs 0r/0w net
+sys161: Elapsed real time: 2.392818 seconds (8.97471e+10 mhz)
+sys161: Elapsed virtual time: 2.354066537 seconds (25 mhz)
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for menu]: p testbin/hash
+(program name unknown): Usage: hash filename
+Operation took 0.098420880 seconds
+OS/161 kernel [? for menu]: 
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m ls
+badcall               badcall_waitpid.script  cp.script            forkbomb.script  pwd.script   tt1.script  tt3.script
+badcall_lseek.script  cat.script              design_document.txt  forktest.script  sys161.conf  tt2.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m rm badd[Kcall badcall.script
+rm: remove regular file ‘badcall’? ls
+rm: cannot remove ‘badcall.script’: No such file or directory
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m cp [K[K[Kmv badcall badcall.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m ls
+badcall.script        badcall_waitpid.script  cp.script            forkbomb.script  pwd.script   tt1.script  tt3.script
+badcall_lseek.script  cat.script              design_document.txt  forktest.script  sys161.conf  tt2.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m vim s[Kdesign_document.txt 
+[?1000h[?1049h[?1h=[2;1H▽[6n[1;1H  [1;1H[1;51r[?12;25h[?12l[?25h[27m[m[H[2J[?25l[50;1H"design_document.txt" 5L, 252C[>c[1;1H[93m  1 [mThings that we didn't have time to implement:[34C[47m [m
+[93m  2 [m[79C[47m [m
+[93m  3 [m1. MLFQ doesn't have different timeslices per level[28C[47m [m
+[93m  4 [m2. We do not track how long each thread has been in the highest level and do   [47m [m
+[93m  5 [mnot lower it (so it's easy to game the scheduler - see original design doc)    [47m [m
+[94m~                                                                                                                                                                                 [7;1H~                                                                                                                                                                                 [8;1H~                                                                                                                                                                                 [9;1H~                                                                                                                                                                                 [10;1H~                                                                                                                                                                                 [11;1H~                                                                                                                                                                                 [12;1H~                                                                                                                                                                                 [13;1H~                                                                                                                                                                                 [14;1H~                                                                                                                                                                                 [15;1H~                                                                                                                                                                                 [16;1H~                                                                                                                                                                                 [17;1H~                                                                                                                                                                                 [18;1H~                                                                                                                                                                                 [19;1H~                                                                                                                                                                                 [20;1H~                                                                                                                                                                                 [21;1H~                                                                                                                                                                                 [22;1H~                                                                                                                                                                                 [23;1H~                                                                                                                                                                                 [24;1H~                                                                                                                                                                                 [25;1H~                                                                                                                                                                                 [26;1H~                                                                                                                                                                                 [27;1H~                                                                                                                                                                                 [28;1H~                                                                                                                                                                                 [29;1H~                                                                                                                                                                                 [30;1H~                                                                                                                                                                                 [31;1H~                                                                                                                                                                                 [32;1H~                                                                                                                                                                                 [33;1H~                                                                                                                                                                                 [34;1H~                                                                                                                                                                                 [35;1H~                                                                                                                                                                                 [36;1H~                                                                                                                                                                                 [37;1H~                                                                                                                                                                                 [38;1H~                                                                                                                                                                                 [39;1H~                                                                                                                                                                                 [40;1H~                                                                                                                                                                                 [41;1H~                                                                                                                                                                                 [42;1H~                                                                                                                                                                                 [43;1H~                                                                                                                                                                                 [44;1H~                                                                                                                                                                                 [45;1H~                                                                                                                                                                                 [46;1H~                                                                                                                                                                                 [47;1H~                                                                                                                                                                                 [48;1H~                                                                                                                                                                                 [m[49;1H[1m[7mdesign_document.txt[utf-8,unix][text]                                                                                                                                    1,1/5 All[1;5H[?12l[?25h[49;170H0,2/[2;5H[49;170H1,3/[3;5H[49;172H4/[4;5H[49;172H5/[5;5H[?25l[mn[48;5;242mot lower it (so it's easy to game the scheduler - see original design doc) [m[51;1H[1m-- VISUAL LINE --[5;5H[?12l[?25h[?25l[m[4;6H[48;5;242m. We do not track how long each thread has been in the highest level and do [5;5Hn[m[49;172H[1m[7m4/[4;5H[?12l[?25h[?25l[m[3;6H[48;5;242m. MLFQ doesn't have different timeslices per level [4;5H2[m[49;172H[1m[7m3/[3;5H[?12l[?25h[?25l[m[48;5;242m1[m[49;170H[1m[7m0,2/[2;5H[?12l[?25h[?25l[m[1;6H[48;5;242mhings that we didn't have time to implement: [2;5H [m[49;170H[1m[7m1,1/[1;5H[?12l[?25h[?25l[?12l[?25h[?25l[mThings that we didn't have time to implement: [2;5H [3;5H1. MLFQ doesn't have different timeslices per level [4;5H2. We do not track how long each thread has been in the highest level and do [5;5Hnot lower it (so it's easy to game the scheduler - see original design doc) [50;1H[K[51;1H[K[1;5H[?12l[?25h[49;170H[1m[7m0,2/[2;5H[49;170H1,3/[3;5H[49;172H4/[4;5H[49;172H5/[5;5H[?25l[50;1H[m:q[?12l[?25h[?25l
+[?1000l[50;1H[K[51;1H[?1l>[?12l[?25h[?1049l[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m vim design_document.txt 
+[?1000h[?1049h[?1h=[2;1H▽[6n[1;1H  [1;1H[1;51r[?12;25h[?12l[?25h[27m[m[H[2J[?25l[50;1H"design_document.txt" 5L, 252C[>c[1;1H[93m  1 [mThings that we didn't have time to implement:[34C[47m [m
+[93m  2 [m[79C[47m [m
+[93m  3 [m1. MLFQ doesn't have different timeslices per level[28C[47m [m
+[93m  4 [m2. We do not track how long each thread has been in the highest level and do   [47m [m
+[93m  5 [mnot lower it (so it's easy to game the scheduler - see original design doc)    [47m [m
+[94m~                                                                                                                                                                                 [7;1H~                                                                                                                                                                                 [8;1H~                                                                                                                                                                                 [9;1H~                                                                                                                                                                                 [10;1H~                                                                                                                                                                                 [11;1H~                                                                                                                                                                                 [12;1H~                                                                                                                                                                                 [13;1H~                                                                                                                                                                                 [14;1H~                                                                                                                                                                                 [15;1H~                                                                                                                                                                                 [16;1H~                                                                                                                                                                                 [17;1H~                                                                                                                                                                                 [18;1H~                                                                                                                                                                                 [19;1H~                                                                                                                                                                                 [20;1H~                                                                                                                                                                                 [21;1H~                                                                                                                                                                                 [22;1H~                                                                                                                                                                                 [23;1H~                                                                                                                                                                                 [24;1H~                                                                                                                                                                                 [25;1H~                                                                                                                                                                                 [26;1H~                                                                                                                                                                                 [27;1H~                                                                                                                                                                                 [28;1H~                                                                                                                                                                                 [29;1H~                                                                                                                                                                                 [30;1H~                                                                                                                                                                                 [31;1H~                                                                                                                                                                                 [32;1H~                                                                                                                                                                                 [33;1H~                                                                                                                                                                                 [34;1H~                                                                                                                                                                                 [35;1H~                                                                                                                                                                                 [36;1H~                                                                                                                                                                                 [37;1H~                                                                                                                                                                                 [38;1H~                                                                                                                                                                                 [39;1H~                                                                                                                                                                                 [40;1H~                                                                                                                                                                                 [41;1H~                                                                                                                                                                                 [42;1H~                                                                                                                                                                                 [43;1H~                                                                                                                                                                                 [44;1H~                                                                                                                                                                                 [45;1H~                                                                                                                                                                                 [46;1H~                                                                                                                                                                                 [47;1H~                                                                                                                                                                                 [48;1H~                                                                                                                                                                                 [m[49;1H[1m[7mdesign_document.txt[utf-8,unix][text]                                                                                                                                    1,1/5 All[1;5H[?12l[?25h[?25l[m[50;1H[K[50;1H:w[?12l[?25h[?25l"design_document.txt" 5L, 252C written[1;5H[?12l[?25h[?25l[50;1H[K[50;1H:q[?12l[?25h[?25l
+[?1000l[50;1H[K[51;1H[?1l>[?12l[?25h[?1049l[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m ls
+badcall.script        badcall_waitpid.script  cp.script            forkbomb.script  pwd.script   tt1.script  tt3.script
+badcall_lseek.script  cat.script              design_document.txt  forktest.script  sys161.conf  tt2.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m script eecbomb[K[K[K[K[K[Kxecbomb.script
+Script started, file is execbomb.script
+[?1034h[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for 

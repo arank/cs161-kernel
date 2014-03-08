@@ -1,0 +1,49 @@
+Script started on Sat Mar  8 16:21:39 2014
+[?1034h[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Feb 23 2014 15:46:25
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+Puffin OS system version 0 (ASST2 #153)
+
+3824k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+cpu2: MIPS/161 (System/161 2.x) features 0x0
+cpu3: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 2048; max size 1024k
+OS/161 kernel [? for menu]: p testbin/execbomb        bigexec
+(program name unknown): Starting.
+(program name unknown): 1. Execing with one 8-letter word.
+/testbin/bigexec: 2. Execing with one 4050-letter word.
+/testbin/bigexec: 3. Execing with two 4050-letter words.
+/testbin/bigexec: 4. Execing with 16 4050-letter words.
+/testbin/bigexec: 5. Execing with one 16320-letter word.
+/testbin/bigexec: 6. Execing with two 16320-letter words.
+/testbin/bigexec: 7. Execing with four 16320-letter words.
+/testbin/bigexec: 8. Execing with one 65500-letter word.
+/testbin/bigexec: 9. Execing with 300 8-letter words.
+/testbin/bigexec: 10. Execing with 1000 8-letter words.
+/testbin/bigexec: Complete.
+Operation took 3.701460280 seconds
+OS/161 kernel [? for menu]: 
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m exit
+exit
+
+Script done on Sat Mar  8 16:22:07 2014
