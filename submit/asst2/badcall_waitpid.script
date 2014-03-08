@@ -424,4 +424,1007 @@ cpu1: MIPS/161 (System/161 2.x) features 0x0
 cpu2: MIPS/161 (System/161 2.x) features 0x0
 cpu3: MIPS/161 (System/161 2.x) features 0x0
 buffers: max count 2048; max size 1024k
-OS/161 kernel [? for 
+OS/161 kernel [? for menu]: p testbin/execbomb        bigexec
+(program name unknown): Starting.
+(program name unknown): 1. Execing with one 8-letter word.
+/testbin/bigexec: 2. Execing with one 4050-letter word.
+/testbin/bigexec: 3. Execing with two 4050-letter words.
+/testbin/bigexec: 4. Execing with 16 4050-letter words.
+/testbin/bigexec: 5. Execing with one 16320-letter word.
+/testbin/bigexec: 6. Execing with two 16320-letter words.
+/testbin/bigexec: 7. Execing with four 16320-letter words.
+/testbin/bigexec: 8. Execing with one 65500-letter word.
+/testbin/bigexec: 9. Execing with 300 8-letter words.
+/testbin/bigexec: 10. Execing with 1000 8-letter words.
+/testbin/bigexec: Complete.
+Operation took 3.701460280 seconds
+OS/161 kernel [? for menu]: 
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m exit
+exit
+Script done, file is execbomb.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m ls
+badcall.script        badcall_waitpid.script  cp.script            execbomb.script  forktest.script  sys161.conf  tt2.script
+badcall_lseek.script  cat.script              design_document.txt  forkbomb.script  pwd.script       tt1.script   tt3.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit/asst2[35m (master)[32m]$(B[m cd ..
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master)[32m]$(B[m ls
+asst0-answers.txt  asst1.txt  [0m[38;5;27masst2[0m
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master)[32m]$(B[m git commit -am "s[Ktypescripts"[K and testing"
+# On branch master
+# Your branch is ahead of 'origin/master' by 2 commits.
+#   (use "git push" to publish your local commits)
+#
+# Untracked files:
+#   (use "git add <file>..." to include in what will be committed)
+#
+#	[31masst2/badcall.script[m
+#	[31masst2/badcall_lseek.script[m
+#	[31masst2/badcall_waitpid.script[m
+#	[31masst2/cat.script[m
+#	[31masst2/cp.script[m
+#	[31masst2/execbomb.script[m
+#	[31masst2/forkbomb.script[m
+#	[31masst2/forktest.script[m
+#	[31masst2/pwd.script[m
+#	[31masst2/sys161.conf[m
+#	[31masst2/tt1.script[m
+#	[31masst2/tt2.script[m
+#	[31masst2/tt3.script[m
+nothing added to commit but untracked files present (use "git add" to track)
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master)[32m]$(B[m git add .
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master +)[32m]$(B[m git status
+# On branch master
+# Your branch is ahead of 'origin/master' by 2 commits.
+#   (use "git push" to publish your local commits)
+#
+# Changes to be committed:
+#   (use "git reset HEAD <file>..." to unstage)
+#
+#	[32mnew file:   asst2/badcall.script[m
+#	[32mnew file:   asst2/badcall_lseek.script[m
+#	[32mnew file:   asst2/badcall_waitpid.script[m
+#	[32mnew file:   asst2/cat.script[m
+#	[32mnew file:   asst2/cp.script[m
+#	[32mnew file:   asst2/execbomb.script[m
+#	[32mnew file:   asst2/forkbomb.script[m
+#	[32mnew file:   asst2/forktest.script[m
+#	[32mnew file:   asst2/pwd.script[m
+#	[32mnew file:   asst2/sys161.conf[m
+#	[32mnew file:   asst2/tt1.script[m
+#	[32mnew file:   asst2/tt2.script[m
+#	[32mnew file:   asst2/tt3.script[m
+#
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master +)[32m]$(B[m git status[1Padd .commit -am "typescripts and testing"
+[master c63933f] typescripts and testing
+ 13 files changed, 1380 insertions(+)
+ create mode 100644 submit/asst2/badcall.script
+ create mode 100644 submit/asst2/badcall_lseek.script
+ create mode 100644 submit/asst2/badcall_waitpid.script
+ create mode 100644 submit/asst2/cat.script
+ create mode 100644 submit/asst2/cp.script
+ create mode 100644 submit/asst2/execbomb.script
+ create mode 100644 submit/asst2/forkbomb.script
+ create mode 100644 submit/asst2/forktest.script
+ create mode 100644 submit/asst2/pwd.script
+ create mode 100644 submit/asst2/sys161.conf
+ create mode 100644 submit/asst2/tt1.script
+ create mode 100644 submit/asst2/tt2.script
+ create mode 100644 submit/asst2/tt3.script
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master *)[32m]$(B[m git push origin master
+Counting objects: 44, done.
+Compressing objects:   3% (1/31)   Compressing objects:   6% (2/31)   Compressing objects:   9% (3/31)   Compressing objects:  12% (4/31)   Compressing objects:  16% (5/31)   Compressing objects:  19% (6/31)   Compressing objects:  22% (7/31)   Compressing objects:  25% (8/31)   Compressing objects:  29% (9/31)   Compressing objects:  32% (10/31)   Compressing objects:  35% (11/31)   Compressing objects:  38% (12/31)   Compressing objects:  41% (13/31)   Compressing objects:  45% (14/31)   Compressing objects:  48% (15/31)   Compressing objects:  51% (16/31)   Compressing objects:  54% (17/31)   Compressing objects:  58% (18/31)   Compressing objects:  61% (19/31)   Compressing objects:  64% (20/31)   Compressing objects:  67% (21/31)   Compressing objects:  70% (22/31)   Compressing objects:  74% (23/31)   Compressing objects:  77% (24/31)   Compressing objects:  80% (25/31)   Compressing objects:  83% (26/31)   Compressing objects:  87% (27/31)   Compressing objects:  90% (28/31)   Compressing objects:  93% (29/31)   Compressing objects:  96% (30/31)   Compressing objects: 100% (31/31)   Compressing objects: 100% (31/31), done.
+Writing objects:   3% (1/32)   Writing objects:   6% (2/32)   Writing objects:   9% (3/32)   Writing objects:  12% (4/32)   Writing objects:  15% (5/32)   Writing objects:  18% (6/32)   Writing objects:  21% (7/32)   Writing objects:  25% (8/32)   Writing objects:  28% (9/32)   Writing objects:  31% (10/32)   Writing objects:  34% (11/32)   Writing objects:  37% (12/32)   Writing objects:  40% (13/32)   Writing objects:  43% (14/32)   Writing objects:  46% (15/32)   Writing objects:  50% (16/32)   Writing objects:  53% (17/32)   Writing objects:  56% (18/32)   Writing objects:  59% (19/32)   Writing objects:  62% (20/32)   Writing objects:  68% (22/32)   Writing objects:  71% (23/32)   Writing objects:  75% (24/32)   Writing objects:  78% (25/32)   Writing objects:  81% (26/32)   Writing objects:  87% (28/32)   Writing objects:  90% (29/32)   Writing objects:  93% (30/32)   Writing objects:  96% (31/32)   Writing objects: 100% (32/32)   Writing objects: 100% (32/32), 13.65 KiB | 0 bytes/s, done.
+Total 32 (delta 21), reused 0 (delta 0)
+remote: => Syncing Gitorious... [OK][K
+To git@code.seas.harvard.edu:puffinos/puffinos.git
+   901e66a..c63933f  master -> master
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master *)[32m]$(B[m an git commit
+bash: an: command not found
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master *)[32m]$(B[m man git commit
+[?1049h[?1h=GIT-COMMIT(1)                                                                     Git Manual                                                                    GIT-COMMIT(1)[m
+[m
+[1mNAME[0m[m
+       git-commit - Record changes to the repository[m
+[m
+[1mSYNOPSIS[0m[m
+       [4mgit[24m [4mcommit[24m [-a | --interactive | --patch] [-s] [-v] [-u<mode>] [--amend][m
+                  [--dry-run] [(-c | -C | --fixup | --squash) <commit>][m
+                  [-F <file> | -m <msg>] [--reset-author] [--allow-empty][m
+                  [--allow-empty-message] [--no-verify] [-e] [--author=<author>][m
+                  [--date=<date>] [--cleanup=<mode>] [--[no-]status][m
+                  [-i | -o] [-S[<keyid>]] [--] [<file>...][m
+[m
+[1mDESCRIPTION[0m[m
+       Stores the current contents of the index in a new commit along with a log message from the user describing the changes.[m
+[m
+       The content to be added can be specified in several ways:[m
+[m
+        1. by using [4mgit[24m [4madd[24m to incrementally "add" changes to the index before using the [4mcommit[24m command (Note: even modified files must be "added");[m
+[m
+        2. by using [4mgit[24m [4mrm[24m to remove files from the working tree and the index, again before using the [4mcommit[24m command;[m
+[m
+        3. by listing files as arguments to the [4mcommit[24m command, in which case the commit will ignore changes staged in the index, and instead record the current content of[m
+           the listed files (which must already be known to Git);[m
+[m
+        4. by using the -a switch with the [4mcommit[24m command to automatically "add" changes from all known files (i.e. all files that are already listed in the index) and to[m
+           automatically "rm" files in the index that have been removed from the working tree, and then perform the actual commit;[m
+[m
+        5. by using the --interactive or --patch switches with the [4mcommit[24m command to decide one by one which files or hunks should be part of the commit, before finalizing[m
+           the operation. See the “Interactive Mode” section of [1mgit-add[0m(1) to learn how to operate these modes.[m
+[m
+       The --dry-run option can be used to obtain a summary of what is included by any of the above for the next commit by giving the same set of parameters (options and[m
+       paths).[m
+[m
+       If you make a commit and then find a mistake immediately after that, you can recover from it with [4mgit[24m [4mreset[24m.[m
+[m
+[1mOPTIONS[0m[m
+       -a, --all[m
+           Tell the command to automatically stage files that have been modified and deleted, but new files you have not told Git about are not affected.[m
+[m
+       -p, --patch[m
+           Use the interactive patch selection interface to chose which changes to commit. See [1mgit-add[0m(1) for details.[m
+[m
+       -C <commit>, --reuse-message=<commit>[m
+           Take an existing commit object, and reuse the log message and the authorship information (including the timestamp) when creating the commit.[m
+[m
+       -c <commit>, --reedit-message=<commit>[m
+           Like [4m-C[24m, but with [4m-c[24m the editor is invoked, so that the user can further edit the commit message.[m
+[m
+       --fixup=<commit>[m
+[7m Manual page git-commit(1) line 1 (press h for help or q to quit)[27m[K[K[?1l>[?1049l[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master *)[32m]$(B[m git tag asst2-submit
+[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master *)[32m]$(B[m git diff asst2-start asst2-submit
+[?1h=[1mdiff --git a/.cproject b/.cproject[m[m
+[1mnew file mode 100644[m[m
+[1mindex 0000000..ea82991[m[m
+[1m--- /dev/null[m[m
+[1m+++ b/.cproject[m[m
+[36m@@ -0,0 +1,64 @@[m[m
+[32m+[m[32m<?xml version="1.0" encoding="UTF-8" standalone="no"?>[m[41m[7m^M[27m[m[m
+[32m+[m[32m<?fileVersion 4.0.0?><cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<storageModule moduleId="org.eclipse.cdt.core.settings">[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<cconfiguration id="0.168089915">[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="0.168089915" moduleId="org.eclipse.cdt.core.settings" nam[m
+[32m+[m                               [32m<externalSettings/>[m[41m[7m^M[27m[m[m
+[32m+[m                               [32m<extensions>[m[41m[7m^M[27m[m[m
+[32m+[m                                       [32m<extension id="org.eclipse.cdt.core.VCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                       [32m<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                       [32m<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                       [32m<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                       [32m<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                       [32m<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>[m[41m[7m^M[27m[m[m
+[32m+[m                               [32m</extensions>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m</storageModule>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<storageModule moduleId="cdtBuildSystem" version="4.0.0">[m[41m[7m^M[27m[m[m
+[32m+[m                               [32m<configuration buildProperties="" description="" id="0.168089915" name="Default" parent="org.eclipse.cdt.build.core.prefbase.cfg">[m[41m[7m^M[27m[m[m
+[32m+[m                                       [32m<folderInfo id="0.168089915." name="/" resourcePath="">[m[41m[7m^M[27m[m[m
+[32m+[m                                               [32m<toolChain id="org.eclipse.cdt.build.core.prefbase.toolchain.790244513" name="No ToolChain" resourceTypeBasedDiscovery="false" sup[m
+[32m+[m                                                       [32m<targetPlatform id="org.eclipse.cdt.build.core.prefbase.toolchain.790244513.1509389892" name=""/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                       [32m<builder id="org.eclipse.cdt.build.core.settings.default.builder.1413848309" keepEnvironmentInBuildfile="false" managedBui[m
+[32m+[m                                                       [32m<tool id="org.eclipse.cdt.build.core.settings.holder.libs.1068883195" name="holder for library settings" superClass="org.e[m
+[32m+[m                                                       [32m<tool id="org.eclipse.cdt.build.core.settings.holder.2027693224" name="Assembly" superClass="org.eclipse.cdt.build.core.se[m
+[32m+[m                                                               [32m<inputType id="org.eclipse.cdt.build.core.settings.holder.inType.1817491723" languageId="org.eclipse.cdt.core.asse[m
+[32m+[m                                                       [32m</tool>[m[41m[7m^M[27m[m[m
+[32m+[m                                                       [32m<tool id="org.eclipse.cdt.build.core.settings.holder.405409260" name="GNU C++" superClass="org.eclipse.cdt.build.core.sett[m
+[32m+[m                                                               [32m<inputType id="org.eclipse.cdt.build.core.settings.holder.inType.1704429323" languageId="org.eclipse.cdt.core.g++"[m
+[32m+[m                                                       [32m</tool>[m[41m[7m^M[27m[m[m
+[32m+[m                                                       [32m<tool id="org.eclipse.cdt.build.core.settings.holder.1359470498" name="GNU C" superClass="org.eclipse.cdt.build.core.setti[m
+[32m+[m                                                               [32m<option id="org.eclipse.cdt.build.core.settings.holder.incpaths.512765551" superClass="org.eclipse.cdt.build.core.[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/kern/include}&quot;"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/kern/include/kern}&quot;"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/kern/arch/mips/include}&quot;"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/kern/arch/mips/include/kern}&quot;"/>[m[41m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/kern/arch/sys161/include}&quot;"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/userland/include}&quot;"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/userland/include/sys}&quot;"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/userland/include/test}&quot;"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="&quot;${workspace_loc:/os161/userland/include/types}&quot;"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                               [32m</option>[m[41m[7m^M[27m[m[m
+[32m+[m                                                               [32m<option id="org.eclipse.cdt.build.core.settings.holder.symbols.227189027" superClass="org.eclipse.cdt.build.core.s[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="__GNUC__=1"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                                       [32m<listOptionValue builtIn="false" value="_KERNEL=1"/>[m[41m[7m^M[27m[m[m
+[32m+[m                                                               [32m</option>[m[41m[7m^M[27m[m[m
+:[K[K[32m+[m                                                               [32m<inputType id="org.eclipse.cdt.build.core.settings.holder.inType.376350716" languageId="org.eclipse.cdt.core.gcc" [m
+[32m+[m                                                       [32m</tool>[m[41m[7m^M[27m[m[m
+[32m+[m                                               [32m</toolChain>[m[41m[7m^M[27m[m[m
+[32m+[m                                       [32m</folderInfo>[m[41m[7m^M[27m[m[m
+[32m+[m                               [32m</configuration>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m</storageModule>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m</cconfiguration>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m</storageModule>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<storageModule moduleId="cdtBuildSystem" version="4.0.0">[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<project id="os161.null.48570211" name="os161"/>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m</storageModule>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<storageModule moduleId="scannerConfiguration">[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<scannerConfigBuildInfo instanceId="0.168089915">[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m</scannerConfigBuildInfo>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m</storageModule>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>[m[41m[7m^M[27m[m[m
+[32m+[m[32m</cproject>[m[41m[7m^M[27m[m[m
+[1mdiff --git a/.project b/.project[m[m
+[1mnew file mode 100644[m[m
+[1mindex 0000000..3106e5c[m[m
+[1m--- /dev/null[m[m
+[1m+++ b/.project[m[m
+[36m@@ -0,0 +1,26 @@[m[m
+:[K[K[32m+[m[32m<?xml version="1.0" encoding="UTF-8"?>[m[41m[7m^M[27m[m[m
+[32m+[m[32m<projectDescription>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<name>os161</name>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<comment></comment>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<projects>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m</projects>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<buildSpec>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<buildCommand>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<name>org.eclipse.cdt.managedbuilder.core.genmakebuilder</name>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<triggers>clean,full,incremental,</triggers>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<arguments>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m</arguments>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m</buildCommand>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<buildCommand>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<name>org.eclipse.cdt.managedbuilder.core.ScannerConfigBuilder</name>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<triggers>full,incremental,</triggers>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m<arguments>[m[41m[7m^M[27m[m[m
+[32m+[m                       [32m</arguments>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m</buildCommand>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m</buildSpec>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m<natures>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<nature>org.eclipse.cdt.core.cnature</nature>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>[m[41m[7m^M[27m[m[m
+[32m+[m               [32m<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>[m[41m[7m^M[27m[m[m
+[32m+[m       [32m</natures>[m[41m[7m^M[27m[m[m
+[32m+[m[32m</projectDescription>[m[41m[7m^M[27m[m[m
+:[K[K[1mdiff --git a/as_vbase1 b/as_vbase1[m[m
+[1mnew file mode 100644[m[m
+[1mindex 0000000..62849f2[m[m
+[1m--- /dev/null[m[m
+[1m+++ b/as_vbase1[m[m
+[36m@@ -0,0 +1,45 @@[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:163:        KASSERT(as->as_vbase1 != 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:164:        KASSERT(as->as_pbase1 != 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:165:        KASSERT(as->as_npages1 != 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:166:        KASSERT(as->as_vbase2 != 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:167:        KASSERT(as->as_pbase2 != 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:168:        KASSERT(as->as_npages2 != 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:169:        KASSERT(as->as_stackpbase != 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:170:        KASSERT((as->as_vbase1 & PAGE_FRAME) == as->as_vbase1);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:171:        KASSERT((as->as_pbase1 & PAGE_FRAME) == as->as_pbase1);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:172:        KASSERT((as->as_vbase2 & PAGE_FRAME) == as->as_vbase2);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:173:        KASSERT((as->as_pbase2 & PAGE_FRAME) == as->as_pbase2);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:174:        KASSERT((as->as_stackpbase & PAGE_FRAME) == as->as_stackpbase);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:176:        vbase1 = as->as_vbase1;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:177:        vtop1 = vbase1 + as->as_npages1 * PAGE_SIZE;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:178:        vbase2 = as->as_vbase2;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:179:        vtop2 = vbase2 + as->as_npages2 * PAGE_SIZE;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:184:                paddr = (faultaddress - vbase1) + as->as_pbase1;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:187:                paddr = (faultaddress - vbase2) + as->as_pbase2;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:190:                paddr = (faultaddress - stackbase) + as->as_stackpbase;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:228:        as->as_vbase1 = 0;[m[m
+:[K[K[32m+[m[32mkern/arch/mips/vm/dumbvm.c:229:        as->as_pbase1 = 0;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:230:        as->as_npages1 = 0;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:231:        as->as_vbase2 = 0;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:232:        as->as_pbase2 = 0;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:233:        as->as_npages2 = 0;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:234:        as->as_stackpbase = 0;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:292:        if (as->as_vbase1 == 0) {[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:293:                as->as_vbase1 = vaddr;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:294:                as->as_npages1 = npages;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:298:        if (as->as_vbase2 == 0) {[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:299:                as->as_vbase2 = vaddr;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:300:                as->as_npages2 = npages;[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:321:        KASSERT(as->as_pbase1 == 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:322:        KASSERT(as->as_pbase2 == 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:323:        KASSERT(as->as_stackpbase == 0);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:325:        as->as_pbase1 = getppages(as->as_npages1);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:326:        if (as->as_pbase1 == 0) {[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:330:        as->as_pbase2 = getppages(as->as_npages2);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:331:        if (as->as_pbase2 == 0) {[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:335:        as->as_stackpbase = getppages(DUMBVM_STACKPAGES);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:336:        if (as->as_stackpbase == 0) {[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:340:        as_zero_region(as->as_pbase1, as->as_npages1);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:341:        as_zero_region(as->as_pbase2, as->as_npages2);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:342:        as_zero_region(as->as_stackpbase, DUMBVM_STACKPAGES);[m[m
+[32m+[m[32mkern/arch/mips/vm/dumbvm.c:357:        KASSERT(as->as_stackpbase != 0);[m[m
+[1mdiff --git a/kern/arch/mips/locore/trap.c b/kern/arch/mips/locore/trap.c[m[m
+:[K[K[1mindex 35456e4..eb39a44 100644[m[m
+[1m--- a/kern/arch/mips/locore/trap.c[m[m
+[1m+++ b/kern/arch/mips/locore/trap.c[m[m
+[36m@@ -108,13 +108,9 @@[m [mkill_curthread(vaddr_t epc, unsigned code, vaddr_t vaddr)[m[m
+                break;[m[m
+        }[m[m
+ [m[m
+[31m-       /*[m[m
+[31m-        * You will probably want to change this.[m[m
+[31m-        */[m[m
+[31m-[m[m
+        kprintf("Fatal user mode trap %u sig %d (%s, epc 0x%x, vaddr 0x%x)\n",[m[m
+                code, sig, trapcodenames[code], epc, vaddr);[m[m
+[31m-       panic("I don't know how to handle this\n");[m[m
+[32m+[m       [32msys__exit(-1);[m[m
+ }[m[m
+ [m[m
+ /*[m[m
+[1mdiff --git a/kern/arch/mips/syscall/syscall.c b/kern/arch/mips/syscall/syscall.c[m[m
+[1mindex 743d18e..ece1f32 100644[m[m
+[1m--- a/kern/arch/mips/syscall/syscall.c[m[m
+[1m+++ b/kern/arch/mips/syscall/syscall.c[m[m
+[36m@@ -35,7 +35,8 @@[m[m
+ #include <thread.h>[m[m
+ #include <current.h>[m[m
+ #include <syscall.h>[m[m
+:[K[K[31m-[m[m
+[32m+[m[32m#include <endian.h>[m[m
+[32m+[m[32m#include <copyinout.h>[m[m
+ [m[m
+ /*[m[m
+  * System call dispatcher.[m[m
+[36m@@ -82,6 +83,10 @@[m [msyscall(struct trapframe *tf)[m[m
+        int32_t retval;[m[m
+        int err;[m[m
+ [m[m
+[32m+[m[32m    /* vars for lseek */[m[m
+[32m+[m[32m    uint64_t offset_in;[m[m
+[32m+[m[32m    uint64_t offset_out;[m[m
+[32m+[m[32m    int whence;[m[m
+        KASSERT(curthread != NULL);[m[m
+        KASSERT(curthread->t_curspl == 0);[m[m
+        KASSERT(curthread->t_iplhigh_count == 0);[m[m
+[36m@@ -105,11 +110,67 @@[m [msyscall(struct trapframe *tf)[m[m
+                break;[m[m
+ [m[m
+            case SYS___time:[m[m
+[31m-               err = sys___time((userptr_t)tf->tf_a0,[m[m
+[31m-                                (userptr_t)tf->tf_a1);[m[m
+[32m+[m               [32merr = sys___time((userptr_t)tf->tf_a0, (userptr_t)tf->tf_a1);[m[m
+[32m+[m               [32mbreak;[m[m
+[32m+[m[m
+:[K[K[32m+[m               [32m/* Add stuff here */[m[m
+[32m+[m       [32m    case SYS_execv:[m[m
+[32m+[m       [32m    err = sys_execv((const_userptr_t)tf->tf_a0, (const_userptr_t *)tf->tf_a1);[m[m
+[32m+[m       [32m    break;[m[m
+[32m+[m[m
+[32m+[m       [32m    case SYS_open:[m[m
+[32m+[m       [32m    err = sys_open((const_userptr_t)tf->tf_a0, tf->tf_a1, tf->tf_a2, &retval);[m[m
+[32m+[m               [32mbreak;[m[m
+[32m+[m[m
+[32m+[m       [32m    case SYS_read:[m[m
+[32m+[m               [32merr = sys_read(tf->tf_a0 , (userptr_t) tf->tf_a1 , tf->tf_a2, (ssize_t *)&retval);[m[m
+[32m+[m               [32mbreak;[m[m
+[32m+[m[m
+[32m+[m       [32m    case SYS_write:[m[m
+[32m+[m               [32merr = sys_write(tf->tf_a0, (const_userptr_t) tf->tf_a1, tf->tf_a2, (ssize_t *)&retval);[m[m
+[32m+[m               [32mbreak;[m[m
+[32m+[m[m
+[32m+[m       [32m    case SYS_lseek:[m[m
+[32m+[m[32m        join32to64(tf->tf_a2, tf->tf_a3, &offset_in);    /* join pos argument */[m[m
+[32m+[m[32m        /* get whence from the stack */[m[m
+[32m+[m[32m        err = copyin((const_userptr_t)(tf->tf_sp + 16), &whence, sizeof (uint32_t));[m[41m [m[m
+[32m+[m[32m        if (err) break;[m[m
+[32m+[m               [32merr = sys_lseek (tf->tf_a0, (off_t)offset_in, (int)whence, (off_t *)&offset_out);[m[m
+[32m+[m[32m        split64to32(offset_out, (uint32_t *)&retval, &tf->tf_v1);[m[m
+                break;[m[m
+ [m[m
+:[K[K[31m-           /* Add stuff here */[m[m
+[32m+[m       [32m    case SYS_close:[m[m
+[32m+[m               [32merr = sys_close(tf->tf_a0);[m[m
+[32m+[m       [32m    break;[m[m
+[32m+[m[m
+[32m+[m       [32m    case SYS_dup2:[m[m
+[32m+[m               [32merr = sys_dup2(tf->tf_a0 , tf->tf_a1, &retval);[m[m
+[32m+[m               [32mbreak;[m[m
+[32m+[m[m
+[32m+[m       [32m    case SYS_chdir:[m[m
+[32m+[m               [32merr = sys_chdir ((const_userptr_t)tf->tf_a0);[m[m
+[32m+[m       [32m    break;[m[m
+[32m+[m[m
+[32m+[m       [32m    case SYS___getcwd:[m[m
+[32m+[m               [32merr=sys___getcwd((userptr_t)tf->tf_a0 , tf->tf_a1, &retval);[m[m
+[32m+[m       [32m    break;[m[m
+[32m+[m[m
+[32m+[m       [32m    case SYS_waitpid:[m[m
+[32m+[m       [32m    err = sys_waitpid(tf->tf_a0, (userptr_t) tf->tf_a1, tf->tf_a2);[m[m
+[32m+[m       [32m    break;[m[m
+[32m+[m[m
+[32m+[m       [32m    // Special case as getpid can't fail in POSIX[m[m
+[32m+[m       [32m    case SYS_getpid:[m[m
+[32m+[m       [32m    err = sys_getpid(&retval);[m[m
+[32m+[m       [32m    break;[m[m
+[32m+[m[m
+:[K[K[32m+[m       [32m    case SYS__exit:[m[m
+[32m+[m       [32m    sys__exit(tf->tf_a0);[m[m
+[32m+[m       [32m    break;[m[m
+[32m+[m[m
+[32m+[m[32m        case SYS_fork:[m[m
+[32m+[m[32m        err = sys_fork(tf, &retval);[m[m
+[32m+[m[32m        break;[m[m
+ [m[m
+            default:[m[m
+                kprintf("Unknown syscall %d\n", callno);[m[m
+[36m@@ -126,8 +187,7 @@[m [msyscall(struct trapframe *tf)[m[m
+                 */[m[m
+                tf->tf_v0 = err;[m[m
+                tf->tf_a3 = 1;      /* signal an error */[m[m
+[31m-       }[m[m
+[31m-       else {[m[m
+[32m+[m       [32m} else {[m[m
+                /* Success. */[m[m
+                tf->tf_v0 = retval;[m[m
+                tf->tf_a3 = 0;      /* signal no error */[m[m
+[1mdiff --git a/kern/conf/conf.kern b/kern/conf/conf.kern[m[m
+[1mindex 31842b0..b79fc19 100644[m[m
+[1m--- a/kern/conf/conf.kern[m[m
+[1m+++ b/kern/conf/conf.kern[m[m
+[36m@@ -325,12 +325,13 @@[m [mfile      thread/spinlock.c[m[m
+ file      thread/synch.c[m[m
+:[K[K file      thread/thread.c[m[m
+ file      thread/threadlist.c[m[m
+[31m-[m[m
+[32m+[m[32mfile      thread/runqueue.c[m[m
+ #[m[m
+ # Process system[m[m
+ #[m[m
+ [m[m
+ file      proc/proc.c[m[m
+[32m+[m[32mfile      proc/pid_table.c[m[m
+ [m[m
+ #[m[m
+ # Virtual memory system[m[m
+[36m@@ -361,6 +362,7 @@[m [mfile      vfs/vfspath.c[m[m
+ file      vfs/vnode.c[m[m
+ [m[m
+ file      vfs/buf.c[m[m
+[32m+[m[32mfile      vfs/fd.c[m[m
+ [m[m
+ #[m[m
+ # VFS devices[m[m
+[36m@@ -377,6 +379,9 @@[m [mfile      vfs/devnull.c[m[m
+ file      syscall/loadelf.c[m[m
+ file      syscall/runprogram.c[m[m
+ file      syscall/time_syscalls.c[m[m
+[32m+[m[32mfile      syscall/fs_calls.c[m[m
+:[K[K[32m+[m[32mfile      syscall/proc_calls.c[m[m
+[32m+[m[32mfile      syscall/fork.c[m[m
+ [m[m
+ #[m[m
+ # Startup and initialization[m[m
+[36m@@ -439,6 +444,8 @@[m [mfile                test/threadlisttest.c[m[m
+ file           test/threadtest.c[m[m
+ file           test/tt3.c[m[m
+ file           test/synchtest.c[m[m
+[32m+[m[32mfile           test/autotest.c[m[m
+ file           test/malloctest.c[m[m
+ file           test/fstest.c[m[m
+[32m+[m[32mfile           test/fdtest.c[m[m
+ optfile net    test/nettest.c[m[m
+[1mdiff --git a/kern/include/cpu.h b/kern/include/cpu.h[m[m
+[1mindex 994f3c1..9036230 100644[m[m
+[1m--- a/kern/include/cpu.h[m[m
+[1m+++ b/kern/include/cpu.h[m[m
+[36m@@ -34,7 +34,7 @@[m[m
+ #include <spinlock.h>[m[m
+ #include <threadlist.h>[m[m
+ #include <machine/vm.h>  /* for TLBSHOOTDOWN_MAX */[m[m
+[31m-[m[m
+[32m+[m[32m#include <runqueue.h>[m[m
+ [m[m
+ /*[m[m
+:[K[K  * Per-cpu structure[m[m
+[36m@@ -45,7 +45,6 @@[m[m
+  * (as opposed to merely dereferencing it) in case curcpu is defined as[m[m
+  * a pointer with a fixed address and a per-cpu mapping in the MMU.[m[m
+  */[m[m
+[31m-[m[m
+ struct cpu {[m[m
+        /*[m[m
+         * Fixed after allocation.[m[m
+[36m@@ -67,7 +66,8 @@[m [mstruct cpu {[m[m
+         * Protected by the runqueue lock.[m[m
+         */[m[m
+        bool c_isidle;                  /* True if this cpu is idle */[m[m
+[31m-       struct threadlist c_runqueue;   /* Run queue for this cpu */[m[m
+[32m+[m       [32m//struct threadlist c_runqueue; /* Run queue for this cpu */[m[m
+[32m+[m[32m    struct mlfq c_mlfq;[m[m
+        struct spinlock c_runqueue_lock;[m[m
+ [m[m
+        /*[m[m
+[1mdiff --git a/kern/include/fd.h b/kern/include/fd.h[m[m
+[1mnew file mode 100644[m[m
+[1mindex 0000000..c20d8e2[m[m
+[1m--- /dev/null[m[m
+[1m+++ b/kern/include/fd.h[m[m
+[36m@@ -0,0 +1,20 @@[m[m
+[32m+[m[32m#ifndef _FD_H_[m[m
+:[K[K[32m+[m[32m#define _FD_H_[m[m
+[32m+[m[m
+[32m+[m[32m#include <vnode.h>[m[m
+[32m+[m[m
+[32m+[m[32mstruct proc;[m[m
+[32m+[m[m
+[32m+[m[32mstruct file_desc {[m[m
+[32m+[m[32m    struct vnode *vn;[m[m
+[32m+[m[32m    off_t offset;[m[m
+[32m+[m[32m    unsigned ref_count;[m[m
+[32m+[m[32m    mode_t mode;[m[m
+[32m+[m[32m    int flags;[m[m
+[32m+[m[32m    struct lock *lock;[m[m
+[32m+[m[32m};[m[m
+[32m+[m[m
+[32m+[m[32mstruct file_desc *fd_init(struct vnode *vn, mode_t mode, int flags);[m[m
+[32m+[m[32mvoid fd_dec_or_destroy(int index, struct proc *proc);[m[m
+[32m+[m[m
+[32m+[m[32m#endif /* _FD_H_ */[m[m
+[1mdiff --git a/kern/include/pid_table.h b/kern/include/pid_table.h[m[m
+[1mnew file mode 100644[m[m
+[1mindex 0000000..c6057a9[m[m
+[1m--- /dev/null[m[m
+[1m+++ b/kern/include/pid_table.h[m[m
+[36m@@ -0,0 +1,40 @@[m[m
+[32m+[m[32m/*[m[m
+:[K[K[32m+[m[32m * Copyright (c) 2013[m[m
+[32m+[m[32m *     The President and Fellows of Harvard College.[m[m
+[32m+[m[32m *[m[m
+[32m+[m[32m * Redistribution and use in source and binary forms, with or without[m[m
+[32m+[m[32m * modification, are permitted provided that the following conditions[m[m
+[32m+[m[32m * are met:[m[m
+[32m+[m[32m * 1. Redistributions of source code must retain the above copyright[m[m
+[32m+[m[32m *    notice, this list of conditions and the following disclaimer.[m[m
+[32m+[m[32m * 2. Redistributions in binary form must reproduce the above copyright[m[m
+[32m+[m[32m *    notice, this list of conditions and the following disclaimer in the[m[m
+[32m+[m[32m *    documentation and/or other materials provided with the distribution.[m[m
+[32m+[m[32m * 3. Neither the name of the University nor the names of its contributors[m[m
+[32m+[m[32m *    may be used to endorse or promote products derived from this software[m[m
+[32m+[m[32m *    without specific prior written permission.[m[m
+[32m+[m[32m *[m[m
+[32m+[m[32m * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY AND CONTRIBUTORS ``AS IS'' AND[m[m
+[32m+[m[32m * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE[m[m
+[32m+[m[32m * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE[m[m
+[32m+[m[32m * ARE DISCLAIMED.  IN NO EVENT SHALL THE UNIVERSITY OR CONTRIBUTORS BE LIABLE[m[m
+[32m+[m[32m * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL[m[m
+[32m+[m[32m * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS[m[m
+[32m+[m[32m * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)[m[m
+[32m+[m[32m * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT[m[m
+[32m+[m[32m * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY[m[m
+[32m+[m[32m * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF[m[m
+[32m+[m[32m * SUCH DAMAGE.[m[m
+:[K[K[32m+[m[32m */[m[m
+[32m+[m[m
+[32m+[m[32m#ifndef _H_PID_TABLE_H_[m[m
+[32m+[m[32m#define _H_PID_TABLE_H_[m[m
+[32m+[m[m
+[32m+[m[32mint init_pid_table(void);[m[m
+[32m+[m[32mvoid destroy_pid_table(void);[m[m
+[32m+[m[32mpid_t pid_get(void);[m[m
+[32m+[m[32mvoid pid_destroy(pid_t pid);[m[m
+[32m+[m[32mbool pid_in_use(pid_t pid);[m[m
+[32m+[m[32mvoid set_kernel_pid(unsigned index);[m[m
+[32m+[m[m
+[32m+[m[32m#endif /* _H_PID_TABLE_H_ */[m[m
+[1mdiff --git a/kern/include/proc.h b/kern/include/proc.h[m[m
+[1mindex 532aa5d..af55d1c 100644[m[m
+[1m--- a/kern/include/proc.h[m[m
+[1m+++ b/kern/include/proc.h[m[m
+[36m@@ -29,6 +29,7 @@[m[m
+ [m[m
+ #ifndef _PROC_H_[m[m
+ #define _PROC_H_[m[m
+[32m+[m[32m#define PARENT -1[m[m
+ [m[m
+ /*[m[m
+  * Definition of a process.[m[m
+[36m@@ -36,6 +37,8 @@[m[m
+:[K[K  * Note: curproc is defined by <current.h>.[m[m
+  */[m[m
+ [m[m
+[32m+[m[32m#include <fd.h>[m[m
+[32m+[m[32m#include <limits.h>[m[m
+ #include <spinlock.h>[m[m
+ #include <thread.h> /* required for struct threadarray */[m[m
+ [m[m
+[36m@@ -45,18 +48,33 @@[m [mstruct vnode;[m[m
+ /*[m[m
+  * Process structure.[m[m
+  */[m[m
+[32m+[m[32mstruct proc_link {[m[m
+[32m+[m[32m    unsigned ref_count;[m[m
+[32m+[m[32m    int exit_code;[m[m
+[32m+[m[32m    pid_t child_pid;[m[m
+[32m+[m[32m    struct lock *lock;[m[m
+[32m+[m[32m    struct cv *cv;[m[m
+[32m+[m[32m};[m[m
+[32m+[m[m
+[32m+[m[32m#define MAX_CLD 10[m[m
+[32m+[m[m
+ struct proc {[m[m
+[31m-       char *p_name;                   /* Name of this process */[m[m
+[31m-       struct spinlock p_lock;         /* Lock for this structure */[m[m
+[32m+[m       [32mchar *p_name;                           /* Name of this process */[m[m
+:[K[K[32m+[m       [32mstruct spinlock p_lock;             /* Lock for this structure */[m[m
+        struct threadarray p_threads;   /* Threads in this process */[m[m
+ [m[m
+        /* VM */[m[m
+        struct addrspace *p_addrspace;  /* virtual address space */[m[m
+ [m[m
+        /* VFS */[m[m
+[31m-       struct vnode *p_cwd;            /* current working directory */[m[m
+[31m-[m[m
+[31m-       /* add more material here as needed */[m[m
+[32m+[m       [32mstruct vnode *p_cwd;                /* current working directory */[m[m
+[32m+[m[m
+[32m+[m[32m    pid_t pid;[m[m
+[32m+[m[32m    // TODO: change to dynamic array[m[m
+[32m+[m[32m    struct file_desc *fd_table[OPEN_MAX];[m[m
+[32m+[m[32m    // TODO: change to dynamic array[m[m
+[32m+[m[32m    struct proc_link *children[MAX_CLD];[m[m
+[32m+[m[32m    struct proc_link *parent;[m[m
+ };[m[m
+ [m[m
+ /* This is the process structure for the kernel and for kernel-only threads. */[m[m
+[36m@@ -77,11 +95,22 @@[m [mint proc_addthread(struct proc *proc, struct thread *t);[m[m
+ /* Detach a thread from its process. */[m[m
+ void proc_remthread(struct thread *t);[m[m
+ [m[m
+[32m+[m[32m/* Clean up all data for a proc, minus the parent which is handled in exit */[m[m
+:[K[K[32m+[m[32mvoid cleanup_data(struct proc *proc);[m[m
+[32m+[m[m
+[32m+[m[32m/* Clean up any shared struct, safely checking if drefed */[m[m
+[32m+[m[32mvoid shared_link_destroy(int index, struct proc *proc);[m[m
+[32m+[m[m
+ /* Fetch the address space of the current process. */[m[m
+ struct addrspace *proc_getas(void);[m[m
+ [m[m
+ /* Change the address space of the current process, and return the old one. */[m[m
+ struct addrspace *proc_setas(struct addrspace *);[m[m
+ [m[m
+[32m+[m[32m/* create a shared structure for parent and child in fork */[m[m
+[32m+[m[32mstruct proc_link *shared_link_create(pid_t pid);[m[m
+[32m+[m[m
+[32m+[m[32m/* create a process for fork */[m[m
+[32m+[m[32mstruct proc *proc_create(const char *name);[m[m
+ [m[m
+ #endif /* _PROC_H_ */[m[m
+[1mdiff --git a/kern/include/runqueue.h b/kern/include/runqueue.h[m[m
+[1mnew file mode 100644[m[m
+[1mindex 0000000..a63259d[m[m
+[1m--- /dev/null[m[m
+[1m+++ b/kern/include/runqueue.h[m[m
+[36m@@ -0,0 +1,31 @@[m[m
+[32m+[m[32m#ifndef _RUNQUEUE_H_[m[41m[7m^M[27m[m[m
+[32m+[m[32m#define _RUNQUEUE_H_[m[41m[7m^M[27m[m[m
+:[K[K[32m+[m[41m[7m^M[27m[m[m
+[32m+[m[32m#define MAX_PRIORITY 3[m[41m[7m^M[27m[m[m
+[32m+[m[41m[7m^M[27m[m[m
+[32m+[m[32mstruct mlfq {[m[41m[7m^M[27m[m[m
+[32m+[m[32m    struct threadlist mlfq[MAX_PRIORITY];[m[41m[7m^M[27m[m[m
+[32m+[m[32m};[m[41m[7m^M[27m[m[m
+[32m+[m[41m[7m^M[27m[m[m
+[32m+[m[32mstruct queue {[m[41m[7m^M[27m[m[m
+[32m+[m       [32mint first;[m[41m[7m^M[27m[m[m
+[32m+[m       [32mint last;[m[41m[7m^M[27m[m[m
+[32m+[m       [32mint count;[m[41m[7m^M[27m[m[m
+[32m+[m       [32mint max;[m[41m[7m^M[27m[m[m
+[32m+[m       [32mstruct thread** q;[m[41m[7m^M[27m[m[m
+[32m+[m[32m};[m[41m[7m^M[27m[m[m
+[32m+[m[41m[7m^M[27m[m[m
+[32m+[m[32mstruct queue* init_queue(int max_size);[m[41m[7m^M[27m[m[m
+[32m+[m[32mbool enqueue(struct queue *q, struct thread *x);[m[41m[7m^M[27m[m[m
+[32m+[m[32mstruct thread* dequeue(struct queue *q);[m[41m[7m^M[27m[m[m
+[32m+[m[32mbool is_empty(struct queue *q);[m[41m[7m^M[27m[m[m
+[32m+[m[32mvoid queue_destroy(struct queue *q);[m[41m[7m^M[27m[m[m
+[32m+[m[41m[7m^M[27m[m[m
+[32m+[m[32mvoid mlfq_add(struct mlfq *fq, struct thread *t);[m[41m[7m^M[27m[m[m
+[32m+[m[32mstruct thread *mlfq_remhead(struct mlfq *fq);[m[41m[7m^M[27m[m[m
+[32m+[m[32mstruct thread *mlfq_remtail(struct mlfq *fq);[m[41m[7m^M[27m[m[m
+[32m+[m[32mbool mlfq_isempty(struct mlfq *fq);[m[41m[7m^M[27m[m[m
+[32m+[m[32munsigned mlfq_count(struct mlfq *fq);[m[41m[7m^M[27m[m[m
+:[K[K[32m+[m[41m[7m^M[27m[m[m
+[32m+[m[32m#endif[m[41m[7m^M[27m[m[m
+[32m+[m[41m[7m^M[27m[m[m
+[1mdiff --git a/kern/include/syscall.h b/kern/include/syscall.h[m[m
+[1mindex ad59b0f..3b037c3 100644[m[m
+[1m--- a/kern/include/syscall.h[m[m
+[1m+++ b/kern/include/syscall.h[m[m
+[36m@@ -58,5 +58,19 @@[m [m__DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,[m[m
+ [m[m
+ int sys_reboot(int code);[m[m
+ int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);[m[m
+[32m+[m[32mint sys_open(const_userptr_t filename , int flags, mode_t mode, int *file_desc_pos);[m[m
+[32m+[m[32mssize_t sys_read(int fd , userptr_t buf , size_t buflen, ssize_t *rbytes);[m[m
+[32m+[m[32mssize_t sys_write(int fd , const_userptr_t buf , size_t nbytes, ssize_t *wbytes);[m[m
+[32m+[m[32moff_t sys_lseek (int fd , off_t pos , int whence, off_t *ret_pos);[m[m
+[32m+[m[32mint sys_close(int fd);[m[m
+[32m+[m[32mint sys_dup2(int oldfd , int newfd, int *retval);[m[m
+[32m+[m[32mint sys_chdir (const_userptr_t pathname);[m[m
+[32m+[m[32mint sys___getcwd(userptr_t buf , size_t buflen, int *bwritten);[m[m
+[32m+[m[32mpid_t sys_waitpid(pid_t pid, userptr_t status, int options);[m[m
+[32m+[m[32mpid_t sys_getpid(pid_t *pid);[m[m
+[32m+[m[32mvoid sys__exit(int exitcode);[m[m
+[32m+[m[32mpid_t sys_fork(struct trapframe *tf, pid_t *child_pid);[m[m
+[32m+[m[32mint sys_execv(const_userptr_t program, const_userptr_t *args);[m[m
+ [m[m
+[32m+[m[32m#define ALIGN 4[m[m
+:[K[K #endif /* _SYSCALL_H_ */[m[m
+[1mdiff --git a/kern/include/test.h b/kern/include/test.h[m[m
+[1mindex ba3a315..9da2645 100644[m[m
+[1m--- a/kern/include/test.h[m[m
+[1m+++ b/kern/include/test.h[m[m
+[36m@@ -76,6 +76,12 @@[m [mint nettest(int, char **);[m[m
+ int lock_unittest(int, char **);[m[m
+ int cv_unittest(int, char**);[m[m
+ [m[m
+[32m+[m[32m/* File descriptor tests */[m[m
+[32m+[m[32mint open_test(int, char **);[m[m
+[32m+[m[m
+[32m+[m[32m/* Macro function to run all unit tests in dependency order */[m[m
+[32m+[m[32mint run_tests(void);[m[m
+[32m+[m[m
+ /* Routine for running a user-level program. */[m[m
+ int runprogram(char *progname);[m[m
+ [m[m
+[1mdiff --git a/kern/include/thread.h b/kern/include/thread.h[m[m
+[1mindex 9402c5d..48ddbcc 100644[m[m
+[1m--- a/kern/include/thread.h[m[m
+[1m+++ b/kern/include/thread.h[m[m
+[36m@@ -70,19 +70,19 @@[m [mstruct thread {[m[m
+         * These go up front so they're easy to get to even if the[m[m
+         * debugger is messed up.[m[m
+         */[m[m
+:[K[K[31m-       char *t_name;                   /* Name of this thread */[m[m
+[32m+[m       [32mchar *t_name;                       /* Name of this thread */[m[m
+        const char *t_wchan_name;       /* Name of wait channel, if sleeping */[m[m
+        threadstate_t t_state;          /* State this thread is in */[m[m
+ [m[m
+        /*[m[m
+         * Thread subsystem internal fields.[m[m
+         */[m[m
+[31m-       struct thread_machdep t_machdep; /* Any machine-dependent goo */[m[m
+[31m-       struct threadlistnode t_listnode; /* Link for run/sleep/zombie lists */[m[m
+[31m-       void *t_stack;                  /* Kernel-level stack */[m[m
+[31m-       struct switchframe *t_context;  /* Saved register context (on stack) */[m[m
+[31m-       struct cpu *t_cpu;              /* CPU thread runs on */[m[m
+[31m-       struct proc *t_proc;            /* Process thread belongs to */[m[m
+[32m+[m       [32mstruct thread_machdep t_machdep;    /* Any machine-dependent goo */[m[m
+[32m+[m       [32mstruct threadlistnode t_listnode;   /* Link for run/sleep/zombie lists */[m[m
+[32m+[m       [32mvoid *t_stack;                      /* Kernel-level stack */[m[m
+[32m+[m       [32mstruct switchframe *t_context;      /* Saved register context (on stack) */[m[m
+[32m+[m       [32mstruct cpu *t_cpu;                  /* CPU thread runs on */[m[m
+[32m+[m       [32mstruct proc *t_proc;                /* Process thread belongs to */[m[m
+ [m[m
+        /*[m[m
+         * Interrupt state fields.[m[m
+[36m@@ -109,7 +109,7 @@[m [mstruct thread {[m[m
+        unsigned t_inuse_buffers;       /* # of buffers currently using */[m[m
+        unsigned t_reserved_buffers;    /* # of buffers allowed to take */[m[m
+:[K[K [m[m
+[31m-       /* add more here as needed */[m[m
+[32m+[m[32m    int t_priority;[m[m
+ };[m[m
+ [m[m
+ /*[m[m
+[36m@@ -172,5 +172,9 @@[m [mvoid schedule(void);[m[m
+  */[m[m
+ void thread_consider_migration(void);[m[m
+ [m[m
+[32m+[m[32m/*[m[m
+[32m+[m[32m * Reset priorities of all threads in the mlfq of curcpu every[m[m
+[32m+[m[32m */[m[m
+[32m+[m[32mvoid reset_priorities(void);[m[m
+ [m[m
+ #endif /* _THREAD_H_ */[m[m
+[1mdiff --git a/kern/include/uio.h b/kern/include/uio.h[m[m
+[1mindex 4c879aa..cf263fb 100644[m[m
+[1m--- a/kern/include/uio.h[m[m
+[1m+++ b/kern/include/uio.h[m[m
+[36m@@ -71,12 +71,12 @@[m [menum uio_seg {[m[m
+ };[m[m
+ [m[m
+ struct uio {[m[m
+[31m-       struct iovec     *uio_iov;      /* Data blocks */[m[m
+[32m+[m       [32mstruct iovec     *uio_iov;          /* Data blocks */[m[m
+:[K[K        unsigned          uio_iovcnt;   /* Number of iovecs */[m[m
+        off_t             uio_offset;   /* Desired offset into object */[m[m
+        size_t            uio_resid;    /* Remaining amt of data to xfer */[m[m
+        enum uio_seg      uio_segflg;   /* What kind of pointer we have */[m[m
+[31m-       enum uio_rw       uio_rw;       /* Whether op is a read or write */[m[m
+[32m+[m       [32menum uio_rw       uio_rw;           /* Whether op is a read or write */[m[m
+        struct addrspace *uio_space;    /* Address space for user pointer */[m[m
+ };[m[m
+ [m[m
+[1mdiff --git a/kern/lib/kprintf.c b/kern/lib/kprintf.c[m[m
+[1mindex 392fe50..ff99a7b 100644[m[m
+[1m--- a/kern/lib/kprintf.c[m[m
+[1m+++ b/kern/lib/kprintf.c[m[m
+[36m@@ -41,7 +41,7 @@[m[m
+ [m[m
+ [m[m
+ /* Flags word for DEBUG() macro. */[m[m
+[31m-uint32_t dbflags = 0;[m[m
+[32m+[m[32muint32_t dbflags = 0; //DB_SYSCALL;[m[m
+ [m[m
+ /* Lock for non-polled kprintfs */[m[m
+ static struct lock *kprintf_lock;[m[m
+[1mdiff --git a/kern/main/main.c b/kern/main/main.c[m[m
+[1mindex 7731c38..99bfa8d 100644[m[m
+[1m--- a/kern/main/main.c[m[m
+[1m+++ b/kern/main/main.c[m[m
+:[K[K[36m@@ -50,6 +50,7 @@[m[m
+ #include <syscall.h>[m[m
+ #include <test.h>[m[m
+ #include <version.h>[m[m
+[32m+[m[32m#include <pid_table.h>[m[m
+ #include "autoconf.h"  // for pseudoconfig[m[m
+ [m[m
+ [m[m
+[36m@@ -102,7 +103,7 @@[m [mboot(void)[m[m
+        kprintf("%s", harvard_copyright);[m[m
+        kprintf("\n");[m[m
+ [m[m
+[31m-       kprintf("Put-your-group-name-here's system version %s (%s #%d)\n",[m[m
+[32m+[m       [32mkprintf("Puffin OS system version %s (%s #%d)\n",[m[m
+                GROUP_VERSION, buildconfig, buildversion);[m[m
+        kprintf("\n");[m[m
+ [m[m
+[36m@@ -146,6 +147,8 @@[m [mboot(void)[m[m
+ [m[m
+ /*[m[m
+  * Shutdown sequence. Opposite to boot().[m[m
+[32m+[m[32m * Don't edit this with cleaning up lock structure[m[m
+[32m+[m[32m * as there could be a potential recursive panic bugs[m[m
+  */[m[m
+ static[m[m
+ void[m[m
+:[K[K[1mdiff --git a/kern/main/menu.c b/kern/main/menu.c[m[m
+[1mindex 41e5929..9b2a05e 100644[m[m
+[1m--- a/kern/main/menu.c[m[m
+[1m+++ b/kern/main/menu.c[m[m
+[36m@@ -42,6 +42,7 @@[m[m
+ #include <sfs.h>[m[m
+ #include <syscall.h>[m[m
+ #include <test.h>[m[m
+[32m+[m[32m#include <pid_table.h>[m[m
+ #include "opt-synchprobs.h"[m[m
+ #include "opt-sfs.h"[m[m
+ #include "opt-net.h"[m[m
+[36m@@ -128,6 +129,16 @@[m [mcommon_prog(int nargs, char **args)[m[m
+                return ENOMEM;[m[m
+        }[m[m
+ [m[m
+[32m+[m[32m    struct proc_link *link = shared_link_create(proc->pid);[m[m
+[32m+[m[32m    if (link == NULL) {[m[m
+[32m+[m[32m        proc_destroy(proc);[m[m
+[32m+[m[32m        return ENOMEM;[m[m
+[32m+[m[32m    }[m[m
+[32m+[m[m
+[32m+[m[32m    link->ref_count = 2;[m[m
+[32m+[m[32m    proc->parent = link;[m[m
+[32m+[m[32m    kproc->children[0] = link;[m[m
+[32m+[m[m
+:[K[K        result = thread_fork(args[0] /* thread name */,[m[m
+                        proc /* new process */,[m[m
+                        cmd_progthread /* thread function */,[m[m
+[36m@@ -138,10 +149,12 @@[m [mcommon_prog(int nargs, char **args)[m[m
+                return result;[m[m
+        }[m[m
+ [m[m
+[31m-       /*[m[m
+[31m-        * The new process will be destroyed when the program exits...[m[m
+[31m-        * once you write the code for handling that.[m[m
+[31m-        */[m[m
+[32m+[m[32m    if (sys_waitpid(proc->pid, NULL, 0) != 0)[m[m
+[32m+[m[32m        panic("Waitpid on runprogram failed");[m[m
+[32m+[m[m
+[32m+[m[32m    /* child exited, decremented the ref_count, expected to be destroyed */[m[m
+[32m+[m[32m    shared_link_destroy(0, kproc);[m[41m  [m[m
+[32m+[m[32m    kproc->children[0] = NULL;[m[m
+ [m[m
+        return 0;[m[m
+ }[m[m
+[36m@@ -614,6 +627,10 @@[m [mstatic struct {[m[m
+     { "lk",     lock_unittest },[m[m
+     { "cv",     cv_unittest },[m[m
+ [m[m
+[32m+[m[32m    /* TODO file descriptor unit tests */[m[m
+[32m+[m[m
+:[K[K[32m+[m[32m    /* TODO process unit tests */[m[m
+[32m+[m[m
+        /* file system assignment tests */[m[m
+        { "fs1",        fstest },[m[m
+        { "fs2",        readstress },[m[m
+[36m@@ -730,8 +747,13 @@[m [mmenu_execute(char *line, int isargs)[m[m
+ void[m[m
+ menu(char *args)[m[m
+ {[m[m
+[32m+[m[m
+        char buf[64];[m[m
+ [m[m
+[32m+[m       [32m// Execute all unit tests here, to ensure a clean boot, if one is failed[m[m
+[32m+[m       [32m// a panic occurs.[m[m
+[32m+[m       [32mrun_tests();[m[m
+[32m+[m[m
+        menu_execute(args, 1);[m[m
+ [m[m
+        while (1) {[m[m
+[1mdiff --git a/kern/proc/pid_table.c b/kern/proc/pid_table.c[m[m
+[1mnew file mode 100644[m[m
+[1mindex 0000000..e7e95bc[m[m
+[1m--- /dev/null[m[m
+[1m+++ b/kern/proc/pid_table.c[m[m
+[36m@@ -0,0 +1,119 @@[m[m
+[32m+[m[32m/*[m[m
+:[K[K[32m+[m[32m * Copyright (c) 2013[m[m
+[32m+[m[32m *     The President and Fellows of Harvard College.[m[m
+[32m+[m[32m *[m[m
+[32m+[m[32m * Redistribution and use in source and binary forms, with or without[m[m
+[32m+[m[32m * modification, are permitted provided that the following conditions[m[m
+[32m+[m[32m * are met:[m[m
+[32m+[m[32m * 1. Redistributions of source code must retain the above copyright[m[m
+[32m+[m[32m *    notice, this list of conditions and the following disclaimer.[m[m
+[32m+[m[32m * 2. Redistributions in binary form must reproduce the above copyright[m[m
+[32m+[m[32m *    notice, this list of conditions and the following disclaimer in the[m[m
+[32m+[m[32m *    documentation and/or other materials provided with the distribution.[m[m
+[32m+[m[32m * 3. Neither the name of the University nor the names of its contributors[m[m
+[32m+[m[32m *    may be used to endorse or promote products derived from this software[m[m
+[32m+[m[32m *    without specific prior written permission.[m[m
+[32m+[m[32m *[m[m
+[32m+[m[32m * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY AND CONTRIBUTORS ``AS IS'' AND[m[m
+[32m+[m[32m * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE[m[m
+[32m+[m[32m * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE[m[m
+[32m+[m[32m * ARE DISCLAIMED.  IN NO EVENT SHALL THE UNIVERSITY OR CONTRIBUTORS BE LIABLE[m[m
+[32m+[m[32m * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL[m[m
+[32m+[m[32m * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS[m[m
+[32m+[m[32m * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)[m[m
+[32m+[m[32m * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT[m[m
+[32m+[m[32m * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY[m[m
+[32m+[m[32m * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF[m[m
+[32m+[m[32m * SUCH DAMAGE.[m[m
+:[K[K[?1l>[1m[32m[jharvard@appliance ~/cs161/os161/submit[35m (master *)[32m]$(B[m git diff --stat asst2-start asst2-submit
+[?1h= .cproject                            |   64 [32m+++++++[m[m
+ .project                             |   26 [32m+++[m[m
+ as_vbase1                            |   45 [32m+++++[m[m
+ kern/arch/mips/locore/trap.c         |    6 [32m+[m[31m-[m[m
+ kern/arch/mips/syscall/syscall.c     |   72 [32m+++++++[m[31m-[m[m
+ kern/conf/conf.kern                  |    9 [32m+[m[31m-[m[m
+ kern/include/cpu.h                   |    6 [32m+[m[31m-[m[m
+ kern/include/fd.h                    |   20 [32m+++[m[m
+ kern/include/pid_table.h             |   40 [32m+++++[m[m
+ kern/include/proc.h                  |   39 [32m++++[m[31m-[m[m
+ kern/include/runqueue.h              |   31 [32m++++[m[m
+ kern/include/syscall.h               |   14 [32m++[m[m
+ kern/include/test.h                  |    6 [32m+[m[m
+ kern/include/thread.h                |   20 [32m++[m[31m-[m[m
+ kern/include/uio.h                   |    4 [32m+[m[31m-[m[m
+ kern/lib/kprintf.c                   |    2 [32m+[m[31m-[m[m
+ kern/main/main.c                     |    5 [32m+[m[31m-[m[m
+ kern/main/menu.c                     |   30 [32m+++[m[31m-[m[m
+ kern/proc/pid_table.c                |  119 [32m+++++++++++++[m[m
+ kern/proc/proc.c                     |  165 [32m+++++++++++++++++[m[31m-[m[m
+ kern/syscall/fork.c                  |  126 [32m++++++++++++++[m[m
+ kern/syscall/fs_calls.c              |  245 [32m++++++++++++++++++++++++++[m[m
+ kern/syscall/proc_calls.c            |  115 [32m+++++++++++++[m[m
+ kern/syscall/runprogram.c            |  297 [32m++++++++++++++++++++++++++[m[31m------[m[m
+ kern/test/autotest.c                 |   44 [32m+++++[m[m
+ kern/test/fdtest.c                   |   45 [32m+++++[m[m
+ kern/test/synchtest.c                |   15 [32m+[m[31m-[m[m
+ kern/thread/clock.c                  |    8 [32m+[m[31m-[m[m
+ kern/thread/runqueue.c               |   95 [32m++++++++++[m[m
+ kern/thread/synch.c                  |    3 [32m+[m[31m-[m[m
+ kern/thread/thread.c                 |   79 [32m+++++++[m[31m--[m[m
+ kern/thread/thread.c.orig            | 1246 [32m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++[m[m
+ kern/vfs/fd.c                        |   46 [32m+++++[m[m
+ kern/vfs/vfspath.c                   |    2 [32m+[m[31m-[m[m
+ kern/vm/kmalloc.c                    |    2 [32m+[m[31m-[m[m
+ mk/os161.kernel.mk                   |    2 [32m+[m[m
+ submit/asst2/badcall.script          |  187 [32m++++++++++++++++++++[m[m
+ submit/asst2/badcall_lseek.script    |   70 [32m++++++++[m[m
+ submit/asst2/badcall_waitpid.script  |  427 [32m+++++++++++++++++++++++++++++++++++++++++++++[m[m
+ submit/asst2/cat.script              |  181 [32m++++++++++++++++++++[m[m
+ submit/asst2/cp.script               |   47 [32m+++++[m[m
+ submit/asst2/design_document.txt     |    5 [32m+[m[m
+ submit/asst2/execbomb.script         |   49 [32m++++++[m[m
+ submit/asst2/forkbomb.script         |   75 [32m++++++++[m[m
+ submit/asst2/forktest.script         |   40 [32m+++++[m[m
+ submit/asst2/pwd.script              |   42 [32m+++++[m[m
+ submit/asst2/sys161.conf             |  142 [32m+++++++++++++++[m[m
+ submit/asst2/tt1.script              |   40 [32m+++++[m[m
+ submit/asst2/tt2.script              |   40 [32m+++++[m[m
+ submit/asst2/tt3.script              |   40 [32m+++++[m[m
+:[K[K:[K11[K[?1l>[1m[32m[jharvard@appliance 
