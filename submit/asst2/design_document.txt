@@ -1,2 +1,5 @@
-<design_doc>
-</design_doc>
+Things that we didn't have time to implement:
+
+1. MLFQ doesn't have different timeslices per level
+2. We do not track how long each thread has been in the highest level and do
+not lower it (so it's easy to game the scheduler - see original design doc)
