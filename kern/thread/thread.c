@@ -81,6 +81,7 @@ static struct wchanarray allwchans;
 static struct semaphore *cpu_startup_sem;
 
 struct threadlist *mlfq[MAX_PRIORITY];
+struct lock *mlfq_lock;
 
 ////////////////////////////////////////////////////////////
 
@@ -234,7 +235,17 @@ cpu_create(unsigned hardware_number)
 		}
 		thread_checkstack_init(c->c_curthread);
 	}
-	c->c_curthread->t_cpu = c;
+
+	// TODO I Added this code check it
+	// Create global queues if it hasn't already been made
+	if(mlfq_lock == NULL){
+		mlfq_lock = lock_create("thread_lock");
+		for(int i = 0 ;i < MAX_PRIORITY; i++){
+			struct threadlist *tl;
+			threadlist_init(tl);
+			mlfq[i] = tl;
+		}
+	}
 
 	cpu_machdep_init(c);
 
@@ -854,6 +865,20 @@ schedule(void)
 	 * You can write this. If we do nothing, threads will run in
 	 * round-robin fashion.
 	 */
+	// remove and run 5 from the top queue, then 4 from the next etc.
+	lock_acquire(mlfq_lock);
+	for(int j = 0; j < MAX_PRIORITY; j++){
+		for(int i =0; i < (MAX_PRIORITY-j); i++){
+			struct thread* to_run = threadlist_remhead(mlfq[j]);
+			// queue is empty
+			if (to_run == NULL)
+				break;
+			// TODO run the thread for a timeslice on the cpu
+
+		}
+	}
+	lock_release(mlfq_lock);
+
 
 
 }
