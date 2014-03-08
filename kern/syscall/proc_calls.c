@@ -63,17 +63,18 @@ pid_t sys_waitpid(pid_t pid, userptr_t status, int options) {
     		break;
     	}
     }
-    if(i==MAX_CLD){
+
+    if (i == MAX_CLD){
     	err = ECHILD;
     	goto out;
     }
+
     lock_acquire(shared->lock);
     // Handle child exits after parent
-    if(shared->ref_count==2){
-    	while(shared->ref_count!=1){
+    if(shared->ref_count == 2)
+    	while(shared->ref_count != 1)
     		cv_wait(shared->cv, shared->lock);
-    	}
-    }
+
     lock_release(shared->lock);
 
     // Handle child has already exited

@@ -58,54 +58,46 @@ out:
 }
 
 ssize_t sys_read(int fd, userptr_t buf, size_t buflen, ssize_t *bread) {
-	int err;
+    if (fd < 0 || fd >= OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
+
+	struct file_desc *fd_ptr = curproc->fd_table[fd];
+	lock_acquire(fd_ptr->lock);
+
 	struct iovec vec;
 	vec.iov_ubase = buf;
 	vec.iov_len = buflen;
 
-	struct file_desc *fd_ptr=curproc->fd_table[fd];
-	if(fd_ptr==NULL){
-		err = EBADF;
-		goto out;
-	}
-
-	lock_acquire(fd_ptr->lock);
-	// TODO possibly check flags
 	struct uio io;
 	io.uio_iov = &vec;
 	io.uio_iovcnt = 1;
+	io.uio_segflg = UIO_USERSPACE;
 	io.uio_offset = fd_ptr->offset;
 	io.uio_resid = buflen;
-	io.uio_segflg = UIO_USERSPACE;
 	io.uio_rw = UIO_READ;
 	io.uio_space = curproc->p_addrspace;
 
-	err = VOP_READ(fd_ptr->vn, &io);
-	if (err != 0) {
-		goto lock_out;
-	}
+	int err = VOP_READ(fd_ptr->vn, &io);
+	if (err) { 
+        lock_release(fd_ptr->lock);
+        return EFAULT;
+    } 
+    
 	// set offset to new value got by delta in offset
 	*bread = io.uio_offset - fd_ptr->offset;
-	fd_ptr->offset=io.uio_offset;
+	fd_ptr->offset = io.uio_offset;
 	lock_release(fd_ptr->lock);
-    return 0;
 
-// TODO translate err codes
-lock_out:
-	lock_release(fd_ptr->lock);
-out:
-	return err;
+    return 0;
 }
 
 /**
- *
  * EBADF    fd is not a valid file descriptor, or was not opened for writing.
  * EFAULT   Part or all of the address space pointed to by buf is invalid.
  * ENOSPC   There is no free space remaining on the filesystem containing the file.
  * EIO      doesn't return this (mentioned in manpages)
  */
 ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten) {
-    if (fd < 0 || fd > OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
+    if (fd < 0 || fd >= OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
      
     lock_acquire(curproc->fd_table[fd]->lock);
 
@@ -113,7 +105,6 @@ ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten)
     iov.iov_ubase = (userptr_t)buf;
     iov.iov_len = nbytes;
 
-    // TODO use uio_kinit
     struct uio uio;
     uio.uio_iov = &iov;
     uio.uio_iovcnt = 1;
@@ -136,43 +127,6 @@ ssize_t sys_write(int fd, const_userptr_t buf, size_t nbytes, ssize_t *bwritten)
     return 0;
 }
 
-off_t sys_lseek (int fd, off_t pos, int whence, off_t *ret_pos) {
-    if (fd < 0 || fd > OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
-
-    if (whence != SEEK_SET || whence != SEEK_CUR || whence != SEEK_END) 
-        return EINVAL;
-
-    lock_acquire(curproc->fd_table[fd]->lock);
-
-    struct stat stat;
-    if (VOP_STAT(curproc->fd_table[fd]->vn, &stat)) {/* get the end of file */
-        lock_release(curproc->fd_table[fd]->lock);
-        return -1;  /* ASK David about VOP_STAT return value */
-    }
-
-    off_t new_pos;
-    if (whence == SEEK_SET) new_pos = pos;
-    else if (whence == SEEK_CUR) new_pos = curproc->fd_table[fd]->offset + pos;
-    else new_pos = stat.st_size + pos;
-    
-    if (new_pos < 0) {
-        lock_release(curproc->fd_table[fd]->lock);
-        return EINVAL;
-    }
-
-    int rv = VOP_TRYSEEK(curproc->fd_table[fd]->vn, pos);
-    if (rv == ESPIPE) { /* console device seek */
-        lock_release(curproc->fd_table[fd]->lock);
-        return rv;
-    }
-
-    curproc->fd_table[fd]->offset = new_pos;
-    *ret_pos = new_pos; 
-    lock_release(curproc->fd_table[fd]->lock);
-
-    return 0;
-}
-
 /**
  * sys_close(fd) - closes file by getting the lock on the fd and decrementing 
  * the reference counter; if the counter is 0, release and free the lock,
@@ -185,7 +139,7 @@ off_t sys_lseek (int fd, off_t pos, int whence, off_t *ret_pos) {
  *  EIO     doesn't return (mentioned in manpages)
  */
 int sys_close(int fd) {
-    if (fd < 0 || fd > OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
+    if (fd < 0 || fd >= OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
 
     lock_acquire(curproc->fd_table[fd]->lock);  
     if (--curproc->fd_table[fd]->ref_count != 0)    
@@ -201,6 +155,42 @@ int sys_close(int fd) {
     return 0;
 }
 
+off_t sys_lseek (int fd, off_t pos, int whence, off_t *ret_pos) {
+    if (fd < 0 || fd >= OPEN_MAX || !curproc->fd_table[fd]) return EBADF;
+
+    if (whence != SEEK_SET && whence != SEEK_CUR && whence != SEEK_END) 
+        return EINVAL;
+
+    lock_acquire(curproc->fd_table[fd]->lock);
+
+    struct stat stat;
+    if (VOP_STAT(curproc->fd_table[fd]->vn, &stat)) {/* get the end of file */
+        lock_release(curproc->fd_table[fd]->lock);
+        return ESPIPE; 
+    }
+
+    off_t new_pos;
+    if (whence == SEEK_SET) new_pos = pos;
+    else if (whence == SEEK_CUR) new_pos = curproc->fd_table[fd]->offset + pos;
+    else new_pos = stat.st_size + pos;
+    
+    if (new_pos < 0) {
+        lock_release(curproc->fd_table[fd]->lock);
+        return EINVAL;
+    }
+
+    if (VOP_TRYSEEK(curproc->fd_table[fd]->vn, new_pos)) {
+        lock_release(curproc->fd_table[fd]->lock);
+        return ESPIPE;
+    }
+
+    curproc->fd_table[fd]->offset = new_pos;
+    *ret_pos = curproc->fd_table[fd]->offset;
+    lock_release(curproc->fd_table[fd]->lock);
+
+    return 0;
+}
+
 int sys_dup2(int oldfd , int newfd, int *retval) {
 	if (oldfd < 0 || oldfd >= OPEN_MAX || newfd < 0 || newfd >= OPEN_MAX 
                 || curproc->fd_table[oldfd] == NULL ) return EBADF;
@@ -211,8 +201,9 @@ int sys_dup2(int oldfd , int newfd, int *retval) {
     }
 
 	if(curproc->fd_table[newfd] != NULL)
-		fd_dec_or_destroy(newfd, curproc);
+        sys_close(newfd);   /* OK not to check for return value */
 
+    KASSERT(curproc->fd_table[newfd] == NULL);
 	curproc->fd_table[newfd] = curproc->fd_table[oldfd];
 
 	lock_acquire(curproc->fd_table[newfd]->lock);
@@ -228,12 +219,10 @@ int sys_chdir (const_userptr_t pathname) {
 	char path[PATH_MAX];
 
     int err = copyinstr(pathname, path, sizeof path, NULL);
-    if (err != 0 || path == NULL)
-        return EFAULT;
+    if (err != 0 || path == NULL) return EFAULT;
 
     err = vfs_chdir(path);
-    if (err != 0) 
-        return err;
+    if (err != 0) return err;
 
     return 0;
 }
@@ -246,20 +235,11 @@ int sys___getcwd(userptr_t buf, size_t buflen, int *bwritten) {
 	uio_kinit(&iov, &kio, path, sizeof path, 0, UIO_READ);
 
 	err = vfs_getcwd(&kio);
-	if(err != 0){
-        err = ENOENT;
-		goto out;
-	}
+	if (err) return ENOENT;
 
     err = copyout((const char *)path, buf, buflen);
-    if (err != 0) {
-        err = EFAULT;
-        goto out;
-    }
+    if (err) return EFAULT;
 
 	*bwritten = kio.uio_offset;
     return 0;
-
-out:
-	return err;
 }
