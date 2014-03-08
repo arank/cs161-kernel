@@ -737,6 +737,8 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 
 	/* Turn interrupts back on. */
 	splx(spl);
+
+	// TODO revamp current thread priority level
 }
 
 /*
@@ -832,6 +834,7 @@ thread_exit(void)
 void
 thread_yield(void)
 {
+	// TODO possibly add code here to change priority
 	thread_switch(S_READY, NULL, NULL);
 }
 
@@ -851,6 +854,8 @@ schedule(void)
 	 * You can write this. If we do nothing, threads will run in
 	 * round-robin fashion.
 	 */
+
+
 }
 
 /*
