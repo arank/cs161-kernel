@@ -1,7 +1,49 @@
 #include <types.h>
 #include <lib.h>
 #include <current.h>
+#include <cpu.h>
 #include <runqueue.h>
+
+void mlfq_add(struct mlfq *fq, struct thread *t){
+    //kprintf("adding thread of priority %d\n",t->priority);
+    if (t->priority >= 0 && t->priority < MAX_PRIORITY){
+        threadlist_addtail(&fq->mlfq[t->priority],t);
+    }
+}
+
+struct thread *mlfq_remhead(struct mlfq *fq){
+    int i;
+    for (i = 0; i < MAX_PRIORITY; i++){
+        if (!threadlist_isempty(&fq->mlfq[i]))
+            return threadlist_remhead(&fq->mlfq[i]);
+    }
+    return NULL;
+}
+
+struct thread *mlfq_remtail(struct mlfq *fq){
+    int i;
+    for (i = MAX_PRIORITY - 1; i >= 0; i--){
+        if (!threadlist_isempty(&fq->mlfq[i]))
+            return threadlist_remtail(&fq->mlfq[i]);
+    }
+    return NULL;
+}
+
+bool mlfq_isempty(struct mlfq *fq){
+    int ret = 0;
+    for (int i = 0; i < MAX_PRIORITY; i++)
+        ret &= threadlist_isempty(&fq->mlfq[i]);
+    return ret;
+}
+
+unsigned mlfq_count(struct mlfq *fq){
+    unsigned count = 0;
+    for (int i = 0; i < MAX_PRIORITY; i++)
+        count += fq->mlfq[i].tl_count;
+    return count;
+}
+
+/* no longer used */
 
 struct queue* init_queue(int max_size)
 {

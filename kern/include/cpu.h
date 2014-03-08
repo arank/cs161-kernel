@@ -34,7 +34,7 @@
 #include <spinlock.h>
 #include <threadlist.h>
 #include <machine/vm.h>  /* for TLBSHOOTDOWN_MAX */
-
+#include <runqueue.h>
 
 /*
  * Per-cpu structure
@@ -45,7 +45,6 @@
  * (as opposed to merely dereferencing it) in case curcpu is defined as
  * a pointer with a fixed address and a per-cpu mapping in the MMU.
  */
-
 struct cpu {
 	/*
 	 * Fixed after allocation.
@@ -67,7 +66,8 @@ struct cpu {
 	 * Protected by the runqueue lock.
 	 */
 	bool c_isidle;			/* True if this cpu is idle */
-	struct threadlist c_runqueue;	/* Run queue for this cpu */
+	//struct threadlist c_runqueue;	/* Run queue for this cpu */
+    struct mlfq c_mlfq;
 	struct spinlock c_runqueue_lock;
 
 	/*

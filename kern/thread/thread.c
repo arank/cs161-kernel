@@ -51,13 +51,12 @@
 #include <mainbus.h>
 #include <vnode.h>
 #include <pid_table.h>
-
+#include <runqueue.h>
 #include "opt-synchprobs.h"
 
 
 /* Magic number used as a guard value on kernel thread stacks. */
 #define THREAD_STACK_MAGIC 0xbaadf00d
-#define MAX_PRIORITY 5
 
 /* Wait channel. A wchan is protected by an associated, passed-in spinlock. */
 struct wchan {
@@ -79,9 +78,6 @@ static struct wchanarray allwchans;
 
 /* Used to wait for secondary CPUs to come online. */
 static struct semaphore *cpu_startup_sem;
-
-struct threadlist *mlfq[MAX_PRIORITY];
-struct lock *mlfq_lock;
 
 ////////////////////////////////////////////////////////////
 
@@ -197,7 +193,10 @@ cpu_create(unsigned hardware_number)
 	c->c_hardclocks = 0;
 
 	c->c_isidle = false;
-	threadlist_init(&c->c_runqueue);
+	//threadlist_init(&c->c_runqueue);
+    for (int i = 0; i < MAX_PRIORITY; i++)
+	    threadlist_init(&c->c_mlfq.mlfq[i]);
+        
 	spinlock_init(&c->c_runqueue_lock);
 
 	c->c_ipi_pending = 0;
@@ -236,8 +235,7 @@ cpu_create(unsigned hardware_number)
 		thread_checkstack_init(c->c_curthread);
 	}
 
-	// TODO I Added this code check it
-	// Create global queues if it hasn't already been made
+    /* Aran's code, no need I think
 	if(mlfq_lock == NULL){
 		mlfq_lock = lock_create("thread_lock");
 		for(int i = 0 ;i < MAX_PRIORITY; i++){
@@ -246,7 +244,7 @@ cpu_create(unsigned hardware_number)
 			mlfq[i] = tl;
 		}
 	}
-
+    */
 	cpu_machdep_init(c);
 
 	return c;
@@ -332,10 +330,18 @@ thread_panic(void)
 	 * to.  Instead, blat the list structure by hand, and take the
 	 * risk that it might not be quite atomic.
 	 */
+
+    for (int i = 0; i < MAX_PRIORITY; i++) {
+        curcpu->c_mlfq.mlfq[i].tl_count = 0;
+        curcpu->c_mlfq.mlfq[i].tl_head.tln_next = &curcpu->c_mlfq.mlfq[i].tl_tail;
+        curcpu->c_mlfq.mlfq[i].tl_tail.tln_prev = &curcpu->c_mlfq.mlfq[i].tl_head;
+    }
+
+    /*
 	curcpu->c_runqueue.tl_count = 0;
 	curcpu->c_runqueue.tl_head.tln_next = &curcpu->c_runqueue.tl_tail;
 	curcpu->c_runqueue.tl_tail.tln_prev = &curcpu->c_runqueue.tl_head;
-
+    */
 	/*
 	 * Ideally, we want to make sure sleeping threads don't wake
 	 * up and start running. However, there's no good way to track
@@ -490,7 +496,8 @@ thread_make_runnable(struct thread *target, bool already_have_lock)
 	target->t_state = S_READY;
 
 	isidle = targetcpu->c_isidle;
-	threadlist_addtail(&targetcpu->c_runqueue, target);
+	//threadlist_addtail(&targetcpu->c_runqueue, target);
+    mlfq_add(&targetcpu->c_mlfq, target);
 	if (isidle) {
 		/*
 		 * Other processor is idle; send interrupt to make
@@ -611,7 +618,8 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	spinlock_acquire(&curcpu->c_runqueue_lock);
 
 	/* Micro-optimization: if nothing to do, just return */
-	if (newstate == S_READY && threadlist_isempty(&curcpu->c_runqueue)) {
+	//if (newstate == S_READY && threadlist_isempty(&curcpu->c_runqueue)) {
+	if (newstate == S_READY && mlfq_isempty(&curcpu->c_mlfq)) {
 		spinlock_release(&curcpu->c_runqueue_lock);
 		splx(spl);
 		return;
@@ -625,6 +633,7 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 		thread_make_runnable(cur, true /*have lock*/);
 		break;
 	    case S_SLEEP:
+        if (cur->priority > 0) cur->priority--;
 		cur->t_wchan_name = wc->wc_name;
 		/*
 		 * Add the thread to the list in the wait channel, and
@@ -664,7 +673,8 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	/* The current cpu is now idle. */
 	curcpu->c_isidle = true;
 	do {
-		next = threadlist_remhead(&curcpu->c_runqueue);
+        next = mlfq_remhead(&curcpu->c_mlfq);
+		//next = threadlist_remhead(&curcpu->c_runqueue);
 		if (next == NULL) {
 			spinlock_release(&curcpu->c_runqueue_lock);
 			cpu_idle();
@@ -845,7 +855,7 @@ thread_exit(void)
 void
 thread_yield(void)
 {
-	// TODO possibly add code here to change priority
+    if (curthread->priority < MAX_PRIORITY - 1) curthread->priority++;
 	thread_switch(S_READY, NULL, NULL);
 }
 
@@ -866,6 +876,7 @@ schedule(void)
 	 * round-robin fashion.
 	 */
 	// remove and run 5 from the top queue, then 4 from the next etc.
+    /*
 	lock_acquire(mlfq_lock);
 	for(int j = 0; j < MAX_PRIORITY; j++){
 		for(int i =0; i < (MAX_PRIORITY-j); i++){
@@ -878,9 +889,7 @@ schedule(void)
 		}
 	}
 	lock_release(mlfq_lock);
-
-
-
+    */
 }
 
 /*
@@ -914,9 +923,11 @@ thread_consider_migration(void)
 	for (i=0; i<numcpus; i++) {
 		c = cpuarray_get(&allcpus, i);
 		spinlock_acquire(&c->c_runqueue_lock);
-		total_count += c->c_runqueue.tl_count;
+		//total_count += c->c_runqueue.tl_count;
+		total_count += mlfq_count(&c->c_mlfq);
 		if (c == curcpu->c_self) {
-			my_count = c->c_runqueue.tl_count;
+			//my_count = c->c_runqueue.tl_count;
+            my_count = mlfq_count(&c->c_mlfq);
 		}
 		spinlock_release(&c->c_runqueue_lock);
 	}
@@ -930,7 +941,8 @@ thread_consider_migration(void)
 	threadlist_init(&victims);
 	spinlock_acquire(&curcpu->c_runqueue_lock);
 	for (i=0; i<to_send; i++) {
-		t = threadlist_remtail(&curcpu->c_runqueue);
+		//t = threadlist_remtail(&curcpu->c_runqueue);
+		t = mlfq_remtail(&curcpu->c_mlfq);
 		threadlist_addhead(&victims, t);
 	}
 	spinlock_release(&curcpu->c_runqueue_lock);
@@ -941,7 +953,8 @@ thread_consider_migration(void)
 			continue;
 		}
 		spinlock_acquire(&c->c_runqueue_lock);
-		while (c->c_runqueue.tl_count < one_share && to_send > 0) {
+		//while (c->c_runqueue.tl_count < one_share && to_send > 0) {
+		while (mlfq_count(&c->c_mlfq) < one_share && to_send > 0) {
 			t = threadlist_remhead(&victims);
 			/*
 			 * Ordinarily, curthread will not appear on
@@ -972,7 +985,8 @@ thread_consider_migration(void)
 			}
 
 			t->t_cpu = c;
-			threadlist_addtail(&c->c_runqueue, t);
+			//threadlist_addtail(&c->c_runqueue, t);
+            mlfq_add(&c->c_mlfq, t);
 			DEBUG(DB_THREADS,
 			      "Migrated thread %s: cpu %u -> %u",
 			      t->t_name, curcpu->c_number, c->c_number);
@@ -996,7 +1010,8 @@ thread_consider_migration(void)
 	if (!threadlist_isempty(&victims)) {
 		spinlock_acquire(&curcpu->c_runqueue_lock);
 		while ((t = threadlist_remhead(&victims)) != NULL) {
-			threadlist_addtail(&curcpu->c_runqueue, t);
+			//threadlist_addtail(&curcpu->c_runqueue, t);
+            mlfq_add(&curcpu->c_mlfq, t);
 		}
 		spinlock_release(&curcpu->c_runqueue_lock);
 	}
