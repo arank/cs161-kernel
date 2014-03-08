@@ -108,17 +108,9 @@ kill_curthread(vaddr_t epc, unsigned code, vaddr_t vaddr)
 		break;
 	}
 
-	/*
-	 * You will probably want to change this.
-	 */
-
-	// Added code to call sys_exit so the proc is cleaned up
-	// TODO is this a safe call?
-	sys__exit(-1);
-
 	kprintf("Fatal user mode trap %u sig %d (%s, epc 0x%x, vaddr 0x%x)\n",
 		code, sig, trapcodenames[code], epc, vaddr);
-	panic("I don't know how to handle this\n");
+	sys__exit(-1);
 }
 
 /*

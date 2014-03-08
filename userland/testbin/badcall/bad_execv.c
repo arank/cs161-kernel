@@ -36,7 +36,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <err.h>
-
+#include <stdio.h>
 #include "config.h"
 #include "test.h"
 
@@ -62,6 +62,7 @@ exec_common_fork(void)
 		warn("UH-OH: waitpid failed");
 		return -1;
 	}
+
 	if (!WIFEXITED(status) || WEXITSTATUS(status) != MAGIC_STATUS) {
 		warnx("FAILURE: wrong exit code of subprocess");
 	}

@@ -19,7 +19,7 @@ struct child_data {
 static 
 struct proc *
 create_child(pid_t pid) {
-    struct proc *child = proc_create("child");
+    struct proc *child = proc_create(curproc->p_name);
     if (child == NULL) goto proc_out;
     
     /* make a shared link between parent and child */

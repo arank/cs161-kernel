@@ -52,156 +52,168 @@
 struct lock *exec_lock;
 
 int sys_execv(const_userptr_t program, const_userptr_t *args){
-	int err;
-	// TODO possibly put on heap to not blow kernel stack
-	char kprogram[NAME_MAX];
-	int argc;
-	struct addrspace *as;
-	struct addrspace *old_as;
-	struct vnode *v;
-	vaddr_t entrypoint, stackptr;
+    int err;
+    // TODO possibly put on heap to not blow kernel stack
+    char kprogram[NAME_MAX];
+    int argc = 0;
+    struct addrspace *as;
+    struct addrspace *old_as;
+    struct vnode *v;
+    vaddr_t entrypoint, stackptr;
 
-	// To save the kernel acquire a lock before allocating a huge chunk of memory for copied strings
-	lock_acquire(exec_lock);
+    // To save the kernel acquire a lock before allocating a huge chunk of memory for copied strings
+    lock_acquire(exec_lock);
 
-	// Read in program name
-	err = copyinstr(program, kprogram, sizeof kprogram, NULL);
-	if (err != 0) goto out;
+    // Copy and check program name
+    err = copyinstr(program, kprogram, sizeof kprogram, NULL);
+    if (err != 0) goto out;
+    if (strlen(kprogram) == 0) {
+        err = EISDIR; 
+        goto out;
+    }
 
-	// Read in number of arguments
-	argc = 0;
-	// TODO figure out some way to check if pointer is in user space, as it is
-	// currently failing the test, how to do copy in on args?
-	if (args == NULL) goto out;
-	while(args[argc] != NULL){
-		argc++;
-	}
+    // check argument list ptr
+    userptr_t ptr;
+    if (copyin((const_userptr_t)args, &ptr, sizeof(userptr_t))) { 
+        err = EFAULT;
+        goto out;
+    }
 
-	// Declare and nullify the argument array
-	char **kargs = kmalloc((argc+1) * sizeof(char*));
-	if(kargs == NULL) goto out;
-	for(int i = 0; i < (argc + 1); i++)
-		kargs[i] = NULL;
+    // check actual pointers to arguments
+    while(args[argc] != NULL) {
+        if (copyin((const_userptr_t)args[argc], &ptr, sizeof(userptr_t))) {     
+            err = EFAULT;
+            goto out;
+        }                                  
+        argc++;                                              
+    } 
 
-	// Add the null terminator and all pointers
-	vaddr_t offset = (argc*4)+4;
+    
+    // Declare and nullify the argument array
+    char **kargs = kmalloc((argc+1) * sizeof(char*));
+    if(kargs == NULL) goto out;
+    for(int i = 0; i < (argc + 1); i++)
+        kargs[i] = NULL;
 
-	// Fill in the rest of the arguments
-	for(int i = 0; i < argc; i++){
-		// Plus one because of the null terminator which is also copied
-	    size_t len = strlen((const char *)args[i])+1;
+    // Add the null terminator and all pointers
+    vaddr_t offset = (argc*4)+4;
 
-		// Calculate how much space it will use up on the user stack and check if it blows arg max
-		offset += (len + 4 - (len % 4));
-		if(offset > ARG_MAX){
-			err = E2BIG;
-			goto args_out;
-		}
+    // Fill in the rest of the arguments
+    for(int i = 0; i < argc; i++){
+        // Plus one because of the null terminator which is also copied
+        size_t len = strlen((const char *)args[i])+1;
 
-	    // Malloc our argument
-		kargs[i] = kmalloc(len);
-		if(kargs[i] == NULL) goto args_out;
+        // Calculate how much space it will use up on the user stack and check if it blows arg max
+        offset += (len + 4 - (len % 4));
+        if(offset > ARG_MAX){
+            err = E2BIG;
+            goto args_out;
+        }
 
-		// Copy into kernel
-		err = copyinstr(args[i], kargs[i], len, NULL);
-		if(err != 0) goto args_out;
-	}
+        // Malloc our argument
+        kargs[i] = kmalloc(len);
+        if(kargs[i] == NULL) goto args_out;
 
-	/* Create a new address space. */
-	as = as_create();
-	if (as == NULL) {
-		err = ENOMEM;
-		goto args_out;
-	}
+        // Copy into kernel
+        err = copyinstr(args[i], kargs[i], len, NULL);
+        if(err != 0) goto args_out;
+    }
 
-	/* Switch to it and activate it, while clearing the old address space */
-	old_as = proc_setas(as);
-	as_activate();
+    /* Create a new address space. */
+    as = as_create();
+    if (as == NULL) {
+        err = ENOMEM;
+        goto args_out;
+    }
+
+    /* Switch to it and activate it, while clearing the old address space */
+    old_as = proc_setas(as);
+    as_activate();
 
     /* Open the file. */
-	err = vfs_open(kprogram, O_RDONLY, 0, &v);
-	if (err != 0) goto addr_out;
+    err = vfs_open(kprogram, O_RDONLY, 0, &v);
+    if (err != 0) goto addr_out;
 
-	/* Load the executable. */
-	err = load_elf(v, &entrypoint);
-	if (err != 0) {
-	    vfs_close(v);
-	    goto addr_out;
-	}
+    /* Load the executable. */
+    err = load_elf(v, &entrypoint);
+    if (err != 0) {
+        vfs_close(v);
+        goto addr_out;
+    }
 
-	/* Done with the file now. */
-	vfs_close(v);
+    /* Done with the file now. */
+    vfs_close(v);
 
-	/* Set stack pointer */
-	err = as_define_stack(as, &stackptr);
-	if (err != 0) goto addr_out;
+    /* Set stack pointer */
+    err = as_define_stack(as, &stackptr);
+    if (err != 0) goto addr_out;
 
-	vaddr_t stack = stackptr-offset;
-	// Plus 4 because of the null2 terminator
-	vaddr_t heap = stack+(argc*4)+4;
+    vaddr_t stack = stackptr-offset;
+    // Plus 4 because of the null2 terminator
+    vaddr_t heap = stack+(argc*4)+4;
 
-	// Write a Null separator first
-	userptr_t *temp = kmalloc(sizeof(userptr_t));
-	if(temp == NULL) goto addr_out;
+    // Write a Null separator first
+    userptr_t *temp = kmalloc(sizeof(userptr_t));
+    if(temp == NULL) goto addr_out;
 
-	// Copy out the pointers and arguments
-	for(int i = 0; i < argc; i++){
-		// TODO I am re-calculating str len
-		size_t len = strlen(kargs[i])+1;
-		size_t real_len = (len + 4 - (len % 4));
+    // Copy out the pointers and arguments
+    for(int i = 0; i < argc; i++){
+        // TODO I am re-calculating str len
+        size_t len = strlen(kargs[i])+1;
+        size_t real_len = (len + 4 - (len % 4));
 
-		// Copy into local buffer
-		char* buf = kmalloc(real_len);
-		if(buf == NULL){
-			kfree(temp);
-			goto addr_out;
-		}
-		strcpy(buf, kargs[i]);
+        // Copy into local buffer
+        char* buf = kmalloc(real_len);
+        if(buf == NULL){
+            kfree(temp);
+            goto addr_out;
+        }
+        strcpy(buf, kargs[i]);
 
-		// Write object at offset, with correct buffer
-		err = copyout(buf, (userptr_t)(heap), real_len);
-		if (err != 0){
-			kfree(buf);
-			kfree(temp);
-			goto addr_out;
-		}
+        // Write object at offset, with correct buffer
+        err = copyout(buf, (userptr_t)(heap), real_len);
+        if (err != 0){
+            kfree(buf);
+            kfree(temp);
+            goto addr_out;
+        }
 
-		// Free the pointer after copying out
-		kfree(kargs[i]);
-		kfree(buf);
-		kargs[i] = NULL;
+        // Free the pointer after copying out
+        kfree(kargs[i]);
+        kfree(buf);
+        kargs[i] = NULL;
 
-		// Write pointer to object at offset
-		*temp = (userptr_t)(heap);
-		err = copyout(temp, (userptr_t)(stack), sizeof(userptr_t));
-		if (err != 0) {
-			kfree(temp);
-			goto addr_out;
-		}
+        // Write pointer to object at offset
+        *temp = (userptr_t)(heap);
+        err = copyout(temp, (userptr_t)(stack), sizeof(userptr_t));
+        if (err != 0) {
+            kfree(temp);
+            goto addr_out;
+        }
 
-		// Augment heap
-		// Augment stack
-		heap += real_len;
-		stack += sizeof(userptr_t);
-	}
+        // Augment heap
+        // Augment stack
+        heap += real_len;
+        stack += sizeof(userptr_t);
+    }
 
-	*temp = NULL;
-	err = copyout(temp, (userptr_t)(stack), sizeof(userptr_t));
-	if (err != 0) {
-		kfree(temp);
-		goto addr_out;
-	}
-	kfree(kargs);
-	kfree(temp);
+    *temp = NULL;
+    err = copyout(temp, (userptr_t)(stack), sizeof(userptr_t));
+    if (err != 0) {
+        kfree(temp);
+        goto addr_out;
+    }
+    kfree(kargs);
+    kfree(temp);
 
-	lock_release(exec_lock);
+    lock_release(exec_lock);
 
-	as_destroy(old_as);
+    as_destroy(old_as);
 
-	// TODO is this the right addr for argv???
-	enter_new_process(argc, (userptr_t)(stackptr-offset) /*userspace addr of argv*/,
-	            NULL /*userspace addr of environment*/,
-	            stackptr-offset, entrypoint);
+    // TODO is this the right addr for argv???
+    enter_new_process(argc, (userptr_t)(stackptr-offset) /*userspace addr of argv*/,
+            NULL /*userspace addr of environment*/,
+            stackptr-offset, entrypoint);
 
     /* enter_new_process does not return. */
     panic("enter_new_process returned\n");
@@ -212,15 +224,15 @@ addr_out:
     as_destroy(proc_setas(old_as));
     as_activate();
 args_out:
-	for(int i = 0; i < argc; i++){
-		if(kargs[i] != NULL){
-			kfree(kargs[i]);
-		}
-	}
+    for(int i = 0; i < argc; i++){
+        if(kargs[i] != NULL){
+            kfree(kargs[i]);
+        }
+    }
+    kfree(kargs);
 out:
-	kfree(kargs);
-	lock_release(exec_lock);
-	return err;
+    lock_release(exec_lock);
+    return err;
 }
 
 
@@ -230,7 +242,7 @@ out:
  * 'Exec' for kernel
  * Calls vfs_open on progname and thus may destroy it.
  */
-int
+    int
 runprogram(char *progname)
 {
     struct addrspace *as;

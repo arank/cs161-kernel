@@ -52,12 +52,17 @@ main(int argc, char *argv[])
 	int fileid;
 	int len;
 
+    /*
 	if (argc != 3) {
 		errx(1, "Usage: bigfile <filename> <size>");
 	}
-
 	filename = argv[1];
 	size = atoi(argv[2]);
+    */
+    (void)argc;
+    (void)argv;
+	filename = "bigfile";
+	size = 2000000;
 
 	printf("Creating a file of size %d\n", size);
 

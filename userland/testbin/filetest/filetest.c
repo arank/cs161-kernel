@@ -52,12 +52,10 @@ main(int argc, char *argv[])
 	static char readbuf[41];
 
 	int fd, rv;
-    (void)argc;
-    /*
+
 	if (argc!=2) {
 		errx(1, "Usage: filetest <filename>");
 	}
-    */
 
 	fd = open("sometest", O_WRONLY|O_CREAT|O_TRUNC, 0664);
 	if (fd<0) {
@@ -107,11 +105,10 @@ main(int argc, char *argv[])
 		errx(1, "Buffer data mismatch!");
 	}
 
-// TODO put back in with vfs
-//	rv = remove("sometest");
-//	if (rv<0) {
-//		err(1, "%s: remove", argv[1]);
-//	}
+	rv = remove("sometest");
+	if (rv<0) {
+		err(1, "%s: remove", argv[1]);
+	}
 	printf("Passed filetest.\n");
 	return 0;
 }
