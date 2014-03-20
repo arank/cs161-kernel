@@ -472,6 +472,8 @@ thread_make_runnable(struct thread *target, bool already_have_lock)
 		spinlock_acquire(&targetcpu->c_runqueue_lock);
 	}
 
+	target->t_state = S_READY;
+
 	isidle = targetcpu->c_isidle;
 	threadlist_addtail(&targetcpu->c_runqueue, target);
 	if (isidle) {
