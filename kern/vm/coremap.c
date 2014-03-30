@@ -12,6 +12,8 @@
 #include <addrspace.h>
 #define DUMBVM_STACKPAGES    18
 
+static paddr_t get_free_cme(vaddr_t vpn, bool kern);
+
 struct cme {
     vaddr_t  vpn:       20,
              pid:       9,
@@ -25,14 +27,17 @@ struct cme {
 };
 
 struct coremap {
-    struct spinlock splk;
-    unsigned free_count;
+    struct spinlock lock;
+    unsigned free;
     unsigned modified;
     unsigned size;
     struct cme *cm;
+    int last_allocated;
 } coremap;
 
 void cm_bootstrap(void) {
+    (void)get_free_cme;
+
     paddr_t lo;
     paddr_t hi;
 
@@ -41,8 +46,8 @@ void cm_bootstrap(void) {
     uint32_t npages = (hi - lo) / PAGE_SIZE;
 
     // initialize global coremap
-    spinlock_init(&coremap.splk);
-    coremap.free_count = npages;
+    spinlock_init(&coremap.lock);
+    coremap.free = npages;
     coremap.size = npages;
     coremap.modified = 0;
     coremap.cm = (struct cme *)PADDR_TO_KVADDR(lo);
@@ -55,7 +60,6 @@ void cm_bootstrap(void) {
         coremap.cm[i].use = 1;
     }
 }
-
 
 
 /*
@@ -215,5 +219,64 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 	kprintf("dumbvm: Ran out of TLB entries - cannot handle page fault\n");
 	splx(spl);
 	return EFAULT;
+}
+
+// We don't give the option to retry as that would
+// involve sleeping which could lead to livelock
+static int core_set_in_use(int index) {
+	spinlock_acquire(&coremap.lock);
+	if(coremap.cm[index].busybit == 0){
+		coremap.cm[index].busybit = 1;
+		spinlock_release(&coremap.lock);
+	}else{
+		spinlock_release(&coremap.lock);
+		return 1;
+	}
+    return 0;
+}
+
+
+static int core_set_free(int index){
+	spinlock_acquire(&coremap.lock);
+	if(coremap.cm[index].busybit == 1){
+		coremap.cm[index].busybit = 0;
+		spinlock_release(&coremap.lock);
+		return 0;
+	}else{
+		spinlock_release(&coremap.lock);
+		return 1;
+	}
+}
+
+static paddr_t get_free_cme(vaddr_t vpn, bool kern) {
+
+	spinlock_acquire(&coremap.lock);
+	int index = coremap.last_allocated;
+	spinlock_release(&coremap.lock);
+
+	for(unsigned i = 0; i < coremap.size; i++){
+		index = (index+1) % coremap.size;
+		if(core_set_in_use(index) == 0){
+			// Check if in use
+			if(coremap.cm[index].use == 0){
+				coremap.cm[index].use = 1;
+				coremap.cm[index].vpn = vpn;
+				coremap.cm[index].pid = curproc->pid;
+				if(kern){
+					coremap.cm[index].kern = 1;
+				}else{
+					coremap.cm[index].kern = 0;
+				}
+				core_set_free(index);
+				// TODO possibly zero page here.
+				// Multiply by page size to get paddr
+				return index * PAGE_SIZE;
+			}
+			// TODO add eviction later
+			core_set_free(index);
+		}
+	}
+
+    return 0;
 }
 
