@@ -84,7 +84,7 @@ proc_create(const char *name)
 		kfree(proc);
 		return NULL;
 	}
-    
+
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
 
@@ -97,7 +97,7 @@ proc_create(const char *name)
 	if(curthread){
 		proc->pid = pid_get();
         if (proc->pid == -1) {      /* ran out of pids */
-            proc_destroy(proc);     
+            proc_destroy(proc);
             return NULL;
         }
 	}else{
@@ -197,8 +197,8 @@ proc_destroy(struct proc *proc)
 }
 
 
-struct 
-proc_link * 
+struct
+proc_link *
 shared_link_create(pid_t pid) {
     struct proc_link *link = kmalloc(sizeof *link);
     if (link == NULL) goto out;
@@ -212,7 +212,7 @@ shared_link_create(pid_t pid) {
     link->ref_count = 0;
     link->exit_code = -1;
     link->child_pid = pid;
-    
+
     return link;
 
 cv_out:
@@ -228,15 +228,15 @@ void shared_link_destroy(int index, struct proc* proc) {
 		return;
 	}
 
-	struct proc_link *link = (index == PARENT) 
-                                ? proc->parent 
+	struct proc_link *link = (index == PARENT)
+                                ? proc->parent
                                 : proc->children[index];
 	if (link == NULL) return;
 
     lock_acquire(link->lock);
     if (index == PARENT)
     	cv_signal(link->cv, link->lock);
-    
+
     // In this state of the world there is no parent
     if (link->ref_count == 1) {
         pid_destroy(link->child_pid);
@@ -244,9 +244,9 @@ void shared_link_destroy(int index, struct proc* proc) {
         lock_destroy(link->lock);
         cv_destroy(link->cv);
         kfree(link);
-        if (index == PARENT) 
+        if (index == PARENT)
             proc->parent = NULL;
-        else 
+        else
             proc->children[index] = NULL;
     } else {
         link->ref_count--;
@@ -275,68 +275,71 @@ void cleanup_data(struct proc *proc) {
 void
 proc_bootstrap(void)
 {
-	init_pid_table();
+	if (init_pid_table())
+		panic("init_pid_table failed\n");
+
 	kproc = proc_create("[kernel]");
     extern struct lock *exec_lock;
     exec_lock = lock_create("exec-lock");
+    if (exec_lock == NULL)
+        panic("exec-lock failed");
 
-	if (kproc == NULL) {
+	if (kproc == NULL)
 		panic("proc_create for kproc failed\n");
-	}
 }
 
 static void console_init(struct proc *proc) {
-    char *con_read = kstrdup("con:");                                                  
-    char *con_write = kstrdup("con:");                                                  
-    char *con_error = kstrdup("con:");                                                  
-    if (con_read == NULL || con_write == NULL || con_error == NULL)           
-        panic("proc init: could not connect to console\n");      
+    char *con_read = kstrdup("con:");
+    char *con_write = kstrdup("con:");
+    char *con_error = kstrdup("con:");
+    if (con_read == NULL || con_write == NULL || con_error == NULL)
+        panic("proc init: could not connect to console\n");
 
-    struct vnode *out;                                                      
-    struct vnode *in;                                                       
-    struct vnode *err;                                                      
-    int rv1 = vfs_open(con_read, O_RDONLY, 0, &in);                          
-    int rv2 = vfs_open(con_write, O_WRONLY, 0, &out);                         
-    int rv3 = vfs_open(con_error, O_WRONLY, 0, &err);                         
-    if (rv1 | rv2 | rv3)                                                       
-        panic("proc init: could not connect to console\n");      
+    struct vnode *out;
+    struct vnode *in;
+    struct vnode *err;
+    int rv1 = vfs_open(con_read, O_RDONLY, 0, &in);
+    int rv2 = vfs_open(con_write, O_WRONLY, 0, &out);
+    int rv3 = vfs_open(con_error, O_WRONLY, 0, &err);
+    if (rv1 | rv2 | rv3)
+        panic("proc init: could not connect to console\n");
 
-    kfree(con_read);                                                        
-    kfree(con_write);                                                        
-    kfree(con_error);                                                        
+    kfree(con_read);
+    kfree(con_write);
+    kfree(con_error);
 
-    struct file_desc *stdin = kmalloc(sizeof *stdin);          
-    struct file_desc *stdout = kmalloc(sizeof *stdout);         
-    struct file_desc *stderr = kmalloc(sizeof *stderr);         
-    if (stdin == NULL || stdout == NULL || stderr == NULL)                  
-        panic("proc init: out of memory\n");                     
+    struct file_desc *stdin = kmalloc(sizeof *stdin);
+    struct file_desc *stdout = kmalloc(sizeof *stdout);
+    struct file_desc *stderr = kmalloc(sizeof *stderr);
+    if (stdin == NULL || stdout == NULL || stderr == NULL)
+        panic("proc init: out of memory\n");
 
-    stdin->flags = O_RDONLY;                                               
-    stdin->ref_count = 1;                                                      
-    stdin->offset = 0;                                                      
-    stdin->vn = in;                                                   
+    stdin->flags = O_RDONLY;
+    stdin->ref_count = 1;
+    stdin->offset = 0;
+    stdin->vn = in;
     stdin->mode = 0;
-    stdin->lock = lock_create("stdin");                                    
+    stdin->lock = lock_create("stdin");
 
-    stdout->flags = O_WRONLY;                                              
-    stdout->ref_count = 1;                                                     
-    stdout->offset = 0;                                                     
-    stdout->vn = out;                                                     
+    stdout->flags = O_WRONLY;
+    stdout->ref_count = 1;
+    stdout->offset = 0;
+    stdout->vn = out;
     stdout->mode = 0;
     stdout->lock = lock_create("stdout");
 
     stderr->flags = O_WRONLY;
     stderr->ref_count = 1;
     stderr->offset = 0;
-    stderr->vn = err;                                       
+    stderr->vn = err;
     stderr->mode = 0;
-    stderr->lock = lock_create("stderr");                                  
+    stderr->lock = lock_create("stderr");
 
     if (stdin->lock == NULL || stdout->lock == NULL || stderr->lock == NULL)
         panic("proc init: stdin, stdout, or stderr lock couldn't be allocated\n");
 
-    proc->fd_table[STDIN_FILENO] = stdin;                                    
-    proc->fd_table[STDOUT_FILENO] = stdout;                                  
+    proc->fd_table[STDIN_FILENO] = stdin;
+    proc->fd_table[STDOUT_FILENO] = stdout;
     proc->fd_table[STDERR_FILENO] = stderr;
 }
 
