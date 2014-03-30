@@ -223,7 +223,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
 // We don't give the option to retry as that would
 // involve sleeping which could lead to livelock
-static int core_set_in_use(int index) {
+static int core_set_busy(int index) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0){
 		coremap.cm[index].busybit = 1;
@@ -256,7 +256,7 @@ static paddr_t get_free_cme(vaddr_t vpn, bool kern) {
 
 	for(unsigned i = 0; i < coremap.size; i++){
 		index = (index+1) % coremap.size;
-		if(core_set_in_use(index) == 0){
+		if(core_set_busy(index) == 0){
 			// Check if in use
 			if(coremap.cm[index].use == 0){
 				coremap.cm[index].use = 1;
