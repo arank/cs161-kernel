@@ -113,4 +113,6 @@ struct proc_link *shared_link_create(pid_t pid);
 /* create a process for fork */
 struct proc *proc_create(const char *name);
 
+struct addrspace * proc_getas(void);
+
 #endif /* _PROC_H_ */
