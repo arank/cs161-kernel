@@ -234,9 +234,9 @@ static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 	int index = coremap.last_allocated;
 	spinlock_release(&coremap.lock);
 
-	for (unsigned i = 0; i < coremap.size; i++){
-		index = (index + 1) % coremap.size;
-		if (core_set_busy(index) == 0){
+	for(unsigned i = 0; i < coremap.size; i++){
+		index = (index+1) % coremap.size;
+		if(core_set_busy(index) == 0){
 			// Check if in use
 			if (coremap.cm[index].use == 0) {
 				coremap.cm[index].use = 1;
