@@ -15,7 +15,7 @@
 static paddr_t get_free_cme(vaddr_t vpn, bool kern);
 
 struct cme {
-    vaddr_t  vpn:       20,
+    uint32_t vpn:       20,
              pid:       9,
              busybit:   1,
              use:       1,
@@ -62,40 +62,20 @@ void cm_bootstrap(void) {
 }
 
 
-/*
- * Wrap ram_stealmem in a spinlock.
- */
-static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
-
 void
 vm_bootstrap(void)
 {
     cm_bootstrap();
 }
 
-static
-paddr_t
-getppages(unsigned long npages)
-{
-	paddr_t addr;
-
-	spinlock_acquire(&stealmem_lock);
-
-	addr = ram_stealmem(npages);
-
-	spinlock_release(&stealmem_lock);
-	return addr;
-}
-
 /* Allocate/free some kernel-space virtual pages */
 vaddr_t
 alloc_kpages(int npages)
 {
-	paddr_t pa;
-	pa = getppages(npages);
-	if (pa==0) {
-		return 0;
-	}
+    if (npages > 1) return 0;   /* for now max 1 page */
+
+	paddr_t pa = get_free_cme((vaddr_t)0, true);
+	if (pa == 0) return 0;
 	return PADDR_TO_KVADDR(pa);
 }
 
@@ -223,7 +203,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
 // We don't give the option to retry as that would
 // involve sleeping which could lead to livelock
-static int core_set_in_use(int index) {
+static int core_set_busy(int index) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0){
 		coremap.cm[index].busybit = 1;
@@ -248,25 +228,21 @@ static int core_set_free(int index){
 	}
 }
 
-static paddr_t get_free_cme(vaddr_t vpn, bool kern) {
+static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 
 	spinlock_acquire(&coremap.lock);
 	int index = coremap.last_allocated;
 	spinlock_release(&coremap.lock);
 
-	for(unsigned i = 0; i < coremap.size; i++){
-		index = (index+1) % coremap.size;
-		if(core_set_in_use(index) == 0){
+	for (unsigned i = 0; i < coremap.size; i++){
+		index = (index + 1) % coremap.size;
+		if (core_set_busy(index) == 0){
 			// Check if in use
-			if(coremap.cm[index].use == 0){
+			if (coremap.cm[index].use == 0) {
 				coremap.cm[index].use = 1;
 				coremap.cm[index].vpn = vpn;
-				coremap.cm[index].pid = curproc->pid;
-				if(kern){
-					coremap.cm[index].kern = 1;
-				}else{
-					coremap.cm[index].kern = 0;
-				}
+				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
+                coremap.cm[index].kern = (is_kern) ? 1 : 0;
 				core_set_free(index);
 				// TODO possibly zero page here.
 				// Multiply by page size to get paddr
