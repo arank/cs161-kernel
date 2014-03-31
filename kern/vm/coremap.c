@@ -30,32 +30,37 @@ struct coremap {
     struct spinlock lock;
     unsigned free;
     unsigned modified;
+
+    /* additional statics Daniel suggested to track, I'll init them all tonight
+    unsigned kernel;
+    unsigned user;
+    unsigned busy;
+    unsigned swap;
+    unsigned ref;
+    */
     unsigned size;
     struct cme *cm;
     int last_allocated;
 } coremap;
 
 void cm_bootstrap(void) {
-    (void)get_free_cme;
-
     paddr_t lo;
     paddr_t hi;
 
-    //compute coremap size
     ram_getsize(&lo, &hi);
-    uint32_t npages = (hi - lo) / PAGE_SIZE;
+    uint32_t free_pages = (hi - lo) / PAGE_SIZE;    /* available aka not stolen */
+    uint32_t total_pages = free_pages + lo / PAGE_SIZE; /* available + stolen */
 
-    // initialize global coremap
     spinlock_init(&coremap.lock);
-    coremap.free = npages;
-    coremap.size = npages;
+    coremap.free = free_pages;
+    coremap.size = total_pages;
     coremap.modified = 0;
     coremap.cm = (struct cme *)PADDR_TO_KVADDR(lo);
 
-    uint32_t cm_size =
-        ROUNDUP(npages * sizeof(struct cme), PAGE_SIZE) / PAGE_SIZE;
+    uint32_t alloc_pages =  /* npages cm occupies + stolen_pages */
+        (ROUNDUP(total_pages * sizeof(struct cme), PAGE_SIZE) / PAGE_SIZE) + stolen_pages;
 
-    for (unsigned i = 0; i < cm_size; i++) {
+    for (unsigned i = 0; i < alloc_pages; i++) {
         coremap.cm[i].kern = 1;
         coremap.cm[i].use = 1;
     }
@@ -240,7 +245,7 @@ static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 			// Check if in use
 			if (coremap.cm[index].use == 0) {
 				coremap.cm[index].use = 1;
-				coremap.cm[index].vpn = vpn;
+				coremap.cm[index].vpn = (is_kern) ? 0 : vpn;
 				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
                 coremap.cm[index].kern = (is_kern) ? 1 : 0;
 				core_set_free(index);
