@@ -21,9 +21,9 @@ struct cme {
              use:       1,
              kern:      1;
     uint32_t swap:      15,
+             seq:       15,
              dirty:     1,
-             ref:       1,
-             junk:      15;
+             ref:       1;
 };
 
 struct coremap {
@@ -49,7 +49,8 @@ void cm_bootstrap(void) {
 
     ram_getsize(&lo, &hi);
     uint32_t free_pages = (hi - lo) / PAGE_SIZE;    /* available aka not stolen */
-    uint32_t total_pages = free_pages + lo / PAGE_SIZE; /* available + stolen */
+    uint32_t stolen_pages = lo / PAGE_SIZE;
+    uint32_t total_pages = free_pages + stolen_pages; /* available + stolen */
 
     spinlock_init(&coremap.lock);
     coremap.free = free_pages;
@@ -84,12 +85,70 @@ alloc_kpages(int npages)
 	return PADDR_TO_KVADDR(pa);
 }
 
+// We don't give the option to retry as that would
+// involve sleeping which could lead to livelock
+static int core_set_busy(int index) {
+	spinlock_acquire(&coremap.lock);
+	if(coremap.cm[index].busybit == 0) {
+		coremap.cm[index].busybit = 1;
+		spinlock_release(&coremap.lock);
+	} else {
+		spinlock_release(&coremap.lock);
+		return 1;
+	}
+    return 0;
+}
+
+
+static int core_set_free(int index){
+	spinlock_acquire(&coremap.lock);
+	if(coremap.cm[index].busybit == 1) {
+		coremap.cm[index].busybit = 0;
+		spinlock_release(&coremap.lock);
+		return 0;
+	} else {
+		spinlock_release(&coremap.lock);
+		return 1;
+	}
+}
+
+void
+kree_one_page(unsigned cm_index) {
+    while (1) {
+        if (core_set_busy(cm_index) == 0) {
+            if (coremap.cm[cm_index].use == 0 )
+                panic("free_kpages: freeing a free page\n");
+            if (coremap.cm[cm_index].kern != 1)
+                panic("free_kpages: freeing not a kernel's page\n");
+
+            KASSERT(coremap.cm[cm_index].pid == 0);
+            KASSERT(coremap.cm[cm_index].swap == 0);
+            KASSERT(coremap.cm[cm_index].vpn == 0);
+
+            coremap.cm[cm_index].use = 0;
+            coremap.cm[cm_index].kern = 0;
+            bzero((void *)PADDR_TO_KVADDR(pa), PAGE_SIZE);  /* zero out */
+
+            core_set_free(cm_index);
+            return;
+        } else
+            continue;
+    }
+}
+
 void
 free_kpages(vaddr_t addr)
 {
-	/* nothing - leak the memory. */
+    paddr_t pa = KVADDR_TO_PADDR(addr);
+    KASSERT (pa % PAGE_SIZE == 0); /* don't believe sw you didn't wrote */
+    unsigned cm_index = pa / PAGE_SIZE;
 
-	(void)addr;
+	spinlock_acquire(&coremap.lock);
+    unsigned seq = coremap.cm[index].seq;
+	spinlock_release(&coremap.lock);
+
+    for (int i = 0; i < seq; i++)
+        kfree_one_page(cm_index + i);
 }
 
 void
@@ -206,33 +265,6 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 	return EFAULT;
 }
 
-// We don't give the option to retry as that would
-// involve sleeping which could lead to livelock
-static int core_set_busy(int index) {
-	spinlock_acquire(&coremap.lock);
-	if(coremap.cm[index].busybit == 0){
-		coremap.cm[index].busybit = 1;
-		spinlock_release(&coremap.lock);
-	}else{
-		spinlock_release(&coremap.lock);
-		return 1;
-	}
-    return 0;
-}
-
-
-static int core_set_free(int index){
-	spinlock_acquire(&coremap.lock);
-	if(coremap.cm[index].busybit == 1){
-		coremap.cm[index].busybit = 0;
-		spinlock_release(&coremap.lock);
-		return 0;
-	}else{
-		spinlock_release(&coremap.lock);
-		return 1;
-	}
-}
-
 static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 
 	spinlock_acquire(&coremap.lock);
@@ -248,6 +280,7 @@ static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 				coremap.cm[index].vpn = (is_kern) ? 0 : vpn;
 				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
                 coremap.cm[index].kern = (is_kern) ? 1 : 0;
+                coremap.cm[index].seq = 1;
 				core_set_free(index);
 				// TODO possibly zero page here.
 				// Multiply by page size to get paddr
