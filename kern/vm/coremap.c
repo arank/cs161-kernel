@@ -208,6 +208,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
 // We don't give the option to retry as that would
 // involve sleeping which could lead to livelock
+// TODO do we need a setting to have this retry getting a single CME, or just do it in a while loop in calling func
 static int core_set_busy(int index) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0){
