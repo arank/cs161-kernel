@@ -228,16 +228,19 @@ mips_trap(struct trapframe *tf)
 	switch (code) {
 	case EX_MOD:
 		if (vm_fault(VM_FAULT_READONLY, tf->tf_vaddr)==0) {
+			// TODO Write
 			goto done;
 		}
 		break;
 	case EX_TLBL:
 		if (vm_fault(VM_FAULT_READ, tf->tf_vaddr)==0) {
+			// TODO Write
 			goto done;
 		}
 		break;
 	case EX_TLBS:
 		if (vm_fault(VM_FAULT_WRITE, tf->tf_vaddr)==0) {
+			// TODO Write
 			goto done;
 		}
 		break;
