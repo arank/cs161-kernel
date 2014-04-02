@@ -115,6 +115,9 @@ static int core_set_free(int index){
 static
 void
 kfree_one_page(unsigned cm_index) {
+	// TODO will this work with a single processor
+	// TODO does this possibly lead to starvartion
+	// Possibly add lock and CV for KERNEL only to avoid this
     while (1) {
         if (core_set_busy(cm_index) == 0) {
             if (coremap.cm[cm_index].use == 0 )
@@ -132,8 +135,7 @@ kfree_one_page(unsigned cm_index) {
 
             core_set_free(cm_index);
             return;
-        } else
-            continue;
+        }
     }
 }
 
