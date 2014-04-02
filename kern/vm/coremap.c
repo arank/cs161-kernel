@@ -112,8 +112,9 @@ static int core_set_free(int index){
 	}
 }
 
+static
 void
-kree_one_page(unsigned cm_index) {
+kfree_one_page(unsigned cm_index) {
     while (1) {
         if (core_set_busy(cm_index) == 0) {
             if (coremap.cm[cm_index].use == 0 )
@@ -127,7 +128,7 @@ kree_one_page(unsigned cm_index) {
 
             coremap.cm[cm_index].use = 0;
             coremap.cm[cm_index].kern = 0;
-            bzero((void *)PADDR_TO_KVADDR(pa), PAGE_SIZE);  /* zero out */
+            bzero((void *)PADDR_TO_KVADDR(cm_index * PAGE_SIZE), PAGE_SIZE);  /* zero out */
 
             core_set_free(cm_index);
             return;
@@ -144,10 +145,10 @@ free_kpages(vaddr_t addr)
     unsigned cm_index = pa / PAGE_SIZE;
 
 	spinlock_acquire(&coremap.lock);
-    unsigned seq = coremap.cm[index].seq;
+    unsigned seq = coremap.cm[cm_index].seq;
 	spinlock_release(&coremap.lock);
 
-    for (int i = 0; i < seq; i++)
+    for (unsigned i = 0; i < seq; i++)
         kfree_one_page(cm_index + i);
 }
 
