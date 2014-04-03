@@ -35,6 +35,7 @@
 #include <proc.h>
 #include <pagetable.h>
 #include <synch.h>
+#include <coremap.h>
 
 /*
  * Note! If OPT_DUMBVM is set, as is the case until you start the VM
@@ -65,12 +66,9 @@ as_create(void)
 	if(as->lock == NULL)
 		goto lock_out;
 
-	// TODO What to do about heap start and end
-
 	return as;
 
 lock_out:
-	// TODO make real page dir recursive destroy
 	page_dir_destroy(as->page_dir);
 out:
 	return NULL;
@@ -99,7 +97,19 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 void
 as_destroy(struct addrspace *as)
 {
-	// TODO how to free all cme entries with this pid
+	// free all cme entries
+	for(int i = 0; i < 1024; i++){
+		if(as->page_dir->dir[i] != NULL){
+			for(int j = 0; j < 1024; j++){
+				if(as->page_dir->dir[i]->table[j].present == 1){
+					(int)as->page_dir->dir[i]->table[j].ppn;
+				}else{
+					// On disk, handle later
+				}
+			}
+		}
+	}
+
 	// TODO destroy pages on disk
 	page_dir_destroy(as->page_dir);
 	kfree(as);
