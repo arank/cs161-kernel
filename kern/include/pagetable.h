@@ -1,3 +1,6 @@
+#ifndef _H_PAGETABLE_H_
+#define _H_PAGETABLE_H_
+
 struct pte {
 	uint32_t ppn: 20, // Doubles as swap if not present
 			 busybit: 1,
@@ -26,3 +29,5 @@ int page_set_busy(struct page_table *pt, int index, bool wait);
 int page_set_free(struct page_table *pt, int index);
 
 int page_dir_destroy(struct page_dir* pd);
+
+#endif

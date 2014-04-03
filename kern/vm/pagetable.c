@@ -1,10 +1,11 @@
-#include<types.h>
-#include<synch.h>
-#include<lib.h>
-#include<pagetable.h>
+#include <types.h>
+#include <synch.h>
+#include <lib.h>
+#include <pagetable.h>
 
 // TODO Handle kmalloc failures
-struct page_dir* page_dir_init(){
+struct page_dir*
+page_dir_init(){
 	struct page_dir* pd = kmalloc(sizeof(struct page_dir));
 	if(pd->dir == NULL){
 		return NULL;
