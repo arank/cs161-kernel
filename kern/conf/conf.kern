@@ -340,7 +340,7 @@ file      proc/pid_table.c
 
 file      vm/kmalloc.c
 file      vm/coremap.c
-# file	  vm/pagetable.c
+file	  vm/pagetable.c
 # file	  vm/backingstore.c
 optofffile dumbvm   vm/addrspace.c
 

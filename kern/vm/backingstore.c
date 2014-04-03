@@ -1,3 +1,9 @@
+#include <types.h>
+#include <synch.h>
+#include <lib.h>
+#include <bitmap.h>
+#include <kern/errno.h>
+
 struct backing_store{
 	struct lock *lock;
 	struct bitmap* bm;
@@ -6,10 +12,11 @@ struct backing_store{
 // TODO  how to get disk size and location on disk to use
 int init_backing_store(void) {
 
-    backing_store = kmalloc (sizeof *backing_store);
+    backing_store = kmalloc(sizeof *backing_store);
     if (backing_store == NULL) goto out;
 
-    backing_store->bm = bitmap_create(1);//TODO figure this out
+    //TODO figure this out currently this is the max our coremap and page table supports
+    backing_store->bm = bitmap_create((unsigned)33554432);
     if (backing_store->bm == NULL) goto bm_out;
 
     backing_store->lock = lock_create("disk_lock");
@@ -38,8 +45,10 @@ int retrieve_from_disk(unsigned swap_index, paddr_t location){
 		return -1;
 	}
 	// TODO figure out how to retrieve from location
+	(void) location;
     bitmap_unmark(backing_store->bm, swap_index);
     lock_release(backing_store->lock);
+    return 0;
 }
 
 int write_to_disk(paddr_t location){
@@ -50,5 +59,7 @@ int write_to_disk(paddr_t location){
 	    	return -1;
 	}
 	// TODO Figure out how to put the pages from location into spot
+	(void) location;
 	lock_release(backing_store->lock);
+	return 0;
 }
