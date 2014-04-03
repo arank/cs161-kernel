@@ -33,6 +33,8 @@
 #include <addrspace.h>
 #include <vm.h>
 #include <proc.h>
+#include <pagetable.h>
+#include <synch.h>
 
 /*
  * Note! If OPT_DUMBVM is set, as is the case until you start the VM
@@ -50,11 +52,28 @@ as_create(void)
 		return NULL;
 	}
 
-	/*
-	 * Initialize as needed.
-	 */
+
+	as->page_dir = page_dir_init();
+	if(as->page_dir == NULL)
+		goto out;
+	if(page_table_add(0, as->page_dir))
+		goto out;
+	if(page_table_add(1023, as->page_dir))
+		goto out;
+
+	as->lock = lock_create("address space lock");
+	if(as->lock == NULL)
+		goto lock_out;
+
+	// TODO What to do about heap start and end
 
 	return as;
+
+lock_out:
+	// TODO make real page dir recursive destroy
+	page_dir_destroy(as->page_dir);
+out:
+	return NULL;
 }
 
 int
@@ -80,10 +99,9 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 void
 as_destroy(struct addrspace *as)
 {
-	/*
-	 * Clean up as needed.
-	 */
-
+	// TODO how to free all cme entries with this pid
+	// TODO destroy pages on disk
+	page_dir_destroy(as->page_dir);
 	kfree(as);
 }
 

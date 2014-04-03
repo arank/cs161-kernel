@@ -1,29 +1,10 @@
 #include<types.h>
 #include<synch.h>
 #include<lib.h>
-
-struct pte {
-	uint32_t ppn: 20, // Doubles as swap if not present
-			 busybit: 1,
-			 present: 1,
-			 valid: 1,
-			 permissions: 2,
-			 junk: 7;
-};
-
-struct page_table {
-	struct lock *lock;
-	struct cv *cv;
-	struct pte* table;
-};
-
-// TODO move to address space
-struct page_dir{
-	struct page_table* dir[1024];
-};
+#include<pagetable.h>
 
 // TODO Handle kmalloc failures
-static struct page_dir* page_dir_init(){
+struct page_dir* page_dir_init(){
 	struct page_dir* pd = kmalloc(sizeof(struct page_dir));
 	if(pd->dir == NULL){
 		return NULL;
@@ -35,7 +16,7 @@ static struct page_dir* page_dir_init(){
 	return pd;
 }
 
-static int page_table_add(int index, struct page_dir* pd){
+int page_table_add(int index, struct page_dir* pd){
 	if(pd->dir[index] != NULL)
 		goto out;
 
@@ -71,8 +52,20 @@ static int page_table_add(int index, struct page_dir* pd){
 		return 1;
 }
 
+int page_dir_destroy(struct page_dir* pd){
+	for(int i = 0; i < 1024; i++){
+		if(pd->dir[i] != NULL){
+			lock_destroy(pd->dir[i]->lock);
+			cv_destroy(pd->dir[i]->cv);
+			kfree(pd->dir[i]->table);
+		}
+	}
+	kfree(pd);
+	return 0;
+}
 
-static int page_set_busy(struct page_table *pt, int index, bool wait){
+
+int page_set_busy(struct page_table *pt, int index, bool wait){
 	lock_acquire(pt->lock);
 	if(pt->table[index].busybit == 0){
 		pt->table[index].busybit = 1;
@@ -91,7 +84,7 @@ static int page_set_busy(struct page_table *pt, int index, bool wait){
 }
 
 
-static int page_set_free(struct page_table *pt, int index){
+int page_set_free(struct page_table *pt, int index){
 	lock_acquire(pt->lock);
 	if(pt->table[index].busybit == 1){
 		pt->table[index].busybit = 0;
