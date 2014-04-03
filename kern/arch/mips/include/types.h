@@ -42,5 +42,6 @@
 
 typedef __u32 paddr_t;
 typedef __u32 vaddr_t;
+typedef __u32 cmi_t;
 
 #endif /* _MIPS_TYPES_H_ */
