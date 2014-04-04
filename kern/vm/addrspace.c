@@ -107,7 +107,7 @@ as_destroy(struct addrspace *as)
 					while (core_set_busy(cm_index) != 0);
 
 					// TODO should I clean the cme more?
-					coremap->cm[cm_index].use = 0;
+					coremap.cm[cm_index].use = 0;
 
 					// set all of page to zero
 					memset((void*)CMI_TO_PADDR(cm_index), 0, (size_t)4096);

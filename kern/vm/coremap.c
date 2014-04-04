@@ -14,37 +14,6 @@
 
 static paddr_t get_free_cme(vaddr_t vpn, bool kern);
 
-struct cme {
-    uint32_t vpn:       20,
-             pid:       9,
-             busybit:   1,
-             use:       1,
-             kern:      1;
-    uint32_t swap:      15, /* swap index */
-             slen:      10, /* sequence length */
-             seq:       1,  /* this bit is 1 if it's a sequence entry except for the first one */
-             dirty:     1,
-             ref:       1,
-             junk:      4;
-};
-
-struct coremap {
-    struct spinlock lock;
-    unsigned free;
-    unsigned modified;
-
-    /* additional statics Daniel suggested to track, I'll init them all tonight
-    unsigned kernel;
-    unsigned user;
-    unsigned busy;
-    unsigned swap;
-    unsigned ref;
-    */
-    unsigned size;
-    struct cme *cm;
-    int last_allocated;
-} coremap;
-
 void cm_bootstrap(void) {
     paddr_t lo;
     paddr_t hi;
@@ -119,9 +88,7 @@ alloc_kpages(int npages)
 
 // We don't give the option to retry as that would
 // involve sleeping which could lead to livelock
-static
-int
-core_set_busy(int index) {
+int core_set_busy(int index) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0) {
 		coremap.cm[index].busybit = 1;
@@ -134,9 +101,8 @@ core_set_busy(int index) {
 }
 
 
-static
-int
-core_set_free(int index){
+
+int core_set_free(int index){
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 1) {
 		coremap.cm[index].busybit = 0;
@@ -166,7 +132,6 @@ kfree_one_page(unsigned cm_index) {
 	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 
 	core_set_free(cm_index);
-    }
 }
 
 void

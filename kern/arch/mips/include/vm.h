@@ -71,9 +71,9 @@
 #define PADDR_TO_CMI(paddr) (paddr / PAGE_SIZE)
 #define CMI_TO_PADDR(cmi) (cmi * PAGE_SIZE)
 
-#define PDI(vaddr) ((int)(vaddr>>22));
-#define PTI(vaddr) ((int)(vaddr>>12) & 0x3FF);
-#define OFFSET(vaddr) ((int)(vaddr & 0xFFF));
+#define PDI(vaddr) ((int)(vaddr>>22))
+#define PTI(vaddr) ((int)(vaddr>>12) & 0x3FF)
+#define OFFSET(vaddr) ((int)(vaddr & 0xFFF))
 
 /*
  * The top of user space. (Actually, the address immediately above the
