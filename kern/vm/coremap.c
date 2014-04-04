@@ -20,9 +20,9 @@ struct cme {
              busybit:   1,
              use:       1,
              kern:      1;
-    uint32_t swap:      15,
-             slen:      10,
-             seq:       1,  /* this bit is 0 in every page returned to the kernel, 1 if it's a sequence entry */
+    uint32_t swap:      15, /* swap index */
+             slen:      10, /* sequence length */
+             seq:       1,  /* this bit is 1 if it's a sequence entry except for the first one */
              dirty:     1,
              ref:       1,
              junk:      4;
@@ -90,7 +90,7 @@ get_cme_seq(unsigned npages) {
 
     while (count != npages) {
         next_pa = get_free_cme((vaddr_t)0, true);
-        if (next_pa == 0)  {    /* out of free pages */
+        if (next_pa == 0) {    /* out of free pages */
             free_kpages(PADDR_TO_KVADDR(pa));
             return 0;
         } else if (next_pa == pa + PAGE_SIZE) { /* hit */
@@ -186,17 +186,23 @@ free_kpages(vaddr_t addr)
         kfree_one_page(cm_index + i);
 }
 
+/* shoot down all TLB entries */
 void
 vm_tlbshootdown_all(void)
 {
-	panic("dumbvm tried to do tlb shootdown?!\n");
+    int spl = splhigh();
+
+    for (int entryno = 0; entryno < NUM_TLB; entryno++)
+        tlb_write(TLBHI_INVALID(entryno), TLBLO_INVALID(), entryno);
+
+    splx(spl);
 }
 
+/* shoot down one TLB entry given the information from ts */
 void
 vm_tlbshootdown(const struct tlbshootdown *ts)
 {
 	(void)ts;
-	panic("dumbvm tried to do tlb shootdown?!\n");
 }
 
 int
@@ -223,12 +229,10 @@ static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
                 coremap.cm[index].kern = (is_kern) ? 1 : 0;
 				core_set_free(index);
-				// TODO possibly zero page here.
-				// Multiply by page size to get paddr
 				return CMI_TO_PADDR(index);
 			}
-			// TODO add eviction later
 			core_set_free(index);
+			// TODO add eviction later
 		}
 	}
 

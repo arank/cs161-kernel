@@ -144,9 +144,7 @@ as_activate(void)
 		return;
 	}
 
-	/*
-	 * Write this.
-	 */
+    vm_tlbshootdown_all();
 }
 
 void
@@ -206,9 +204,9 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		}
 
 		if(executable == 1){
-			as->page_dir->dir[cur_index]->table[j].execute = 1;
+			as->page_dir->dir[cur_index]->table[j].exec = 1;
 		}else{
-			as->page_dir->dir[cur_index]->table[j].execute = 0;
+			as->page_dir->dir[cur_index]->table[j].exec = 0;
 		}
 	}
 
@@ -223,7 +221,7 @@ int
 as_prepare_load(struct addrspace *as)
 {
 	/*
-	 * Write this.
+	 * Initialize HEAP after all elf regions are defined
 	 */
 
 	(void)as;
@@ -234,7 +232,7 @@ int
 as_complete_load(struct addrspace *as)
 {
 	/*
-	 * Write this.
+	 * red zone definition so that sbrk cannot set it to valid
 	 */
 
 	(void)as;
@@ -244,10 +242,6 @@ as_complete_load(struct addrspace *as)
 int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
-	/*
-	 * Write this. Define buffer area
-	 */
-
 	(void)as;
 
 	/* Initial user-level stack pointer */
