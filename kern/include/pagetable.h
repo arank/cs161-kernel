@@ -1,13 +1,21 @@
 #ifndef _H_PAGETABLE_H_
 #define _H_PAGETABLE_H_
 
+#define PT_SIZE 1024
+#define PD_SIZE 1024
+
 struct pte {
-	uint32_t ppn: 20, // Doubles as swap if not present
-			 busybit: 1,
-			 present: 1,
-			 valid: 1,
-			 permissions: 2,
-			 junk: 7;
+    union {
+        uint32_t ppn    : 20; // Doubles as swap if not present
+        uint32_t swap   : 20;
+    };
+	uint32_t busybit    : 1;
+    uint32_t present    : 1;
+    uint32_t valid      : 1;
+    uint32_t read       : 1;
+    uint32_t write      : 1;
+    uint32_t exec       : 1;
+    uint32_t junk       : 6;
 };
 
 struct page_table {
@@ -17,7 +25,7 @@ struct page_table {
 };
 
 struct page_dir{
-	struct page_table* dir[1024];
+	struct page_table* dir[PD_SIZE];
 };
 
 struct page_dir* page_dir_init(void);

@@ -119,9 +119,7 @@ as_activate(void)
 		return;
 	}
 
-	/*
-	 * Write this.
-	 */
+    vm_tlbshootdown_all();
 }
 
 void
@@ -165,7 +163,7 @@ int
 as_prepare_load(struct addrspace *as)
 {
 	/*
-	 * Write this.
+	 * Initialize HEAP after all elf regions are defined
 	 */
 
 	(void)as;
@@ -176,7 +174,7 @@ int
 as_complete_load(struct addrspace *as)
 {
 	/*
-	 * Write this.
+	 * red zone definition so that sbrk cannot set it to valid
 	 */
 
 	(void)as;
@@ -187,7 +185,7 @@ int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
 	/*
-	 * Write this.
+	 * define 16 stack pages
 	 */
 
 	(void)as;

@@ -2,6 +2,7 @@
 #include <synch.h>
 #include <lib.h>
 #include <pagetable.h>
+#include <kern/errno.h>
 
 // TODO Handle kmalloc failures
 struct page_dir*
@@ -10,16 +11,17 @@ page_dir_init(){
 	if(pd->dir == NULL){
 		return NULL;
 	}
-	// Null all entries in the dir
-	for(int i = 0; i < 1024; i++)
+    memset(pd, 0, sizeof (struct page_dir));
+    /*
+	for(int i = 0; i < PD_SIZE; i++)
 		pd->dir[i] = NULL;
-
+    */
 	return pd;
 }
 
 int page_table_add(int index, struct page_dir* pd){
 	if(pd->dir[index] != NULL)
-		goto out;
+        return -1;
 
 	pd->dir[index] = kmalloc(sizeof(struct page_table));
 	if(pd->dir[index] == NULL)
@@ -33,12 +35,12 @@ int page_table_add(int index, struct page_dir* pd){
 	if(pd->dir[index]->cv == NULL)
 		goto lock_out;
 
-	pd->dir[index]->table = kmalloc(sizeof(struct pte) * 1024);
+	pd->dir[index]->table = kmalloc(sizeof(struct pte) * PT_SIZE);
 	if(pd->dir[index]->table == NULL)
 		goto cv_out;
 
 	// Null all entries in page table
-	for(int i; i < 1024; i++)
+	for(int i; i < PT_SIZE; i++)
 		pd->dir[index]->table[i].valid = 0;
 
 	return 0;
@@ -50,11 +52,11 @@ int page_table_add(int index, struct page_dir* pd){
 	pt_out:
 		kfree(pd->dir[index]);
 	out:
-		return 1;
+		return ENOMEM;
 }
 
 int page_dir_destroy(struct page_dir* pd){
-	for(int i = 0; i < 1024; i++){
+	for(int i = 0; i < PD_SIZE; i++){
 		if(pd->dir[i] != NULL){
 			lock_destroy(pd->dir[i]->lock);
 			cv_destroy(pd->dir[i]->cv);
