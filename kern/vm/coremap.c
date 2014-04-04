@@ -151,21 +151,21 @@ core_set_free(int index){
 static
 void
 kfree_one_page(unsigned cm_index) {
-    while (core_set_busy(cm_index) != 0) {
-        if (coremap.cm[cm_index].use == 0 )
-            panic("free_kpages: freeing a free page\n");
-        if (coremap.cm[cm_index].kern != 1)
-            panic("free_kpages: freeing not a kernel's page\n");
+    while (core_set_busy(cm_index) != 0);
+	if (coremap.cm[cm_index].use == 0 )
+		panic("free_kpages: freeing a free page\n");
+	if (coremap.cm[cm_index].kern != 1)
+		panic("free_kpages: freeing not a kernel's page\n");
 
-        KASSERT(coremap.cm[cm_index].pid == 0);
-        KASSERT(coremap.cm[cm_index].swap == 0);
-        KASSERT(coremap.cm[cm_index].vpn == 0);
+	KASSERT(coremap.cm[cm_index].pid == 0);
+	KASSERT(coremap.cm[cm_index].swap == 0);
+	KASSERT(coremap.cm[cm_index].vpn == 0);
 
-        /* zero out cme and physical page */
-        memset(&coremap.cm[cm_index], 0, sizeof (struct cme));
-        memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
+	/* zero out cme and physical page */
+	memset(&coremap.cm[cm_index], 0, sizeof (struct cme));
+	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 
-        core_set_free(cm_index);
+	core_set_free(cm_index);
     }
 }
 

@@ -29,6 +29,7 @@
 
 #include <types.h>
 #include <kern/errno.h>
+#include <mips/vm.h>
 #include <lib.h>
 #include <addrspace.h>
 #include <vm.h>
@@ -53,13 +54,8 @@ as_create(void)
 		return NULL;
 	}
 
-
 	as->page_dir = page_dir_init();
 	if(as->page_dir == NULL)
-		goto out;
-	if(page_table_add(0, as->page_dir))
-		goto out;
-	if(page_table_add(1023, as->page_dir))
 		goto out;
 
 	as->lock = lock_create("address space lock");
@@ -101,16 +97,35 @@ as_destroy(struct addrspace *as)
 	for(int i = 0; i < 1024; i++){
 		if(as->page_dir->dir[i] != NULL){
 			for(int j = 0; j < 1024; j++){
+				// TODO dead lock here if eviction is coming in the other direction
+				// figure out who has to give up first, probably the evictor
+				page_set_busy(as->page_dir->dir[i], j, true);
+
 				if(as->page_dir->dir[i]->table[j].present == 1){
-					(int)as->page_dir->dir[i]->table[j].ppn;
+					int cm_index = (int)as->page_dir->dir[i]->table[j].ppn;
+					// busily wait to get lock on memory
+					while (core_set_busy(cm_index) != 0);
+
+					// TODO should I clean the cme more?
+					coremap->cm[cm_index].use = 0;
+
+					// set all of page to zero
+					memset((void*)CMI_TO_PADDR(cm_index), 0, (size_t)4096);
+
+					core_set_free(cm_index);
 				}else{
-					// On disk, handle later
+					// TODO page on disk, handle deleting this later
+					// TODO this may be some hairy synch
 				}
+
+				as->page_dir->dir[i]->table[j].valid = 0;
+
+				page_set_free(as->page_dir->dir[i], j);
+
 			}
 		}
 	}
 
-	// TODO destroy pages on disk
 	page_dir_destroy(as->page_dir);
 	kfree(as);
 }
@@ -154,21 +169,54 @@ as_deactivate(void)
  * moment, these are ignored. When you write the VM system, you may
  * want to implement them.
  */
+
 int
 as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		 int readable, int writeable, int executable)
 {
-	/*
-	 * Write this.
-	 */
+	// Calculate offset into dir, and define new table, set the addr to valid, plus the offset.
+	if(page_table_add(PDI(vaddr), as->page_dir))
+		goto out;
 
-	(void)as;
-	(void)vaddr;
-	(void)sz;
-	(void)readable;
-	(void)writeable;
-	(void)executable;
-	return ENOSYS;
+	int pages_to_alloc = (OFFSET(vaddr) + sz)/4096;
+	if((OFFSET(vaddr) + sz) % 4096 != 0)
+		pages_to_alloc++;
+
+	int cur_index = PDI(vaddr);
+	for(int i, j = PTI(vaddr); i < pages_to_alloc; i++, j++){
+
+		if(j > 1024){
+			if(page_table_add(++cur_index, as->page_dir))
+				goto out;
+			j=0;
+		}
+
+		as->page_dir->dir[cur_index]->table[j].valid = 1;
+
+		if(readable == 1){
+			as->page_dir->dir[cur_index]->table[j].read = 1;
+		}else{
+			as->page_dir->dir[cur_index]->table[j].read = 0;
+		}
+
+		if(writeable == 1){
+			as->page_dir->dir[cur_index]->table[j].write = 1;
+		}else{
+			as->page_dir->dir[cur_index]->table[j].write = 0;
+		}
+
+		if(executable == 1){
+			as->page_dir->dir[cur_index]->table[j].execute = 1;
+		}else{
+			as->page_dir->dir[cur_index]->table[j].execute = 0;
+		}
+	}
+
+	return 0;
+
+out:
+	page_dir_destroy(as->page_dir);
+	return -1;
 }
 
 int
@@ -197,7 +245,7 @@ int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
 	/*
-	 * Write this.
+	 * Write this. Define buffer area
 	 */
 
 	(void)as;

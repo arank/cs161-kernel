@@ -6,8 +6,10 @@ struct pte {
 			 busybit: 1,
 			 present: 1,
 			 valid: 1,
-			 permissions: 2,
-			 junk: 7;
+			 read: 1,
+			 write: 1,
+			 execute: 1,
+			 junk: 6;
 };
 
 struct page_table {

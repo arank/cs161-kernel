@@ -3,5 +3,7 @@
 
 void cm_bootstrap(void);
 
+extern struct coremap coremap;
+
 #endif
 
