@@ -237,17 +237,16 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 	/* Initial user-level stack pointer */
 	*stackptr = USERSTACK;
 
-	if(as->page_dir->dir[PDI(stackptr)] == NULL)
-		page_table_add(PDI(stackptr), as->page_dir);
+	if(as->page_dir->dir[PDI(*stackptr)] == NULL)
+		page_table_add(PDI(*stackptr), as->page_dir);
 
-	int cur_index = PDI(stackptr);
-	// TODO pages increasing from here (original stack ptr) should they be decreasing?
-	for(int i = 0, j = PTI(stackptr); i < 17; i++, j++){
+	int cur_index = PDI(*stackptr);
+	for(int i = 0, j = PTI(*stackptr); i < 17; i++, j--){
 
-		if(j > 1024){
+		if(j < 0){
 			if(page_table_add(++cur_index, as->page_dir))
 				return -1;
-			j=0;
+			j=1023;
 		}
 
 		// For last page add redzone
