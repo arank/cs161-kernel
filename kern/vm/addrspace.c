@@ -176,29 +176,23 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 	if(page_table_add(PDI(vaddr), as->page_dir))
 		goto out;
 
-	int pages_to_alloc = (OFFSET(vaddr) + sz)/4096;
-	if((OFFSET(vaddr) + sz) % 4096 != 0)
+	int pages_to_alloc = (OFFSET(vaddr) + sz) / PAGE_SIZE;
+	if((OFFSET(vaddr) + sz) % PAGE_SIZE != 0)
 		pages_to_alloc++;
 
-	int cur_index = PDI(vaddr);
-	for(int i = 0, j = PTI(vaddr); i < pages_to_alloc; i++, j++){
+	int pdi = PDI(vaddr);
+	for(int i = 0, pti = PTI(vaddr); i < pages_to_alloc; i++, pti++){
 
-		if(j > 1024){
-			if(page_table_add(++cur_index, as->page_dir))
+		if(pti == PT_SIZE){
+			if(page_table_add(++pdi, as->page_dir))
 				goto out;
-			j=0;
+			pti = 0;
 		}
 
-		as->page_dir->dir[cur_index]->table[j].valid = 1;
-
-		if(readable == 1)
-			as->page_dir->dir[cur_index]->table[j].read = 1;
-
-		if(writeable == 1)
-			as->page_dir->dir[cur_index]->table[j].write = 1;
-
-		if(executable == 1)
-			as->page_dir->dir[cur_index]->table[j].exec = 1;
+		as->page_dir->dir[pdi]->table[pti].valid = 1;
+        as->page_dir->dir[pdi]->table[pti].read = readable;
+        as->page_dir->dir[pdi]->table[pti].write = writeable;
+        as->page_dir->dir[pdi]->table[pti].exec = executable;
 	}
 
 	return 0;
