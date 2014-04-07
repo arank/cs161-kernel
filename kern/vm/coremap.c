@@ -83,9 +83,10 @@ get_kern_cme_seq(unsigned npages) {
 	// This globally locks to find kernel pages as it simplifies the process, and this function is used sparingly
 	// so it wont cause great slowdown
 	spinlock_acquire(&coremap.lock);
+
 	int index = coremap.last_allocated;
 	unsigned alloced = 0;
-	for(unsigned i = 0; i<2*coremap.size && alloced<npages; i++){
+	for(unsigned i = 0; i<(2*coremap.size) && alloced<npages; i++){
 		index = (index+1) % coremap.size;
 		if(coremap.cm[index].busybit == 1 || coremap.cm[index].kern == 1){
 			alloced = 0;
@@ -93,7 +94,7 @@ get_kern_cme_seq(unsigned npages) {
 		}else if (coremap.cm[index].use == 1){
 			//Only evict on second run through coremap
 			if(i>=coremap.size){
-				// TODO evict
+				// TODO evict and set as not in use
 			}else{
 				alloced = 0;
 				continue;
@@ -107,13 +108,12 @@ get_kern_cme_seq(unsigned npages) {
 		coremap.cm[index].kern = 1;
 		alloced++;
 	}
+	spinlock_release(&coremap.lock);
 
 	if(alloced == npages)
 		return CMI_TO_PADDR(index-alloced+1);
-
-	spinlock_release(&coremap.lock);
-
-	return 0;
+	else
+		return 0;
 
 }
 
