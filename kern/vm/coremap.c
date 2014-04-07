@@ -63,7 +63,7 @@ get_cme_seq(unsigned npages) {
             free_kpages(PADDR_TO_KVADDR(pa));
             return 0;
         } else if (next_pa == pa + PAGE_SIZE) { /* hit */
-            coremap.cm[PADDR_TO_CMI(pa)].seq = 1;
+            coremap.cm[PADDR_TO_CMI(next_pa)].seq = 1;
             count++;
         } else {                /* not contigious */
             free_kpages(PADDR_TO_KVADDR(pa));   /* free initial guess */
@@ -117,21 +117,23 @@ int core_set_free(int index){
 static
 void
 kfree_one_page(unsigned cm_index) {
-    while (core_set_busy(cm_index) != 0);
-	if (coremap.cm[cm_index].use == 0 )
-		panic("free_kpages: freeing a free page\n");
-	if (coremap.cm[cm_index].kern != 1)
-		panic("free_kpages: freeing not a kernel's page\n");
+    while (core_set_busy(cm_index) == 0) {
+        if (coremap.cm[cm_index].use == 0 )
+            panic("free_kpages: freeing a free page\n");
+        if (coremap.cm[cm_index].kern != 1)
+            panic("free_kpages: freeing not a kernel's page\n");
 
-	KASSERT(coremap.cm[cm_index].pid == 0);
-	KASSERT(coremap.cm[cm_index].swap == 0);
-	KASSERT(coremap.cm[cm_index].vpn == 0);
+        KASSERT(coremap.cm[cm_index].pid == 0);
+        KASSERT(coremap.cm[cm_index].swap == 0);
+        KASSERT(coremap.cm[cm_index].vpn == 0);
 
-	/* zero out cme and physical page */
-	memset(&coremap.cm[cm_index], 0, sizeof (struct cme));
-	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
+        /* zero out cme and physical page */
+        memset(&coremap.cm[cm_index], 0, sizeof (struct cme));
+        memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 
-	core_set_free(cm_index);
+        core_set_free(cm_index);
+        break;
+    }
 }
 
 void
@@ -193,7 +195,9 @@ static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 				coremap.cm[index].vpn = vpn;
 				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
                 coremap.cm[index].kern = (is_kern) ? 1 : 0;
-				core_set_free(index);
+                spinlock_acquire(&coremap.lock);
+                coremap.last_allocated = index;
+                spinlock_release(&coremap.lock);
 				return CMI_TO_PADDR(index);
 			}
 			core_set_free(index);

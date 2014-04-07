@@ -108,7 +108,8 @@ as_destroy(struct addrspace *as)
 
 					// TODO should I clean the cme more?
 					coremap.cm[cm_index].use = 0;
-
+                    coremap.cm[cm_index].seq = 0;
+                    coremap.cm[cm_index].slen = 0;
 					// set all of page to zero
 					memset((void*)CMI_TO_PADDR(cm_index), 0, (size_t)4096);
 
@@ -173,7 +174,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		 int readable, int writeable, int executable)
 {
 	// Calculate offset into dir, and define new table, set the addr to valid, plus the offset.
-	if(page_table_add(PDI(vaddr), as->page_dir))
+	if(page_table_add(PDI(vaddr), as->page_dir) == ENOMEM)
 		goto out;
 
 	int pages_to_alloc = (OFFSET(vaddr) + sz) / PAGE_SIZE;

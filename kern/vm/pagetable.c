@@ -40,7 +40,7 @@ int page_table_add(int index, struct page_dir* pd){
 		goto cv_out;
 
 	// Null all entries in page table
-	for(int i; i < PT_SIZE; i++)
+	for(int i = 0; i < PT_SIZE; i++)
 		pd->dir[index]->table[i].valid = 0;
 
 	return 0;
