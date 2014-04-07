@@ -181,7 +181,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		pages_to_alloc++;
 
 	int cur_index = PDI(vaddr);
-	for(int i, j = PTI(vaddr); i < pages_to_alloc; i++, j++){
+	for(int i = 0, j = PTI(vaddr); i < pages_to_alloc; i++, j++){
 
 		if(j > 1024){
 			if(page_table_add(++cur_index, as->page_dir))
@@ -191,23 +191,14 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 
 		as->page_dir->dir[cur_index]->table[j].valid = 1;
 
-		if(readable == 1){
+		if(readable == 1)
 			as->page_dir->dir[cur_index]->table[j].read = 1;
-		}else{
-			as->page_dir->dir[cur_index]->table[j].read = 0;
-		}
 
-		if(writeable == 1){
+		if(writeable == 1)
 			as->page_dir->dir[cur_index]->table[j].write = 1;
-		}else{
-			as->page_dir->dir[cur_index]->table[j].write = 0;
-		}
 
-		if(executable == 1){
+		if(executable == 1)
 			as->page_dir->dir[cur_index]->table[j].exec = 1;
-		}else{
-			as->page_dir->dir[cur_index]->table[j].exec = 0;
-		}
 	}
 
 	return 0;
@@ -242,10 +233,38 @@ as_complete_load(struct addrspace *as)
 int
 as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
-	(void)as;
 
 	/* Initial user-level stack pointer */
 	*stackptr = USERSTACK;
+
+	if(as->page_dir->dir[PDI(stackptr)] == NULL)
+		page_table_add(PDI(stackptr), as->page_dir);
+
+	int cur_index = PDI(stackptr);
+	// TODO pages increasing from here (original stack ptr) should they be decreasing?
+	for(int i = 0, j = PTI(stackptr); i < 17; i++, j++){
+
+		if(j > 1024){
+			if(page_table_add(++cur_index, as->page_dir))
+				return -1;
+			j=0;
+		}
+
+		// For last page add redzone
+		// TODO redzone check be here?
+		if(i == 17){
+			as->page_dir->dir[cur_index]->table[j].valid = 0;
+			as->page_dir->dir[cur_index]->table[j].read = 0;
+			as->page_dir->dir[cur_index]->table[j].write = 0;
+			as->page_dir->dir[cur_index]->table[j].exec = 0;
+		}else{
+			as->page_dir->dir[cur_index]->table[j].valid = 1;
+			as->page_dir->dir[cur_index]->table[j].read = 1;
+			as->page_dir->dir[cur_index]->table[j].write = 1;
+			// TODO should exec be 1 for this?
+			as->page_dir->dir[cur_index]->table[j].exec = 1;
+		}
+	}
 
 	return 0;
 }
