@@ -45,38 +45,39 @@ vm_bootstrap(void)
     cm_bootstrap();
 }
 
-//static
-//paddr_t
-//get_cme_seq(unsigned npages) {
-//
-//    paddr_t pa, next_pa;
-//
-//    pa = get_free_cme((vaddr_t)0, true);
-//    if (pa == 0) return 0;
-//    coremap.cm[PADDR_TO_CMI(pa)].slen = npages;
-//    coremap.cm[PADDR_TO_CMI(pa)].seq = 0;
-//    unsigned count = 1; /* initial count set to 1, because we got one cme */
-//
-//    // TODO change to garuntee continuity
-//    while (count != npages) {
-//        next_pa = get_free_cme((vaddr_t)0, true);
-//        if (next_pa == 0) {    /* out of free pages */
-//            free_kpages(PADDR_TO_KVADDR(pa));
-//            return 0;
-//        } else if (next_pa == pa + PAGE_SIZE) { /* hit */
-//            coremap.cm[PADDR_TO_CMI(next_pa)].seq = 1;
-//            count++;
-//        } else {                /* not contigious */
-//            free_kpages(PADDR_TO_KVADDR(pa));   /* free initial guess */
-//            pa = next_pa;                       /* set next_pa to guess */
-//            coremap.cm[PADDR_TO_CMI(pa)].slen = npages;    /* set the length */
-//            coremap.cm[PADDR_TO_CMI(pa)].seq = 0;         /* first page in seq */
-//            count = 1;                          /* we have the first page */
-//        }
-//    }
-//
-//    return pa;
-//}
+static
+paddr_t
+get_cme_seq(unsigned npages) {
+
+    paddr_t pa, next_pa;
+
+    pa = get_free_cme((vaddr_t)0, true);
+    if (pa == 0) return 0;
+    coremap.cm[PADDR_TO_CMI(pa)].slen = npages;
+    coremap.cm[PADDR_TO_CMI(pa)].seq = 0;
+    unsigned count = 1; /* initial count set to 1, because we got one cme */
+
+    // TODO change to garuntee continuity
+    while (count != npages) {
+        next_pa = get_free_cme((vaddr_t)0, true);
+        if (next_pa == 0) {    /* out of free pages */
+            free_kpages(PADDR_TO_KVADDR(pa));
+            return 0;
+        } else if (next_pa == pa + PAGE_SIZE) { /* hit */
+            coremap.cm[PADDR_TO_CMI(next_pa)].seq = 1;
+            count++;
+        } else {                /* not contigious */
+            free_kpages(PADDR_TO_KVADDR(pa));   /* free initial guess */
+            pa = next_pa;                       /* set next_pa to guess */
+            coremap.cm[PADDR_TO_CMI(pa)].slen = npages;    /* set the length */
+            coremap.cm[PADDR_TO_CMI(pa)].seq = 0;         /* first page in seq */
+            count = 1;                          /* we have the first page */
+        }
+    }
+
+    return pa;
+}
+
 static
 paddr_t
 get_kern_cme_seq(unsigned npages) {
@@ -123,7 +124,7 @@ get_kern_cme_seq(unsigned npages) {
 vaddr_t
 alloc_kpages(int npages)
 {
-	paddr_t pa = get_kern_cme_seq(npages); //get_free_cme((vaddr_t)0, true);
+	paddr_t pa = get_cme_seq(npages); //get_free_cme((vaddr_t)0, true);
 	if (pa == 0) return 0;
 	return PADDR_TO_KVADDR(pa);
 }
@@ -214,6 +215,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 {
 	(void)ts;
 	(void)get_free_cme;
+	(void)get_kern_cme_seq;
 }
 
 int
