@@ -45,43 +45,83 @@ vm_bootstrap(void)
     cm_bootstrap();
 }
 
+//static
+//paddr_t
+//get_cme_seq(unsigned npages) {
+//
+//    paddr_t pa, next_pa;
+//
+//    pa = get_free_cme((vaddr_t)0, true);
+//    if (pa == 0) return 0;
+//    coremap.cm[PADDR_TO_CMI(pa)].slen = npages;
+//    coremap.cm[PADDR_TO_CMI(pa)].seq = 0;
+//    unsigned count = 1; /* initial count set to 1, because we got one cme */
+//
+//    // TODO change to garuntee continuity
+//    while (count != npages) {
+//        next_pa = get_free_cme((vaddr_t)0, true);
+//        if (next_pa == 0) {    /* out of free pages */
+//            free_kpages(PADDR_TO_KVADDR(pa));
+//            return 0;
+//        } else if (next_pa == pa + PAGE_SIZE) { /* hit */
+//            coremap.cm[PADDR_TO_CMI(next_pa)].seq = 1;
+//            count++;
+//        } else {                /* not contigious */
+//            free_kpages(PADDR_TO_KVADDR(pa));   /* free initial guess */
+//            pa = next_pa;                       /* set next_pa to guess */
+//            coremap.cm[PADDR_TO_CMI(pa)].slen = npages;    /* set the length */
+//            coremap.cm[PADDR_TO_CMI(pa)].seq = 0;         /* first page in seq */
+//            count = 1;                          /* we have the first page */
+//        }
+//    }
+//
+//    return pa;
+//}
 static
 paddr_t
-get_cme_seq(unsigned npages) {
+get_kern_cme_seq(unsigned npages) {
+	// This globally locks to find kernel pages as it simplifies the process, and this function is used sparingly
+	// so it wont cause great slowdown
+	spinlock_acquire(&coremap.lock);
+	int index = coremap.last_allocated;
+	unsigned alloced = 0;
+	for(unsigned i = 0; i<2*coremap.size && alloced<npages; i++){
+		index = (index+1) % coremap.size;
+		if(coremap.cm[index].busybit == 1 || coremap.cm[index].kern == 1){
+			alloced = 0;
+			continue;
+		}else if (coremap.cm[index].use == 1){
+			//Only evict on second run through coremap
+			if(i>=coremap.size){
+				// TODO evict
+			}else{
+				alloced = 0;
+				continue;
+			}
+		}
 
-    paddr_t pa, next_pa;
+		// We are garunteed a clean cme here
+		coremap.cm[index].use = 1;
+		coremap.cm[index].vpn = 0;
+		coremap.cm[index].pid = 0;
+		coremap.cm[index].kern = 1;
+		alloced++;
+	}
 
-    pa = get_free_cme((vaddr_t)0, true);
-    if (pa == 0) return 0;
-    coremap.cm[PADDR_TO_CMI(pa)].slen = npages;
-    coremap.cm[PADDR_TO_CMI(pa)].seq = 0;
-    unsigned count = 1; /* initial count set to 1, because we got one cme */
+	if(alloced == npages)
+		return CMI_TO_PADDR(index-alloced+1);
 
-    while (count != npages) {
-        next_pa = get_free_cme((vaddr_t)0, true);
-        if (next_pa == 0) {    /* out of free pages */
-            free_kpages(PADDR_TO_KVADDR(pa));
-            return 0;
-        } else if (next_pa == pa + PAGE_SIZE) { /* hit */
-            coremap.cm[PADDR_TO_CMI(pa)].seq = 1;
-            count++;
-        } else {                /* not contigious */
-            free_kpages(PADDR_TO_KVADDR(pa));   /* free initial guess */
-            pa = next_pa;                       /* set next_pa to guess */
-            coremap.cm[PADDR_TO_CMI(pa)].slen = npages;    /* set the length */
-            coremap.cm[PADDR_TO_CMI(pa)].seq = 0;         /* first page in seq */
-            count = 1;                          /* we have the first page */
-        }
-    }
+	spinlock_release(&coremap.lock);
 
-    return pa;
+	return 0;
+
 }
 
 /* Allocate/free some kernel-space virtual pages */
 vaddr_t
 alloc_kpages(int npages)
 {
-	paddr_t pa = get_cme_seq(npages); //get_free_cme((vaddr_t)0, true);
+	paddr_t pa = get_kern_cme_seq(npages); //get_free_cme((vaddr_t)0, true);
 	if (pa == 0) return 0;
 	return PADDR_TO_KVADDR(pa);
 }
@@ -117,7 +157,7 @@ int core_set_free(int index){
 static
 void
 kfree_one_page(unsigned cm_index) {
-    while (core_set_busy(cm_index) != 0);
+    while (core_set_busy(cm_index));
 	if (coremap.cm[cm_index].use == 0 )
 		panic("free_kpages: freeing a free page\n");
 	if (coremap.cm[cm_index].kern != 1)
@@ -141,11 +181,12 @@ free_kpages(vaddr_t addr)
     KASSERT (pa % PAGE_SIZE == 0);  /* don't believe s/w you didn't wrote */
     unsigned cm_index = PADDR_TO_CMI(pa);
 
-	spinlock_acquire(&coremap.lock);
+    // This is okay because we never hold a page here
+	while(core_set_busy(cm_index));
     unsigned slen = coremap.cm[cm_index].slen;
     /* check that we're given the page returned by kalloc_pages */
     KASSERT(coremap.cm[cm_index].seq == 0);
-	spinlock_release(&coremap.lock);
+    core_set_free(cm_index);
 
     for (unsigned i = 0; i < slen; i++) /* can be reimplemeted using only seq bit */
         kfree_one_page(cm_index + i);
@@ -168,6 +209,7 @@ void
 vm_tlbshootdown(const struct tlbshootdown *ts)
 {
 	(void)ts;
+	(void)get_free_cme;
 }
 
 int
@@ -178,6 +220,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
     return 0;
 }
 
+// Returns with busy bit set on the entry
 static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 
 	spinlock_acquire(&coremap.lock);
@@ -193,8 +236,10 @@ static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 				coremap.cm[index].vpn = vpn;
 				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
                 coremap.cm[index].kern = (is_kern) ? 1 : 0;
-				core_set_free(index);
-				return CMI_TO_PADDR(index);
+                spinlock_acquire(&coremap.lock);
+                coremap.last_allocated = index;
+                spinlock_release(&coremap.lock);
+                return CMI_TO_PADDR(index);
 			}
 			core_set_free(index);
 			// TODO add eviction later
@@ -203,4 +248,6 @@ static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 
     return 0;
 }
+
+
 
