@@ -108,13 +108,15 @@ get_kern_cme_seq(unsigned npages) {
 		coremap.cm[index].kern = 1;
 		alloced++;
 	}
-	spinlock_release(&coremap.lock);
 
-	if(alloced == npages)
+	if(alloced == npages){
+		coremap.last_allocated = index;
+		spinlock_release(&coremap.lock);
 		return CMI_TO_PADDR(index-alloced+1);
-	else
+	}else{
+		spinlock_release(&coremap.lock);
 		return 0;
-
+	}
 }
 
 /* Allocate/free some kernel-space virtual pages */
