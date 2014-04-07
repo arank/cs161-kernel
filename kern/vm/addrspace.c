@@ -250,9 +250,8 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 		}
 
 		// For last page add redzone
-		// TODO redzone check be here?
 		if(i == 17){
-			as->page_dir->dir[cur_index]->table[j].valid = 0;
+			as->page_dir->dir[cur_index]->table[j].valid = 1;
 			as->page_dir->dir[cur_index]->table[j].read = 0;
 			as->page_dir->dir[cur_index]->table[j].write = 0;
 			as->page_dir->dir[cur_index]->table[j].exec = 0;
