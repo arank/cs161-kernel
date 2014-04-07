@@ -223,7 +223,7 @@ int
 as_complete_load(struct addrspace *as)
 {
 	/*
-	 * red zone definition so that sbrk cannot set it to valid
+	 * red zone already defined with the stack
 	 */
 
 	(void)as;
@@ -250,7 +250,7 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 		}
 
 		// For last page add redzone
-		if(i == 17){
+		if(i == 16){
 			as->page_dir->dir[cur_index]->table[j].valid = 1;
 			as->page_dir->dir[cur_index]->table[j].read = 0;
 			as->page_dir->dir[cur_index]->table[j].write = 0;
