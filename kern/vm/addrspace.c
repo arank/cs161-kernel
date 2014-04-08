@@ -93,11 +93,12 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				return ENOMEM;
 			for(int j=0; j<PT_SIZE; j++){
 				page_set_busy(old->page_dir->dir[i], j, true);
+
+				// Copy everything but the location of the physical page
 				newas->page_dir->dir[i]->table[j].valid = old->page_dir->dir[i]->table[j].valid;
 				newas->page_dir->dir[i]->table[j].read = old->page_dir->dir[i]->table[j].read;
 				newas->page_dir->dir[i]->table[j].write = old->page_dir->dir[i]->table[j].write;
 				newas->page_dir->dir[i]->table[j].exec = old->page_dir->dir[i]->table[j].exec;
-				// Even copy junk as we may use that later
 				newas->page_dir->dir[i]->table[j].junk = old->page_dir->dir[i]->table[j].junk;
 
 				// Allocate space to copy over page

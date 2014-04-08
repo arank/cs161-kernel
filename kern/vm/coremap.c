@@ -136,6 +136,7 @@ int core_set_busy(int index, bool wait) {
 	}else if(wait){
 		// At this point busy wait for the bit to be open by sleeping till its available
 		while(coremap.cm[index].busybit == 1){
+			// TODO Ask david if this is ok
 			thread_yield();
 		}
 		coremap.cm[index].busybit = 1;
