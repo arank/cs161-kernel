@@ -155,8 +155,15 @@ get_kern_cme_seq(unsigned npages) {
 vaddr_t
 alloc_kpages(int npages)
 {
-	paddr_t pa = get_cme_seq(npages); //get_free_cme((vaddr_t)0, true);
-	if (pa == 0) return 0;
+	paddr_t pa;
+	if(npages==1)
+		pa = get_free_cme((vaddr_t)0, true);
+	else
+		pa = get_cme_seq(npages);
+
+	if (pa == 0)
+		return 0;
+
 	return PADDR_TO_KVADDR(pa);
 }
 
@@ -208,8 +215,15 @@ kfree_one_page(unsigned cm_index) {
 	KASSERT(coremap.cm[cm_index].swap == 0);
 	KASSERT(coremap.cm[cm_index].vpn == 0);
 
-	/* zero out cme and physical page */
-	memset(&coremap.cm[cm_index], 0, sizeof (struct cme));
+	coremap.cm[cm_index].dirty = 0;
+	coremap.cm[cm_index].kern = 0;
+	coremap.cm[cm_index].use = 0;
+	coremap.cm[cm_index].slen = 0;
+	coremap.cm[cm_index].seq = 0;
+	coremap.cm[cm_index].junk = 0;
+	coremap.cm[cm_index].ref = 0;
+
+	/* zero out physical page */
 	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 
 	core_set_free(cm_index);
