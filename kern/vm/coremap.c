@@ -187,11 +187,15 @@ free_kpages(vaddr_t addr)
     unsigned cm_index = PADDR_TO_CMI(pa);
 
     // This is okay because we never hold a page here
-	while(core_set_busy(cm_index));
-    unsigned slen = coremap.cm[cm_index].slen;
-    /* check that we're given the page returned by kalloc_pages */
-    KASSERT(coremap.cm[cm_index].seq == 0);
-    core_set_free(cm_index);
+
+    unsigned slen;
+	while(core_set_busy(cm_index) != 1) {
+        slen = coremap.cm[cm_index].slen;
+        /* check that we're given the page returned by kalloc_pages */
+        KASSERT(coremap.cm[cm_index].seq == 0);
+        core_set_free(cm_index);
+        break;
+    }
 
     for (unsigned i = 0; i < slen; i++) /* can be reimplemeted using only seq bit */
         kfree_one_page(cm_index + i);

@@ -68,27 +68,27 @@ int sys_execv(const_userptr_t program, const_userptr_t *args){
     err = copyinstr(program, kprogram, sizeof kprogram, NULL);
     if (err != 0) goto out;
     if (strlen(kprogram) == 0) {
-        err = EISDIR; 
+        err = EISDIR;
         goto out;
     }
 
     // check argument list ptr
     userptr_t ptr;
-    if (copyin((const_userptr_t)args, &ptr, sizeof(userptr_t))) { 
+    if (copyin((const_userptr_t)args, &ptr, sizeof(userptr_t))) {
         err = EFAULT;
         goto out;
     }
 
     // check actual pointers to arguments
     while(args[argc] != NULL) {
-        if (copyin((const_userptr_t)args[argc], &ptr, sizeof(userptr_t))) {     
+        if (copyin((const_userptr_t)args[argc], &ptr, sizeof(userptr_t))) {
             err = EFAULT;
             goto out;
-        }                                  
-        argc++;                                              
-    } 
+        }
+        argc++;
+    }
 
-    
+
     // Declare and nullify the argument array
     char **kargs = kmalloc((argc+1) * sizeof(char*));
     if(kargs == NULL) goto out;

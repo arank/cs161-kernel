@@ -89,7 +89,7 @@ proc_create(const char *name)
 	spinlock_init(&proc->p_lock);
 
 	/* VM fields */
-	proc->p_addrspace = as_create();
+	proc->p_addrspace = NULL;
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
