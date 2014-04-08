@@ -185,7 +185,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 	for(int i = 0, pti = PTI(vaddr); i < pages_to_alloc; i++, pti++){
 
 		if(pti == PT_SIZE){
-			if(page_table_add(++pdi, as->page_dir))
+			if(page_table_add(++pdi, as->page_dir) == ENOMEM)
 				goto out;
 			pti = 0;
 		}
