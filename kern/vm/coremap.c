@@ -129,14 +129,20 @@ alloc_kpages(int npages)
 	return PADDR_TO_KVADDR(pa);
 }
 
-// We don't give the option to retry as that would
-// involve sleeping which could lead to livelock
-int core_set_busy(int index) {
+// We give the option to retry but use with care as it could lead to livelock
+int core_set_busy(int index, bool wait) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0) {
 		coremap.cm[index].busybit = 1;
 		spinlock_release(&coremap.lock);
-	} else {
+	}else if(wait){
+		// At this point busy wait for the bit to be open by sleeping till its available
+		while(coremap.cm[index].busybit == 1){
+			thread_yield();
+		}
+		coremap.cm[index].busybit = 1;
+		spinlock_release(&coremap.lock);
+	}else{
 		spinlock_release(&coremap.lock);
 		return 1;
 	}
@@ -160,23 +166,21 @@ int core_set_free(int index){
 static
 void
 kfree_one_page(unsigned cm_index) {
-    while (core_set_busy(cm_index) == 0) {
-        if (coremap.cm[cm_index].use == 0 )
-            panic("free_kpages: freeing a free page\n");
-        if (coremap.cm[cm_index].kern != 1)
-            panic("free_kpages: freeing not a kernel's page\n");
+	core_set_busy(cm_index, true);
+	if (coremap.cm[cm_index].use == 0 )
+		panic("free_kpages: freeing a free page\n");
+	if (coremap.cm[cm_index].kern != 1)
+		panic("free_kpages: freeing not a kernel's page\n");
 
-        KASSERT(coremap.cm[cm_index].pid == 0);
-        KASSERT(coremap.cm[cm_index].swap == 0);
-        KASSERT(coremap.cm[cm_index].vpn == 0);
+	KASSERT(coremap.cm[cm_index].pid == 0);
+	KASSERT(coremap.cm[cm_index].swap == 0);
+	KASSERT(coremap.cm[cm_index].vpn == 0);
 
-        /* zero out cme and physical page */
-        memset(&coremap.cm[cm_index], 0, sizeof (struct cme));
-        memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
+	/* zero out cme and physical page */
+	memset(&coremap.cm[cm_index], 0, sizeof (struct cme));
+	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 
-        core_set_free(cm_index);
-        break;
-    }
+	core_set_free(cm_index);
 }
 
 void
@@ -187,7 +191,7 @@ free_kpages(vaddr_t addr)
     unsigned cm_index = PADDR_TO_CMI(pa);
 
     // This is okay because we never hold a page here
-	while(core_set_busy(cm_index));
+	core_set_busy(cm_index, true);
     unsigned slen = coremap.cm[cm_index].slen;
     /* check that we're given the page returned by kalloc_pages */
     KASSERT(coremap.cm[cm_index].seq == 0);
@@ -235,7 +239,8 @@ static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 
 	for(unsigned i = 0; i < coremap.size; i++){
 		index = (index+1) % coremap.size;
-		if(core_set_busy(index) == 0){
+		// doesn't wait
+		if(core_set_busy(index, false) == 0){
 			// Check if in use
 			if (coremap.cm[index].use == 0) {
 				coremap.cm[index].use = 1;

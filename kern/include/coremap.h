@@ -3,7 +3,7 @@
 
 void cm_bootstrap(void);
 
-int core_set_busy(int index);
+int core_set_busy(int index, bool wait);
 
 int core_set_free(int index);
 

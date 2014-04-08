@@ -104,7 +104,7 @@ as_destroy(struct addrspace *as)
 				if(as->page_dir->dir[i]->table[j].present == 1){
 					int cm_index = (int)as->page_dir->dir[i]->table[j].ppn;
 					// busily wait to get lock on memory
-					while (core_set_busy(cm_index) != 0);
+					core_set_busy(cm_index, true);
 
 					// TODO should I clean the cme more?
 					coremap.cm[cm_index].use = 0;
@@ -254,7 +254,6 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 			as->page_dir->dir[cur_index]->table[j].valid = 1;
 			as->page_dir->dir[cur_index]->table[j].read = 1;
 			as->page_dir->dir[cur_index]->table[j].write = 1;
-			// TODO should exec be 1 for this?
 			as->page_dir->dir[cur_index]->table[j].exec = 1;
 		}
 	}
