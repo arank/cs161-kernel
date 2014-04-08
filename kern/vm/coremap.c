@@ -43,6 +43,38 @@ vm_bootstrap(void)
     cm_bootstrap();
 }
 
+// Returns with busy bit set on the entry
+paddr_t
+get_free_cme(vaddr_t vpn, bool is_kern) {
+
+	spinlock_acquire(&coremap.lock);
+	int index = coremap.last_allocated;
+	spinlock_release(&coremap.lock);
+
+	for(unsigned i = 0; i < coremap.size; i++){
+		index = (index+1) % coremap.size;
+		if(core_set_busy(index, true) == 0){
+			// Check if in use
+			if (coremap.cm[index].use == 0) {
+				coremap.cm[index].use = 1;
+				coremap.cm[index].vpn = vpn;
+				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
+                coremap.cm[index].kern = (is_kern) ? 1 : 0;
+
+                spinlock_acquire(&coremap.lock);
+                coremap.last_allocated = index;
+                spinlock_release(&coremap.lock);
+
+				return CMI_TO_PADDR(index);
+			}
+			core_set_free(index);
+			// TODO add eviction later
+		}
+	}
+
+    return 0;
+}
+
 static
 paddr_t
 get_cme_seq(unsigned npages) {
@@ -76,6 +108,7 @@ get_cme_seq(unsigned npages) {
     return pa;
 }
 
+/*
 static
 paddr_t
 get_kern_cme_seq(unsigned npages) {
@@ -117,7 +150,7 @@ get_kern_cme_seq(unsigned npages) {
 		return 0;
 	}
 }
-
+*/
 /* Allocate/free some kernel-space virtual pages */
 vaddr_t
 alloc_kpages(int npages)
@@ -218,7 +251,6 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 {
 	(void)ts;
 	(void)get_free_cme;
-	(void)get_kern_cme_seq;
 }
 
 int
@@ -228,34 +260,3 @@ vm_fault(int faulttype, vaddr_t faultaddress)
     (void)faultaddress;
     return 0;
 }
-
-// Returns with busy bit set on the entry
-paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
-
-	spinlock_acquire(&coremap.lock);
-	int index = coremap.last_allocated;
-	spinlock_release(&coremap.lock);
-
-	for(unsigned i = 0; i < coremap.size; i++){
-		index = (index+1) % coremap.size;
-		// doesn't wait
-		if(core_set_busy(index, false) == 0){
-			// Check if in use
-			if (coremap.cm[index].use == 0) {
-				coremap.cm[index].use = 1;
-				coremap.cm[index].vpn = vpn;
-				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
-                coremap.cm[index].kern = (is_kern) ? 1 : 0;
-                spinlock_acquire(&coremap.lock);
-                coremap.last_allocated = index;
-                spinlock_release(&coremap.lock);
-				return CMI_TO_PADDR(index);
-			}
-			core_set_free(index);
-			// TODO add eviction later
-		}
-	}
-
-    return 0;
-}
-

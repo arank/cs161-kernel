@@ -220,4 +220,6 @@ vnode_check(struct vnode *v, const char *opstr)
 	}
 
 	spinlock_release(&v->vn_countlock);
+
+    return;
 }
