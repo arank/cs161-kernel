@@ -12,8 +12,6 @@
 #include <addrspace.h>
 #define DUMBVM_STACKPAGES    18
 
-static paddr_t get_free_cme(vaddr_t vpn, bool kern);
-
 void cm_bootstrap(void) {
     paddr_t lo;
     paddr_t hi;
@@ -231,7 +229,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 }
 
 // Returns with busy bit set on the entry
-static paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
+paddr_t get_free_cme(vaddr_t vpn, bool is_kern) {
 
 	spinlock_acquire(&coremap.lock);
 	int index = coremap.last_allocated;

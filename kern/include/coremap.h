@@ -7,6 +7,8 @@ int core_set_busy(int index, bool wait);
 
 int core_set_free(int index);
 
+paddr_t get_free_cme(vaddr_t vpn, bool kern);
+
 struct cme {
     uint32_t vpn:       20,
              pid:       9,
