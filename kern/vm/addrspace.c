@@ -80,11 +80,47 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 		return ENOMEM;
 	}
 
-	/*
-	 * Write this.
-	 */
+	// TODO do we need a lock on this function?
+	lock_acquire(old->lock);
 
-	(void)old;
+	newas->page_dir = page_dir_init();
+		if(newas->page_dir == NULL)
+			return ENOMEM;
+
+	for(int i=0; i<PD_SIZE; i++){
+		if(old->page_dir->dir[i]!=NULL){
+			if (page_table_add(i, newas->page_dir) == ENOMEM)
+				return ENOMEM;
+			for(int j=0; j<PT_SIZE; j++){
+				page_set_busy(old->page_dir->dir[i], j, true);
+				newas->page_dir->dir[i]->table[j].valid = old->page_dir->dir[i]->table[j].valid;
+				newas->page_dir->dir[i]->table[j].read = old->page_dir->dir[i]->table[j].read;
+				newas->page_dir->dir[i]->table[j].write = old->page_dir->dir[i]->table[j].write;
+				newas->page_dir->dir[i]->table[j].exec = old->page_dir->dir[i]->table[j].exec;
+				// Even copy junk as we may use that later
+				newas->page_dir->dir[i]->table[j].junk = old->page_dir->dir[i]->table[j].junk;
+
+				// Allocate space to copy over page
+				paddr_t free = get_free_cme(((i<<22) + (j<<12)), false);
+				newas->page_dir->dir[i]->table[j].present = 1;
+				newas->page_dir->dir[i]->table[j].ppn = free;
+
+				// Copy over page from old addr space
+				if(old->page_dir->dir[i]->table[j].present == 1){
+					paddr_t ppn = old->page_dir->dir[i]->table[j].ppn;
+					memcpy((void*)free, (void*)ppn, PAGE_SIZE);
+				}else{
+					// TODO page on disk, handle copying this later
+					// TODO this may be some hairy synch
+				}
+
+				core_set_free(PADDR_TO_CMI(free));
+				page_set_free(old->page_dir->dir[i], j);
+			}
+		}
+	}
+
+	lock_release(old->lock);
 
 	*ret = newas;
 	return 0;
@@ -104,7 +140,7 @@ as_destroy(struct addrspace *as)
 				if(as->page_dir->dir[i]->table[j].present == 1){
 					int cm_index = (int)as->page_dir->dir[i]->table[j].ppn;
 					// busily wait to get lock on memory
-					while (core_set_busy(cm_index) != 0);
+					core_set_busy(cm_index, true);
 
 					// TODO should I clean the cme more?
 					coremap.cm[cm_index].use = 0;
@@ -254,7 +290,6 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 			as->page_dir->dir[cur_index]->table[j].valid = 1;
 			as->page_dir->dir[cur_index]->table[j].read = 1;
 			as->page_dir->dir[cur_index]->table[j].write = 1;
-			// TODO should exec be 1 for this?
 			as->page_dir->dir[cur_index]->table[j].exec = 1;
 		}
 	}

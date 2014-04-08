@@ -3,9 +3,11 @@
 
 void cm_bootstrap(void);
 
-int core_set_busy(int index);
+int core_set_busy(int index, bool wait);
 
 int core_set_free(int index);
+
+paddr_t get_free_cme(vaddr_t vpn, bool kern);
 
 struct cme {
     uint32_t vpn:       20,
