@@ -196,7 +196,7 @@ cpu_create(unsigned hardware_number)
 	//threadlist_init(&c->c_runqueue);
     for (int i = 0; i < MAX_PRIORITY; i++)
 	    threadlist_init(&c->c_mlfq.mlfq[i]);
-        
+
 	spinlock_init(&c->c_runqueue_lock);
 
 	c->c_ipi_pending = 0;
@@ -867,7 +867,7 @@ reset_priorities(void) {
         struct thread *th = mlfq_remtail(&curcpu->c_mlfq);
         th->t_priority = 0;
         mlfq_add(&curcpu->c_mlfq, th);
-    } 
+    }
 }
 
 /*
