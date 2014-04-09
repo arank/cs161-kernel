@@ -110,7 +110,8 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 					paddr_t ppn = old->page_dir->dir[i]->table[j].ppn;
 					memcpy((void*)free, (void*)ppn, PAGE_SIZE);
 				}else{
-					// TODO page on disk, handle copying this later
+					// TODO page on disk, use copy function to pull page into dedicated swap space
+					// TODO copy out of dedicated swap space to free cme & fill in corresponding data
 					// TODO this may be some hairy synch
 				}
 
@@ -142,21 +143,32 @@ as_destroy(struct addrspace *as)
 					// busily wait to get lock on memory
 					core_set_busy(cm_index, true);
 
-					// TODO should I clean the cme more?
-					coremap.cm[cm_index].use = 0;
-                    coremap.cm[cm_index].seq = 0;
-                    coremap.cm[cm_index].slen = 0;
+					KASSERT(coremap.cm[cm_index].kern == 0);
+					set_use_bit(cm_index, 0);
+					coremap.cm[cm_index].dirty = 0;
+					coremap.cm[cm_index].slen = 0;
+					coremap.cm[cm_index].seq = 0;
+					coremap.cm[cm_index].junk = 0;
+					coremap.cm[cm_index].ref = 0;
+					coremap.cm[cm_index].pid = 0;
+					coremap.cm[cm_index].vpn = 0;
+
+					if(coremap.cm[cm_index].swap!=0){
+						// TODO clean data off disk (this is post cleaning deamon - pre eviction)
+
+						coremap.cm[cm_index].swap = 0;
+					}
+
 					// set all of page to zero
 					memset((void*)CMI_TO_PADDR(cm_index), 0, (size_t)4096);
 
 					core_set_free(cm_index);
 				}else{
-					// TODO page on disk, handle deleting this later
+					// TODO page solely on disk, just clean off disk
 					// TODO this may be some hairy synch
 				}
 
 				as->page_dir->dir[i]->table[j].valid = 0;
-
 				page_set_free(as->page_dir->dir[i], j);
 
 			}
@@ -242,6 +254,10 @@ out:
 int
 as_prepare_load(struct addrspace *as)
 {
+	/*
+	 * None
+	 */
+
 	(void)as;
 	return 0;
 }
@@ -249,6 +265,10 @@ as_prepare_load(struct addrspace *as)
 int
 as_complete_load(struct addrspace *as)
 {
+	/*
+	 * None
+	 */
+
 	(void)as;
 	return 0;
 }
