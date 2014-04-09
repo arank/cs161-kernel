@@ -10,7 +10,6 @@
 #include <kern/errno.h>
 #include <spl.h>
 #include <addrspace.h>
-#define DUMBVM_STACKPAGES    18
 
 void cm_bootstrap(void) {
     paddr_t lo;
@@ -91,6 +90,7 @@ get_cme_seq(unsigned npages) {
     while (count != npages) {
         next_pa = get_free_cme((vaddr_t)0, true);
         if (next_pa == 0) {    /* out of free pages */
+            // TODO: do we need to core_set_free() here?
             free_kpages(PADDR_TO_KVADDR(pa));
             return 0;
         } else if (next_pa == pa + PAGE_SIZE) { /* hit */
@@ -102,7 +102,7 @@ get_cme_seq(unsigned npages) {
             free_kpages(PADDR_TO_KVADDR(pa));   /* free initial guess */
             pa = next_pa;                       /* set next_pa to guess */
             coremap.cm[PADDR_TO_CMI(pa)].slen = npages;    /* set the length */
-            coremap.cm[PADDR_TO_CMI(pa)].seq = 0;         /* first page in seq */
+            coremap.cm[PADDR_TO_CMI(pa)].seq = 0;   /* first page in seq for assert when freeing */
             count = 1;                          /* we have the first page */
         }
     }
@@ -179,10 +179,12 @@ int core_set_busy(int index, bool wait) {
 		coremap.cm[index].busybit = 1;
 		spinlock_release(&coremap.lock);
 	}else if(wait){
-		// At this point busy wait for the bit to be open by sleeping till its available
+		// At this point busy wait for the bit to be open by sleeping till it's available
 		while(coremap.cm[index].busybit == 1){
 			// TODO Ask david if this is ok
+            spinlock_release(&coremap.lock);
 			thread_yield();
+            spinlock_acquire(&coremap.lock);
 		}
 		coremap.cm[index].busybit = 1;
 		spinlock_release(&coremap.lock);
