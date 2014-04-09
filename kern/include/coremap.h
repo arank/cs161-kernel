@@ -9,6 +9,8 @@ int core_set_free(int index);
 
 paddr_t get_free_cme(vaddr_t vpn, bool kern);
 
+int stat_coremap(int nargs, char **args);
+
 struct cme {
     uint32_t vpn:       20,
              pid:       9,
@@ -28,13 +30,13 @@ struct coremap {
     unsigned free;
     unsigned modified;
 
-    /* additional statics Daniel suggested to track, I'll init them all tonight
     unsigned kernel;
-    unsigned user;
+    //unsigned user;
     unsigned busy;
-    unsigned swap;
-    unsigned ref;
-    */
+    unsigned used;
+    //unsigned swap;
+    //unsigned ref;
+
     unsigned size;
     struct cme *cm;
     int last_allocated;
