@@ -17,8 +17,9 @@ int stat_coremap(int nargs, char **args) {
 	spinlock_acquire(&coremap.lock);
     kprintf("coremap.kernel: %d\n"
             "coremap.used: %d\n"
-            "coremap.size: %d\n",
-            coremap.kernel, coremap.used, coremap.size);
+            "coremap.size: %d\n"
+            "coremap.busy: %d\n",
+            coremap.kernel, coremap.used, coremap.size, coremap.busy);
 	spinlock_release(&coremap.lock);
     return 0;
 }
@@ -29,6 +30,14 @@ void
 set_use_bit(int index, int bitvalue) {
     coremap.cm[index].use = bitvalue;
     (bitvalue) ? coremap.used++ : coremap.used--;
+}
+
+/* must be called with acquired spinlock */
+static
+void
+set_busy_bit(int index, int bitvalue) {
+    coremap.cm[index].busybit = bitvalue;
+    (bitvalue) ? coremap.busy++ : coremap.busy--;
 }
 
 /* must be called with acquired spinlock */
@@ -88,10 +97,11 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 			if (coremap.cm[index].use == 0) {
                 set_use_bit(index, 1);
 				//coremap.cm[index].use = 1;
-				coremap.cm[index].vpn = vpn;
-				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
                 set_kern_bit(index, is_kern);
                 //coremap.cm[index].kern = (is_kern) ? 1 : 0;
+
+				coremap.cm[index].vpn = vpn;
+				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
 
                 spinlock_acquire(&coremap.lock);
                 coremap.last_allocated = index;
@@ -177,12 +187,14 @@ wait_for_busy(int index) {
 int core_set_busy(int index, bool wait) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0) {
-		coremap.cm[index].busybit = 1;
+        set_busy_bit(index, 1);
+		//coremap.cm[index].busybit = 1;
 		spinlock_release(&coremap.lock);
 	}else if(wait){
 		// At this point busy wait for the bit to be open by sleeping till it's available
         wait_for_busy(index);
-		coremap.cm[index].busybit = 1;
+        set_busy_bit(index, 1);
+		//coremap.cm[index].busybit = 1;
 		spinlock_release(&coremap.lock);
 	}else{
 		spinlock_release(&coremap.lock);
@@ -194,7 +206,8 @@ int core_set_busy(int index, bool wait) {
 int core_set_free(int index){
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 1) {
-		coremap.cm[index].busybit = 0;
+        set_busy_bit(index, 0);
+		//coremap.cm[index].busybit = 0;
 		spinlock_release(&coremap.lock);
 		return 0;
 	} else {
