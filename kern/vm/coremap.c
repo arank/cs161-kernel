@@ -86,7 +86,7 @@ get_cme_seq(unsigned npages) {
     coremap.cm[PADDR_TO_CMI(pa)].slen = npages;
     coremap.cm[PADDR_TO_CMI(pa)].seq = 0;
     unsigned count = 1; /* initial count set to 1, because we got one cme */
-
+    core_set_free(PADDR_TO_CMI(pa));
     // TODO change to garuntee continuity
     while (count != npages) {
         next_pa = get_free_cme((vaddr_t)0, true);
@@ -94,9 +94,11 @@ get_cme_seq(unsigned npages) {
             free_kpages(PADDR_TO_KVADDR(pa));
             return 0;
         } else if (next_pa == pa + PAGE_SIZE) { /* hit */
+        	core_set_free(PADDR_TO_CMI(next_pa));
             coremap.cm[PADDR_TO_CMI(next_pa)].seq = 1;
             count++;
         } else {                /* not contigious */
+        	core_set_free(PADDR_TO_CMI(next_pa));
             free_kpages(PADDR_TO_KVADDR(pa));   /* free initial guess */
             pa = next_pa;                       /* set next_pa to guess */
             coremap.cm[PADDR_TO_CMI(pa)].slen = npages;    /* set the length */
@@ -156,10 +158,13 @@ vaddr_t
 alloc_kpages(int npages)
 {
 	paddr_t pa;
-	if(npages==1)
+	// We don't need complex logic to alloc a single page
+	if(npages==1){
 		pa = get_free_cme((vaddr_t)0, true);
-	else
+		core_set_free(PADDR_TO_CMI(pa));
+	}else{
 		pa = get_cme_seq(npages);
+	}
 
 	if (pa == 0)
 		return 0;
