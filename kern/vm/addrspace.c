@@ -32,7 +32,6 @@
 #include <mips/vm.h>
 #include <lib.h>
 #include <addrspace.h>
-#include <vm.h>
 #include <proc.h>
 #include <pagetable.h>
 #include <synch.h>

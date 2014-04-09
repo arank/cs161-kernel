@@ -39,7 +39,6 @@
 #include <array.h>
 #include <spinlock.h>
 #include <threadlist.h>
-
 struct cpu;
 
 /* get machine-dependent defs */

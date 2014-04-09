@@ -1,6 +1,8 @@
 #ifndef _H_COREMAP_H_
 #define _H_COREMAP_H_
 
+#define KERNEL_CMI 1
+
 void cm_bootstrap(void);
 
 void set_use_bit(int index, int bitvalue);
