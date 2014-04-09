@@ -5,6 +5,7 @@
 #include <coremap.h>
 #include <pagetable.h>
 
+#include <synch.h>
 #include <proc.h>
 #include <current.h>
 #include <mips/tlb.h>
@@ -266,7 +267,18 @@ vm_tlbshootdown_all(void)
 void
 vm_tlbshootdown(const struct tlbshootdown *ts)
 {
-	(void)ts;
+    int spl = splhigh();
+
+    int cmi = PADDR_TO_CMI(ts->ppn);
+    if (coremap.cm[cmi].use == 0) goto done;
+    uint32_t vpn = (cmi << 12) & TLBHI_VPAGE;   // TODO: is there a need for &
+    int rv = tlb_probe(vpn, 0);
+    if (rv >= 0)
+        tlb_write(TLBHI_INVALID(rv), TLBLO_INVALID(), rv);
+
+done:
+    V(ts->tlb_sem); /* don't know where we should P() */
+    splx(spl);
 }
 
 // Returns with the page table index locked, and a valid ppn that is in memory
@@ -339,7 +351,6 @@ int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
     // Check fault address (?)
-
     (void)faultaddress;
     switch(faulttype) {
         case VM_FAULT_READONLY:
