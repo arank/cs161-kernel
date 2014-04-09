@@ -32,7 +32,6 @@
 #include <mips/vm.h>
 #include <lib.h>
 #include <addrspace.h>
-#include <vm.h>
 #include <proc.h>
 #include <pagetable.h>
 #include <synch.h>
@@ -243,10 +242,6 @@ out:
 int
 as_prepare_load(struct addrspace *as)
 {
-	/*
-	 * Initialize HEAP after all elf regions are defined
-	 */
-
 	(void)as;
 	return 0;
 }
@@ -254,10 +249,6 @@ as_prepare_load(struct addrspace *as)
 int
 as_complete_load(struct addrspace *as)
 {
-	/*
-	 * red zone already defined with the stack
-	 */
-
 	(void)as;
 	return 0;
 }
