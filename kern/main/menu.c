@@ -46,7 +46,7 @@
 #include "opt-synchprobs.h"
 #include "opt-sfs.h"
 #include "opt-net.h"
-
+#include <coremap.h>
 /*
  * In-kernel menu and command dispatcher.
  */
@@ -501,6 +501,7 @@ static const char *testmenu[] = {
 	"[km1] Kernel malloc test            ",
 	"[km2] kmalloc stress test           ",
 	"[km3] Large kmalloc test            ",
+	"[cm]  Coremap statistics            ",
 	"[tt1] Thread test 1                 ",
 	"[tt2] Thread test 2                 ",
 	"[tt3] Thread test 3                 ",
@@ -612,6 +613,7 @@ static struct {
 	{ "km1",	malloctest },
 	{ "km2",	mallocstress },
 	{ "km3",	malloctest3 },
+    { "cm",     stat_coremap },
 #if OPT_NET
 	{ "net",	nettest },
 #endif
