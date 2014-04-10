@@ -3,6 +3,8 @@
 #include <vm.h>
 #include <lib.h>
 #include <coremap.h>
+#include <pagetable.h>
+
 #include <synch.h>
 #include <proc.h>
 #include <current.h>
@@ -206,7 +208,7 @@ int core_set_free(int index){
 	} else {    /* already set free */
         panic("busybit is already unset\n");
 		//spinlock_release(&coremap.lock);
-		//return 1;
+		return -1;
 	}
 }
 
@@ -285,6 +287,72 @@ done:
     splx(spl);
 }
 
+// Returns with the page table index locked, and a valid ppn that is in memory
+static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
+	page_set_busy(pt, pti, true);
+	if(pt->table[pti].valid != 1)
+		return -1;
+	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0){
+		// Page exists but is not allocated
+		pt->table[pti].ppn = get_free_cme(vaddr, false);
+		if(pt->table[pti].ppn == 0)
+			return -1;
+		// We can free this because any eviction has to get the page table busy bit which is already set
+		core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+	}else{
+		// TODO page on disk handle retrival later
+	}
+	return 0;
+}
+
+static int tlb_miss_on_load(vaddr_t vaddr){
+	// TODO do I check permissions here?
+	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
+	int pti = PTI(vaddr);
+	if(validate_vaddr(vaddr, pt, pti) != 0)
+		return -1;
+	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
+	// TODO put pt->table[pti].ppn into the TLB
+	page_set_free(pt, pti);
+	return 0;
+}
+
+static int tbl_miss_on_store(vaddr_t vaddr){
+	// TODO do I check permissions here?
+	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
+	int pti = PTI(vaddr);
+	if(validate_vaddr(vaddr, pt, pti) != 0)
+		return -1;
+	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
+	// TODO put pt->table[pti].ppn into the TLB
+	page_set_free(pt, pti);
+	return 0;
+}
+
+static int tlb_fault_readonly(vaddr_t vaddr){
+	// TODO do I check permissions here
+	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
+	int pti = PTI(vaddr);
+	if(validate_vaddr(vaddr, pt, pti) != 0)
+		return -1;
+
+	int cmi = PADDR_TO_CMI(pt->table[pti].ppn);
+
+	// Set core to busy while we dirty it
+	// TODO do i even need to get the coremap lock here to set the dirty bit?
+	// TODO I changed from the design so that we never unlock the page, therefore we don't have to worry about the wierd state
+	core_set_busy(cmi, true);
+
+	coremap.cm[cmi].dirty = 1;
+
+	core_set_free(cmi);
+
+	// TODO is it already in the TLB at this point? do I just have to change permissions?
+	// TODO should I free page before I get the coremap lock
+	page_set_free(pt, pti);
+	return 0;
+}
+
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
@@ -292,12 +360,18 @@ vm_fault(int faulttype, vaddr_t faultaddress)
     (void)faultaddress;
     switch(faulttype) {
         case VM_FAULT_READONLY:
+        	tlb_fault_readonly(faultaddress);
+        	// TODO check if process failed and kill it
         break;
 
         case VM_FAULT_READ:
+        	tlb_miss_on_load(faultaddress);
+        	// TODO check if process failed and kill it
         break;
 
         case VM_FAULT_WRITE:
+        	tbl_miss_on_store(faultaddress);
+        	// TODO check if process failed and kill it
         break;
 
         default: panic ("bad faulttype\n");
@@ -309,7 +383,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 /*
 static
 paddr_t
-get_kern_cme_seq(unsigned npages) {
+get_kpage_seq(unsigned npages) {
 	// This globally locks to find kernel pages as it simplifies the process, and this function is used sparingly
 	// so it wont cause great slowdown
 	spinlock_acquire(&coremap.lock);

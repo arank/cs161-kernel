@@ -69,6 +69,7 @@ out:
 	return NULL;
 }
 
+// TODO add cleanup on error code
 int
 as_copy(struct addrspace *old, struct addrspace **ret)
 {
@@ -81,6 +82,10 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 
 	// TODO do we need a lock on this function?
 	lock_acquire(old->lock);
+
+	// Copy heap pointers
+	newas->heap_end = old->heap_end;
+	newas->heap_start = old->heap_end;
 
 	newas->page_dir = page_dir_init();
 		if(newas->page_dir == NULL)
@@ -239,6 +244,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		}
 
 		as->page_dir->dir[pdi]->table[pti].valid = 1;
+		as->page_dir->dir[pdi]->table[pti].present = 1;
         as->page_dir->dir[pdi]->table[pti].read = readable;
         as->page_dir->dir[pdi]->table[pti].write = writeable;
         as->page_dir->dir[pdi]->table[pti].exec = executable;
@@ -300,6 +306,7 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 			as->page_dir->dir[cur_index]->table[j].exec = 0;
 		}else{
 			as->page_dir->dir[cur_index]->table[j].valid = 1;
+			as->page_dir->dir[cur_index]->table[j].present = 1;
 			as->page_dir->dir[cur_index]->table[j].read = 1;
 			as->page_dir->dir[cur_index]->table[j].write = 1;
 			as->page_dir->dir[cur_index]->table[j].exec = 1;
