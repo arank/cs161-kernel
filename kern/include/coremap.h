@@ -2,6 +2,8 @@
 #define _H_COREMAP_H_
 
 #define KERNEL_CMI 1
+#define WAIT 1
+#define NO_WAIT 0
 
 void cm_bootstrap(void);
 

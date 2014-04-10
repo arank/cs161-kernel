@@ -72,7 +72,8 @@ void cm_bootstrap(void) {
         set_kern_bit(i, 1);
         set_use_bit(i, 1);
     }
-    coremap.last_allocated = alloc_pages;
+
+    coremap.last_allocated = --alloc_pages;
 }
 
 void
@@ -91,7 +92,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 
 	for(unsigned i = 0; i < coremap.size; i++){
 		index = (index+1) % coremap.size;
-		if(core_set_busy(index, false) == 0){
+		if(core_set_busy(index, NO_WAIT) == 0){
 			// Check if in use
 			if (coremap.cm[index].use == 0) {
                 set_use_bit(index, 1);
@@ -102,7 +103,8 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
 
                 spinlock_acquire(&coremap.lock);
-                coremap.last_allocated = index;
+                //coremap.last_allocated = index;
+                kprintf("cmi: %zu; used: %zu\n", index, coremap.used);
                 spinlock_release(&coremap.lock);
 
 				return CMI_TO_PADDR(index);
@@ -131,7 +133,7 @@ get_kpage_seq(unsigned npages) {
     // free pages than npages that we need we'll loop forever; but now we never
     // call this function
     while (count != npages) {
-        next_pa = get_free_cme((vaddr_t)0, true);
+        next_pa = get_free_cme((vaddr_t)0, KERNEL_CMI);
         if (next_pa == 0) {    /* out of free pages */
             free_kpages(PADDR_TO_KVADDR(pa));
             return 0;
@@ -156,10 +158,14 @@ get_kpage_seq(unsigned npages) {
 vaddr_t
 alloc_kpages(int npages)
 {
+    KASSERT(npages == 1);
+    (void)get_kpage_seq;
+    paddr_t pa = get_free_cme(0, KERNEL_CMI);
+    core_set_free(PADDR_TO_CMI(pa));
+    /*
 	paddr_t pa = get_kpage_seq(npages);
 	if (pa == 0) return 0;
-
-    //kprintf("coremap.kernel: %d\n", coremap.last_allocated);
+    */
 	return PADDR_TO_KVADDR(pa);
 }
 
@@ -207,7 +213,7 @@ int core_set_free(int index){
 static
 void
 kfree_one_page(unsigned cm_index) {
-	core_set_busy(cm_index, true);
+	core_set_busy(cm_index, WAIT);
 	if (coremap.cm[cm_index].use == 0 )
 		panic("free_kpages: freeing a free page\n");
 	if (coremap.cm[cm_index].kern != 1)
@@ -239,7 +245,7 @@ free_kpages(vaddr_t addr)
     unsigned cm_index = PADDR_TO_CMI(pa);
 
     // This is okay because we never hold a page here
-	core_set_busy(cm_index, true);
+	core_set_busy(cm_index, WAIT);
     unsigned slen = coremap.cm[cm_index].slen;
     /* check that we're given the page returned by kalloc_pages */
     KASSERT(coremap.cm[cm_index].seq == 0);
