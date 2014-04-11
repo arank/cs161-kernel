@@ -9,6 +9,7 @@
 #include <proc.h>
 #include <current.h>
 #include <mips/tlb.h>
+#include <mips/vm.h>
 #include <kern/errno.h>
 #include <spl.h>
 #include <addrspace.h>
@@ -96,7 +97,12 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 		for(unsigned i = 0; i < coremap.size; i++){
 			index = (index+1) % coremap.size;
 			// TODO we can probably wait here if this becomes an issue
-			if(core_set_busy(index, NO_WAIT) == 0 && coremap.cm[index].kern == 0){
+			if(core_set_busy(index, false) == 0){
+				if(coremap.cm[index].kern == 1){
+					core_set_free(index);
+					continue;
+				}
+
 				// Check if in use
 				if (coremap.cm[index].use == 0) {
 					set_use_bit(index, 1);
@@ -137,7 +143,8 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 
 					coremap.cm[index].swap = 0;
 
-					// TODO Zero page here
+					// Zero physical page
+					memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
 
 					page_set_free(as->page_dir->dir[pdi], pti);
 
@@ -172,7 +179,10 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 						write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
 					}
 
-					// TODO Zero page here
+					coremap.cm[index].swap = 0;
+
+					// Zero physical page
+					memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
 
 					page_set_free(as->page_dir->dir[pdi], pti);
 
