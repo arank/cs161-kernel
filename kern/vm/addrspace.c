@@ -109,11 +109,18 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                     = old->page_dir->dir[i]->table[j].exec;
 				newas->page_dir->dir[i]->table[j].junk
                     = old->page_dir->dir[i]->table[j].junk;
+				newas->page_dir->dir[i]->table[j].present =
+						old->page_dir->dir[i]->table[j].present;
+
+				// If not allocated or only symbolically linked
+				if(old->page_dir->dir[i]->table[j].ppn == 0)
+					continue;
 
 				// Allocate space to copy over page
 				paddr_t free = get_free_cme(((i<<22) | (j<<12)), false);
-				newas->page_dir->dir[i]->table[j].present = 1;
 				newas->page_dir->dir[i]->table[j].ppn = free;
+				// We are pulling into memory here and making it present
+				newas->page_dir->dir[i]->table[j].present = 1;
 
 				// Copy over page from old addr space
 				if(old->page_dir->dir[i]->table[j].present == 1){
