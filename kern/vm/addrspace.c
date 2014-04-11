@@ -106,7 +106,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				newas->page_dir->dir[i]->table[j].junk = old->page_dir->dir[i]->table[j].junk;
 
 				// Allocate space to copy over page
-				paddr_t free = get_free_cme(((i<<22) + (j<<12)), false);
+				paddr_t free = get_free_cme(((i<<22) | (j<<12)), false);
 				newas->page_dir->dir[i]->table[j].present = 1;
 				newas->page_dir->dir[i]->table[j].ppn = free;
 
@@ -232,8 +232,6 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		goto out;
 
 	int pages_to_alloc = (OFFSET(vaddr) + sz) / PAGE_SIZE;
-	if((OFFSET(vaddr) + sz) % PAGE_SIZE != 0)
-		pages_to_alloc++;
 
 	for(int i = 0, pti = PTI(vaddr); i < pages_to_alloc; i++, pti++){
 
@@ -242,6 +240,10 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 				goto out;
 			pti = 0;
 		}
+
+		// Check if we have hit something that we already allocated
+		if(as->page_dir->dir[pdi]->table[pti].valid == 1)
+			goto out;
 
 		as->page_dir->dir[pdi]->table[pti].valid = 1;
 		as->page_dir->dir[pdi]->table[pti].present = 1;
@@ -253,7 +255,6 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 	return 0;
 
 out:
-	page_dir_destroy(as->page_dir);
 	return -1;
 }
 
@@ -293,7 +294,7 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 	for(int i = 0, j = PTI(*stackptr); i < 17; i++, j--){
 
 		if(j < 0){
-			if(page_table_add(++cur_index, as->page_dir))
+			if(page_table_add(--cur_index, as->page_dir))
 				return -1;
 			j=1023;
 		}

@@ -70,9 +70,7 @@ struct proc {
 	struct vnode *p_cwd;		    /* current working directory */
 
     pid_t pid;
-    // TODO: change to dynamic array
     struct file_desc *fd_table[OPEN_MAX];
-    // TODO: change to dynamic array
     struct proc_link *children[MAX_CLD];
     struct proc_link *parent;
 };

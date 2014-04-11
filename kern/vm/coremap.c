@@ -74,7 +74,7 @@ void cm_bootstrap(void) {
         set_kern_bit(i, 1);
         set_use_bit(i, 1);
     }
-    coremap.last_allocated = alloc_pages;
+    coremap.last_allocated = --alloc_pages;
 }
 
 void
@@ -91,26 +91,34 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 	int index = coremap.last_allocated;
 	spinlock_release(&coremap.lock);
 
-	for(unsigned i = 0; i < coremap.size; i++){
-		index = (index+1) % coremap.size;
-		if(core_set_busy(index, false) == 0){
-			// Check if in use
-			if (coremap.cm[index].use == 0) {
-                set_use_bit(index, 1);
-                set_kern_bit(index, is_kern);
+	// Loop through core map, once for unused, then for clean pages, then for dirty pages
+	for(unsigned j = 0; j < 3; j++){
+		for(unsigned i = 0; i < coremap.size; i++){
+			index = (index+1) % coremap.size;
+			if(core_set_busy(index, false) == 0){
+				// Check if in use
+				if (coremap.cm[index].use == 0) {
 
-                coremap.cm[index].slen = 1;
-				coremap.cm[index].vpn = vpn;
-				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
+					set_use_bit(index, 1);
+					set_kern_bit(index, is_kern);
 
-                spinlock_acquire(&coremap.lock);
-                coremap.last_allocated = index;
-                spinlock_release(&coremap.lock);
+					// TODO change this slen thing
+					coremap.cm[index].slen = 1;
+					coremap.cm[index].vpn = vpn;
+					coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
 
-				return CMI_TO_PADDR(index);
+					spinlock_acquire(&coremap.lock);
+					coremap.last_allocated = index;
+					spinlock_release(&coremap.lock);
+
+					return CMI_TO_PADDR(index);
+				} else if(j<=1 && coremap.cm[index].dirty == 0){
+					// TODO evict clean page
+				} else if(j<=2 && coremap.cm[index].kern == 0){
+					// TODO evict dirty page
+				}
+				core_set_free(index);
 			}
-			core_set_free(index);
-			// TODO add eviction later checking for clean pages, then cleaning up pages and evicting them
 		}
 	}
 
@@ -123,7 +131,7 @@ get_kpage_seq(unsigned npages) {
 
     paddr_t pa, next_pa;
 
-    pa = get_free_cme((vaddr_t)0, KERNEL_CMI);
+    pa = get_free_cme((vaddr_t)0, true);
     if (pa == 0) return 0;
     core_set_free(PADDR_TO_CMI(pa));
     coremap.cm[PADDR_TO_CMI(pa)].slen = npages;
@@ -160,8 +168,6 @@ alloc_kpages(int npages)
 {
 	paddr_t pa = get_kpage_seq(npages);
 	if (pa == 0) return 0;
-
-    //kprintf("coremap.kernel: %d\n", coremap.last_allocated);
 	return PADDR_TO_KVADDR(pa);
 }
 
@@ -201,7 +207,6 @@ int core_set_free(int index){
 		return 0;
 	} else {    /* already set free */
         panic("busybit is already unset\n");
-		//spinlock_release(&coremap.lock);
 		return -1;
 	}
 }
@@ -307,6 +312,7 @@ static int tlb_miss_on_load(vaddr_t vaddr){
 		return -1;
 	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
 	// TODO put pt->table[pti].ppn into the TLB
+
 	page_set_free(pt, pti);
 	return 0;
 }
@@ -319,6 +325,7 @@ static int tbl_miss_on_store(vaddr_t vaddr){
 		return -1;
 	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
 	// TODO put pt->table[pti].ppn into the TLB
+
 	page_set_free(pt, pti);
 	return 0;
 }
@@ -333,7 +340,7 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 	int cmi = PADDR_TO_CMI(pt->table[pti].ppn);
 
 	// Set core to busy while we dirty it
-	// TODO do i even need to get the coremap lock here to set the dirty bit?
+	// TODO do i even need to get the coremap lock here to set the dirty bit? should I free page before I get the coremap lock?
 	// TODO I changed from the design so that we never unlock the page, therefore we don't have to worry about the wierd state
 	core_set_busy(cmi, true);
 
@@ -341,8 +348,8 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 
 	core_set_free(cmi);
 
-	// TODO is it already in the TLB at this point? do I just have to change permissions?
-	// TODO should I free page before I get the coremap lock
+	// Changing permissions for stuff
+	// TODO is already in the TLB at this point I just have to change permissions?
 	page_set_free(pt, pti);
 	return 0;
 }
@@ -350,8 +357,7 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-    // Check fault address (?)
-    (void)faultaddress;
+    KASSERT(curproc->pid!=0);
     switch(faulttype) {
         case VM_FAULT_READONLY:
         	tlb_fault_readonly(faultaddress);
@@ -392,7 +398,7 @@ get_kpage_seq(unsigned npages) {
 		}else if (coremap.cm[index].use == 1){
 			//Only evict on second run through coremap
 			if(i>=coremap.size){
-				// TODO evict and set as not in use
+				// evict here
 			}else{
 				alloced = 0;
 				continue;

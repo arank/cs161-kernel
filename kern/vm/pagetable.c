@@ -20,6 +20,8 @@ page_dir_init(){
 }
 
 int page_table_add(int index, struct page_dir* pd){
+	KASSERT(pd!=NULL);
+
 	if(pd->dir[index] != NULL)
         return -1;
 
@@ -56,6 +58,7 @@ int page_table_add(int index, struct page_dir* pd){
 }
 
 int page_dir_destroy(struct page_dir* pd){
+	KASSERT(pd!=NULL);
 	for(int i = 0; i < PD_SIZE; i++){
 		if(pd->dir[i] != NULL){
 			lock_destroy(pd->dir[i]->lock);
@@ -69,6 +72,7 @@ int page_dir_destroy(struct page_dir* pd){
 
 
 int page_set_busy(struct page_table *pt, int index, bool wait){
+	KASSERT(pt!=NULL);
 	lock_acquire(pt->lock);
 	if(pt->table[index].busybit == 0){
 		pt->table[index].busybit = 1;

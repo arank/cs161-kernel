@@ -71,6 +71,7 @@ pid_t sys_getpid(pid_t *pid);
 void sys__exit(int exitcode);
 pid_t sys_fork(struct trapframe *tf, pid_t *child_pid);
 int sys_execv(const_userptr_t program, const_userptr_t *args);
+int sys_sbrk(intptr_t num_bytes, vaddr_t *top);
 
 #define ALIGN 4
 #endif /* _SYSCALL_H_ */
