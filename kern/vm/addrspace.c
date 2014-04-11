@@ -125,7 +125,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				// Copy over page from old addr space
 				if(old->page_dir->dir[i]->table[j].present == 1){
 					paddr_t ppn = old->page_dir->dir[i]->table[j].ppn;
-					memcpy((void*)free, (void*)ppn, PAGE_SIZE);
+					memcpy((void*)PADDR_TO_KVADDR(free), (void*)PADDR_TO_KVADDR(ppn), PAGE_SIZE);
 				}else{
 					// TODO page on disk, use copy function to pull page into dedicated swap space
 					// TODO copy out of dedicated swap space to free cme & fill in corresponding data
