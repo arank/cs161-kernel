@@ -98,7 +98,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 			// Check if in use
 			if (coremap.cm[index].use == 0) {
                 set_use_bit(index, 1);
-                set_kern_bit(index, is_kern);
+                if (is_kern) set_kern_bit(index, 1);
 
                 coremap.cm[index].slen = 1;
 				coremap.cm[index].vpn = vpn;
@@ -324,7 +324,7 @@ static int tlb_miss_on_load(vaddr_t vaddr){
 	int pti = PTI(vaddr);
 	if(validate_vaddr(vaddr, pt, pti) != 0)
 		return -1;
-    paddr_t paddr = pt->table[pti].ppn << 12;
+    paddr_t paddr = pt->table[pti].ppn;
     update_tlb(paddr, vaddr, false, false);
 
 	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
@@ -340,7 +340,7 @@ static int tbl_miss_on_store(vaddr_t vaddr){
 	if(validate_vaddr(vaddr, pt, pti) != 0)
 		return -1;
 
-    paddr_t paddr = pt->table[pti].ppn << 12;
+    paddr_t paddr = pt->table[pti].ppn;
     update_tlb(paddr, vaddr, true, false);
 
 	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
@@ -354,7 +354,7 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 	int pti = PTI(vaddr);
 	if(validate_vaddr(vaddr, pt, pti) != 0) return -1;
 
-    paddr_t paddr = pt->table[pti].ppn << 12;
+    paddr_t paddr = pt->table[pti].ppn;
     update_tlb(paddr, vaddr, true, true);
 
 	// TODO do i even need to get the coremap lock here to set the dirty bit?
@@ -373,7 +373,7 @@ int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
     // Check fault address (?)
-    (void)faultaddress;
+    KASSERT(faultaddress != 0);
     switch(faulttype) {
         case VM_FAULT_READONLY:
         	tlb_fault_readonly(faultaddress);
