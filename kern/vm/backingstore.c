@@ -30,7 +30,7 @@ int init_backing_store(void) {
     backing_store->lock = lock_create("disk_lock");
     if (backing_store->lock == NULL) goto lk_out;
 
-    //Set 0 to in use, as that is reserved for clean pages
+    //Set 0 to in use, as that is reserved
     bitmap_mark(backing_store->bm, 0);
 
     return 0;
@@ -109,13 +109,13 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 
 // Assumes that cme for location is already locked, and returns with cme still locked
 // TODO zero pages on allocation to allow for isolation between procs?
-int write_to_disk(paddr_t location){
+int write_to_disk(paddr_t location, int index){
 	KASSERT(coremap.cm[PADDR_TO_CMI(location)].busybit == 1);
 	lock_acquire(backing_store->lock);
-	unsigned spot;
-	if(bitmap_alloc(backing_store->bm, &spot) == ENOSPC){
-	    	lock_release(backing_store->lock);
-	    	return -1;
+	unsigned spot = index;
+	if(index < 0 && bitmap_alloc(backing_store->bm, &spot) == ENOSPC){
+	    lock_release(backing_store->lock);
+	    return -1;
 	}
 
 	struct vnode *node;

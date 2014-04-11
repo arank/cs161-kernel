@@ -115,7 +115,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 
 				// TODO write a helper function to abstract the next two functions
 				}else if(round >= 1 && coremap.cm[index].dirty == 0){
-					kprintf("evicting clean page\n");
+					panic("evicting clean page\n");
 					// Steal cleaned page and evict
 					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
 					struct addrspace *as;
@@ -129,10 +129,12 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					}
 
 					// TODO TLB shootdown this proc's stuff
-
-					// TODO check if this is a symbolic page?
-					as->page_dir->dir[pdi]->table[pti].present = 0;
 					as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
+					if(as->page_dir->dir[pdi]->table[pti].ppn == 0)
+						as->page_dir->dir[pdi]->table[pti].present = 1;
+					else
+						as->page_dir->dir[pdi]->table[pti].present = 0;
+
 					coremap.cm[index].swap = 0;
 
 					// TODO Zero page here
@@ -146,7 +148,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 2){
-					kprintf("evicting dirty page\n");
+					panic("evicting dirty page\n");
 					//Write dirty page to disk and then evict
 					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
 					struct addrspace *as;
@@ -162,7 +164,13 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					// TODO TLB shootdown this proc's stuff
 
 					as->page_dir->dir[pdi]->table[pti].present = 0;
-					as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index));
+
+					if(coremap.cm[index].swap == 0){
+						as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index), -1);
+						coremap.cm[index].swap = as->page_dir->dir[pdi]->table[pti].ppn;
+					}else{
+						write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
+					}
 
 					// TODO Zero page here
 
@@ -351,18 +359,15 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 		return -1;
 
     // Page exists but is not allocated
-	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0)
+	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0){
 		pt->table[pti].ppn = get_free_cme(vaddr, false);
-	else if(pt->table[pti].present==0)
+		core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+	}else if(pt->table[pti].present==0 && pt->table[pti].ppn > 0){
+		panic("TLB get from disk\n");
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
-	else
-		return 0;
-
-	if(pt->table[pti].ppn == 0)
-		return -1;
-
-	// We can free this because any eviction has to get the page table busy bit which is already set
-	core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+		pt->table[pti].present=1;
+		core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+	}
 
 	return 0;
 }
