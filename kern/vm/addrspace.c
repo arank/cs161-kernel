@@ -99,11 +99,16 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				page_set_busy(old->page_dir->dir[i], j, true);
 
 				// Copy everything but the location of the physical page
-				newas->page_dir->dir[i]->table[j].valid = old->page_dir->dir[i]->table[j].valid;
-				newas->page_dir->dir[i]->table[j].read = old->page_dir->dir[i]->table[j].read;
-				newas->page_dir->dir[i]->table[j].write = old->page_dir->dir[i]->table[j].write;
-				newas->page_dir->dir[i]->table[j].exec = old->page_dir->dir[i]->table[j].exec;
-				newas->page_dir->dir[i]->table[j].junk = old->page_dir->dir[i]->table[j].junk;
+				newas->page_dir->dir[i]->table[j].valid
+                    = old->page_dir->dir[i]->table[j].valid;
+				newas->page_dir->dir[i]->table[j].read
+                    = old->page_dir->dir[i]->table[j].read;
+				newas->page_dir->dir[i]->table[j].write
+                    = old->page_dir->dir[i]->table[j].write;
+				newas->page_dir->dir[i]->table[j].exec
+                    = old->page_dir->dir[i]->table[j].exec;
+				newas->page_dir->dir[i]->table[j].junk
+                    = old->page_dir->dir[i]->table[j].junk;
 
 				// Allocate space to copy over page
 				paddr_t free = get_free_cme(((i<<22) | (j<<12)), false);
@@ -143,8 +148,11 @@ as_destroy(struct addrspace *as)
 				// figure out who has to give up first, probably the evictor
 				page_set_busy(as->page_dir->dir[i], j, true);
 
-				if(as->page_dir->dir[i]->table[j].present == 1){
-					int cm_index = (int)as->page_dir->dir[i]->table[j].ppn;
+                if (as->page_dir->dir[i]->table[j].valid != 1) continue;
+
+				if(as->page_dir->dir[i]->table[j].present == 1) {
+                    if (as->page_dir->dir[i]->table[j].ppn == 0) continue;
+					int cm_index = PADDR_TO_CMI(as->page_dir->dir[i]->table[j].ppn);
 					// busily wait to get lock on memory
 					core_set_busy(cm_index, true);
 
@@ -165,7 +173,7 @@ as_destroy(struct addrspace *as)
 					}
 
 					// set all of page to zero
-					memset((void*)CMI_TO_PADDR(cm_index), 0, (size_t)4096);
+					memset((void*)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 
 					core_set_free(cm_index);
 				}else{
@@ -285,8 +293,13 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 {
 
 	/* Initial user-level stack pointer */
+    // TODO error checking
+    as_define_region(as, USERSTACK - (17 * PAGE_SIZE), PAGE_SIZE, 1, 1, 0);
+    as_define_region(as, USERSTACK - (16 * PAGE_SIZE), 16 * PAGE_SIZE, 1, 1, 0);
+
 	*stackptr = USERSTACK;
 
+    /*
 	if(as->page_dir->dir[PDI(*stackptr)] == NULL)
 		page_table_add(PDI(*stackptr), as->page_dir);
 
@@ -313,7 +326,7 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 			as->page_dir->dir[cur_index]->table[j].exec = 1;
 		}
 	}
-
+    */
 	return 0;
 }
 

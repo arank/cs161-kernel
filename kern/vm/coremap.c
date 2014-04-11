@@ -74,6 +74,7 @@ void cm_bootstrap(void) {
         set_kern_bit(i, 1);
         set_use_bit(i, 1);
     }
+
     coremap.last_allocated = --alloc_pages;
 }
 
@@ -95,20 +96,19 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 	for(unsigned j = 0; j < 3; j++){
 		for(unsigned i = 0; i < coremap.size; i++){
 			index = (index+1) % coremap.size;
-			if(core_set_busy(index, false) == 0){
+			if(core_set_busy(index, NO_WAIT) == 0){
 				// Check if in use
 				if (coremap.cm[index].use == 0) {
-
 					set_use_bit(index, 1);
-					set_kern_bit(index, is_kern);
+					if (is_kern) set_kern_bit(index, 1);
 
-					// TODO change this slen thing
 					coremap.cm[index].slen = 1;
 					coremap.cm[index].vpn = vpn;
 					coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
 
 					spinlock_acquire(&coremap.lock);
-					coremap.last_allocated = index;
+					//coremap.last_allocated = index;
+					kprintf("cmi: %zu; used: %zu\n", index, coremap.used);
 					spinlock_release(&coremap.lock);
 
 					return CMI_TO_PADDR(index);
@@ -141,7 +141,7 @@ get_kpage_seq(unsigned npages) {
     // free pages than npages that we need we'll loop forever; but now we never
     // call this function
     while (count != npages) {
-        next_pa = get_free_cme((vaddr_t)0, true);
+        next_pa = get_free_cme((vaddr_t)0, KERNEL_CMI);
         if (next_pa == 0) {    /* out of free pages */
             free_kpages(PADDR_TO_KVADDR(pa));
             return 0;
@@ -214,7 +214,7 @@ int core_set_free(int index){
 static
 void
 kfree_one_page(unsigned cm_index) {
-	core_set_busy(cm_index, true);
+	core_set_busy(cm_index, WAIT);
 	if (coremap.cm[cm_index].use == 0 )
 		panic("free_kpages: freeing a free page\n");
 	if (coremap.cm[cm_index].kern != 1)
@@ -246,7 +246,7 @@ free_kpages(vaddr_t addr)
     unsigned cm_index = PADDR_TO_CMI(pa);
 
     // This is okay because we never hold a page here
-	core_set_busy(cm_index, true);
+	core_set_busy(cm_index, WAIT);
     unsigned slen = coremap.cm[cm_index].slen;
     /* check that we're given the page returned by kalloc_pages */
     KASSERT(coremap.cm[cm_index].seq == 0);
@@ -276,7 +276,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 
     int cmi = PADDR_TO_CMI(ts->ppn);
     if (coremap.cm[cmi].use == 0) goto done;
-    uint32_t vpn = (cmi << 12) & TLBHI_VPAGE;   // TODO: is there a need for &
+    uint32_t vpn = (cmi << 12) & TLBHI_VPAGE;
     int rv = tlb_probe(vpn, 0);
     if (rv >= 0)
         tlb_write(TLBHI_INVALID(rv), TLBLO_INVALID(), rv);
@@ -291,8 +291,9 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	page_set_busy(pt, pti, true);
 	if(pt->table[pti].valid != 1)
 		return -1;
+
+    // Page exists but is not allocated
 	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0){
-		// Page exists but is not allocated
 		pt->table[pti].ppn = get_free_cme(vaddr, false);
 		if(pt->table[pti].ppn == 0)
 			return -1;
@@ -304,12 +305,34 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	return 0;
 }
 
+static
+void
+update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only) {
+    uint32_t elo = (pa & TLBLO_PPAGE) | TLBLO_VALID;
+    if (dirty) elo |= TLBLO_DIRTY;
+
+    uint32_t ehi = va & TLBHI_VPAGE;
+
+    int spl = splhigh();
+
+    if (read_only) {
+        int tlbi = tlb_probe(va, 0);
+        (tlbi >= 0) ? tlb_write(ehi, elo, tlbi) : tlb_random(ehi, elo);
+    } else
+        tlb_random(ehi, elo);
+
+    splx(spl);
+}
+
 static int tlb_miss_on_load(vaddr_t vaddr){
 	// TODO do I check permissions here?
 	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
 	int pti = PTI(vaddr);
 	if(validate_vaddr(vaddr, pt, pti) != 0)
 		return -1;
+    paddr_t paddr = pt->table[pti].ppn;
+    update_tlb(paddr, vaddr, false, false);
+
 	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
 	// TODO put pt->table[pti].ppn into the TLB
 
@@ -323,6 +346,10 @@ static int tbl_miss_on_store(vaddr_t vaddr){
 	int pti = PTI(vaddr);
 	if(validate_vaddr(vaddr, pt, pti) != 0)
 		return -1;
+
+    paddr_t paddr = pt->table[pti].ppn;
+    update_tlb(paddr, vaddr, true, false);
+
 	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
 	// TODO put pt->table[pti].ppn into the TLB
 
@@ -331,21 +358,18 @@ static int tbl_miss_on_store(vaddr_t vaddr){
 }
 
 static int tlb_fault_readonly(vaddr_t vaddr){
-	// TODO do I check permissions here
 	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
 	int pti = PTI(vaddr);
-	if(validate_vaddr(vaddr, pt, pti) != 0)
-		return -1;
+	if(validate_vaddr(vaddr, pt, pti) != 0) return -1;
 
+    paddr_t paddr = pt->table[pti].ppn;
+    update_tlb(paddr, vaddr, true, true);
+
+
+	// TODO do i even need to get the coremap lock here to set the dirty bit?
 	int cmi = PADDR_TO_CMI(pt->table[pti].ppn);
-
-	// Set core to busy while we dirty it
-	// TODO do i even need to get the coremap lock here to set the dirty bit? should I free page before I get the coremap lock?
-	// TODO I changed from the design so that we never unlock the page, therefore we don't have to worry about the wierd state
 	core_set_busy(cmi, true);
-
 	coremap.cm[cmi].dirty = 1;
-
 	core_set_free(cmi);
 
 	// Changing permissions for stuff
@@ -357,22 +381,18 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-    KASSERT(curproc->pid!=0);
     switch(faulttype) {
         case VM_FAULT_READONLY:
         	tlb_fault_readonly(faultaddress);
-        	// TODO check if process failed and kill it
-        break;
+            break;
 
         case VM_FAULT_READ:
         	tlb_miss_on_load(faultaddress);
-        	// TODO check if process failed and kill it
-        break;
+            break;
 
         case VM_FAULT_WRITE:
         	tbl_miss_on_store(faultaddress);
-        	// TODO check if process failed and kill it
-        break;
+            break;
 
         default: panic ("bad faulttype\n");
     }

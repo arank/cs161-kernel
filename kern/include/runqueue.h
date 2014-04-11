@@ -1,7 +1,7 @@
 #ifndef _RUNQUEUE_H_
 #define _RUNQUEUE_H_
 
-#define MAX_PRIORITY 3
+#define MAX_PRIORITY 5
 
 struct mlfq {
     struct threadlist mlfq[MAX_PRIORITY];
