@@ -124,7 +124,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 					// Copy over page from old addr space memory
 					free = get_free_cme(vpn, false);
 					paddr_t ppn = old->page_dir->dir[i]->table[j].ppn;
-					memcpy((void*)free, (void*)ppn, PAGE_SIZE);
+					memcpy((void*)PADDR_TO_KVADDR(free), (void*)PADDR_TO_KVADDR(ppn), PAGE_SIZE);
 				}else{
 					// Copy over from disk
 					free = retrieve_from_disk(newas->page_dir->dir[i]->table[j].ppn, vpn);

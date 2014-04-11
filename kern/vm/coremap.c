@@ -368,7 +368,7 @@ update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only) {
     if (dirty) elo |= TLBLO_DIRTY;
 
     uint32_t ehi = va & TLBHI_VPAGE;
-
+    va &= PAGE_FRAME;
     int spl = splhigh();
 
     if (read_only) {
@@ -434,8 +434,9 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-    // Check fault address (?)
     KASSERT(faultaddress != 0);
+    KASSERT(faultaddress < MIPS_KSEG0);
+
     switch(faulttype) {
         case VM_FAULT_READONLY:
         	tlb_fault_readonly(faultaddress);
