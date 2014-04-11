@@ -5,10 +5,7 @@
 #define PD_SIZE 1024
 
 struct pte {
-    union {
-        uint32_t ppn    : 20; // Doubles as swap if not present
-        uint32_t swap   : 20;
-    };
+    uint32_t ppn        : 20; // Doubles as swap if not present
 	uint32_t busybit    : 1;
     uint32_t present    : 1;
     uint32_t valid      : 1;
@@ -17,6 +14,7 @@ struct pte {
     uint32_t exec       : 1;
     uint32_t junk       : 6;
 };
+
 struct page_table {
 	struct lock *lock;
 	struct cv *cv;
