@@ -104,9 +104,11 @@ hardclock(void)
 	if ((curcpu->c_hardclocks % SCHEDULE_HARDCLOCKS) == 0) {
 		schedule();
 	}
+    /*
     if ((curcpu->c_hardclocks % RESET_PRIORITIES) == 0) {
         reset_priorities();
     }
+    */
 	thread_yield();
 }
 

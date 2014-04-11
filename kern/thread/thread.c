@@ -161,7 +161,7 @@ thread_create(const char *name)
 	thread->t_reserved_buffers = 0;
 
 	/* If you add to struct thread, be sure to initialize here */
-    thread->t_priority = 0;
+    thread->t_priority = 1;
 	return thread;
 }
 

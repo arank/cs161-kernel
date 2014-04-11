@@ -160,14 +160,8 @@ get_kpage_seq(unsigned npages) {
 vaddr_t
 alloc_kpages(int npages)
 {
-    KASSERT(npages == 1);
-    (void)get_kpage_seq;
-    paddr_t pa = get_free_cme(0, KERNEL_CMI);
-    core_set_free(PADDR_TO_CMI(pa));
-    /*
 	paddr_t pa = get_kpage_seq(npages);
 	if (pa == 0) return 0;
-    */
 	return PADDR_TO_KVADDR(pa);
 }
 
@@ -208,7 +202,6 @@ int core_set_free(int index){
 	} else {    /* already set free */
         panic("busybit is already unset\n");
 		//spinlock_release(&coremap.lock);
-		return -1;
 	}
 }
 
@@ -277,7 +270,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 
     int cmi = PADDR_TO_CMI(ts->ppn);
     if (coremap.cm[cmi].use == 0) goto done;
-    uint32_t vpn = (cmi << 12) & TLBHI_VPAGE;   // TODO: is there a need for &
+    uint32_t vpn = (cmi << 12) & TLBHI_VPAGE;
     int rv = tlb_probe(vpn, 0);
     if (rv >= 0)
         tlb_write(TLBHI_INVALID(rv), TLBLO_INVALID(), rv);
@@ -292,8 +285,9 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	page_set_busy(pt, pti, true);
 	if(pt->table[pti].valid != 1)
 		return -1;
+
+    // Page exists but is not allocated
 	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0){
-		// Page exists but is not allocated
 		pt->table[pti].ppn = get_free_cme(vaddr, false);
 		if(pt->table[pti].ppn == 0)
 			return -1;
@@ -305,12 +299,34 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	return 0;
 }
 
+static
+void
+update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only) {
+    uint32_t elo = (pa & TLBLO_PPAGE) | TLBLO_VALID;
+    if (dirty) elo |= TLBLO_DIRTY;
+
+    uint32_t ehi = va & TLBHI_VPAGE;
+
+    int spl = splhigh();
+
+    if (read_only) {
+        int tlbi = tlb_probe(va, 0);
+        (tlbi >= 0) ? tlb_write(ehi, elo, tlbi) : tlb_random(ehi, elo);
+    } else
+        tlb_random(ehi, elo);
+
+    splx(spl);
+}
+
 static int tlb_miss_on_load(vaddr_t vaddr){
 	// TODO do I check permissions here?
 	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
 	int pti = PTI(vaddr);
 	if(validate_vaddr(vaddr, pt, pti) != 0)
 		return -1;
+    paddr_t paddr = pt->table[pti].ppn << 12;
+    update_tlb(paddr, vaddr, false, false);
+
 	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
 	// TODO put pt->table[pti].ppn into the TLB
 	page_set_free(pt, pti);
@@ -323,6 +339,10 @@ static int tbl_miss_on_store(vaddr_t vaddr){
 	int pti = PTI(vaddr);
 	if(validate_vaddr(vaddr, pt, pti) != 0)
 		return -1;
+
+    paddr_t paddr = pt->table[pti].ppn << 12;
+    update_tlb(paddr, vaddr, true, false);
+
 	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
 	// TODO put pt->table[pti].ppn into the TLB
 	page_set_free(pt, pti);
@@ -330,21 +350,17 @@ static int tbl_miss_on_store(vaddr_t vaddr){
 }
 
 static int tlb_fault_readonly(vaddr_t vaddr){
-	// TODO do I check permissions here
 	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
 	int pti = PTI(vaddr);
-	if(validate_vaddr(vaddr, pt, pti) != 0)
-		return -1;
+	if(validate_vaddr(vaddr, pt, pti) != 0) return -1;
 
-	int cmi = PADDR_TO_CMI(pt->table[pti].ppn);
+    paddr_t paddr = pt->table[pti].ppn << 12;
+    update_tlb(paddr, vaddr, true, true);
 
-	// Set core to busy while we dirty it
 	// TODO do i even need to get the coremap lock here to set the dirty bit?
-	// TODO I changed from the design so that we never unlock the page, therefore we don't have to worry about the wierd state
+	int cmi = PADDR_TO_CMI(pt->table[pti].ppn);
 	core_set_busy(cmi, true);
-
 	coremap.cm[cmi].dirty = 1;
-
 	core_set_free(cmi);
 
 	// TODO is it already in the TLB at this point? do I just have to change permissions?
@@ -361,18 +377,15 @@ vm_fault(int faulttype, vaddr_t faultaddress)
     switch(faulttype) {
         case VM_FAULT_READONLY:
         	tlb_fault_readonly(faultaddress);
-        	// TODO check if process failed and kill it
-        break;
+            break;
 
         case VM_FAULT_READ:
         	tlb_miss_on_load(faultaddress);
-        	// TODO check if process failed and kill it
-        break;
+            break;
 
         case VM_FAULT_WRITE:
         	tbl_miss_on_store(faultaddress);
-        	// TODO check if process failed and kill it
-        break;
+            break;
 
         default: panic ("bad faulttype\n");
     }

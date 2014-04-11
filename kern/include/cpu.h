@@ -46,8 +46,7 @@
  * a pointer with a fixed address and a per-cpu mapping in the MMU.
  */
 struct cpu {
-	/*
-	 * Fixed after allocation.
+	/* * Fixed after allocation.
 	 */
 	struct cpu *c_self;		/* Canonical address of this struct */
 	unsigned c_number;		/* This cpu's cpu number */
