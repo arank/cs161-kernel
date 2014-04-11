@@ -127,6 +127,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 					memcpy((void*)PADDR_TO_KVADDR(free), (void*)PADDR_TO_KVADDR(ppn), PAGE_SIZE);
 				}else{
 					// Copy over from disk
+					kprintf("disk copy on as cpy\n");
 					free = retrieve_from_disk(newas->page_dir->dir[i]->table[j].ppn, vpn);
 				}
 
@@ -179,6 +180,7 @@ as_destroy(struct addrspace *as)
 					coremap.cm[cm_index].vpn = 0;
 
 					if(coremap.cm[cm_index].swap!=0){
+						kprintf("clean disk remove on as destroy\n");
 						remove_from_disk(coremap.cm[cm_index].swap);
 						coremap.cm[cm_index].swap = 0;
 					}
@@ -188,6 +190,7 @@ as_destroy(struct addrspace *as)
 
 					core_set_free(cm_index);
 				}else{
+					kprintf("dirty disk remove on as destroy\n");
 					remove_from_disk(as->page_dir->dir[i]->table[j].ppn);
 				}
 

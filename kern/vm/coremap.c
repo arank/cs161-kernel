@@ -95,6 +95,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 	for(unsigned round = 0; round <3; round++){
 		for(unsigned i = 0; i < coremap.size; i++){
 			index = (index+1) % coremap.size;
+			// TODO we can probably wait here if this becomes an issue
 			if(core_set_busy(index, NO_WAIT) == 0 && coremap.cm[index].kern == 0){
 				// Check if in use
 				if (coremap.cm[index].use == 0) {
@@ -114,6 +115,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 
 				// TODO write a helper function to abstract the next two functions
 				}else if(round >= 1 && coremap.cm[index].dirty == 0){
+					kprintf("evicting clean page\n");
 					// Steal cleaned page and evict
 					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
 					struct addrspace *as;
@@ -128,6 +130,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 
 					// TODO TLB shootdown this proc's stuff
 
+					// TODO check if this is a symbolic page?
 					as->page_dir->dir[pdi]->table[pti].present = 0;
 					as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
 					coremap.cm[index].swap = 0;
@@ -143,6 +146,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 2){
+					kprintf("evicting dirty page\n");
 					//Write dirty page to disk and then evict
 					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
 					struct addrspace *as;
@@ -349,8 +353,10 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
     // Page exists but is not allocated
 	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0)
 		pt->table[pti].ppn = get_free_cme(vaddr, false);
-	else
+	else if(pt->table[pti].present==0)
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
+	else
+		return 0;
 
 	if(pt->table[pti].ppn == 0)
 		return -1;
