@@ -48,10 +48,20 @@ struct vnode;
  */
 
 struct addrspace {
+#if OPT_DUMBVM
+        vaddr_t as_vbase1;
+        paddr_t as_pbase1;
+        size_t as_npages1;
+        vaddr_t as_vbase2;
+        paddr_t as_pbase2;
+        size_t as_npages2;
+        paddr_t as_stackpbase;
+#else
         struct page_dir *page_dir;
         struct lock *lock; // Used in as_copy or destroy
         vaddr_t heap_start;
         vaddr_t heap_end;
+#endif
 };
 
 /*
