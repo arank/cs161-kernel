@@ -36,6 +36,7 @@
 #include <pagetable.h>
 #include <synch.h>
 #include <coremap.h>
+#include <backingstore.h>
 
 /*
  * Note! If OPT_DUMBVM is set, as is the case until you start the VM
@@ -116,22 +117,26 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				if(old->page_dir->dir[i]->table[j].ppn == 0)
 					continue;
 
-				// Allocate space to copy over page
-				paddr_t free = get_free_cme(((i<<22) | (j<<12)), false);
+				paddr_t free;
+				vaddr_t vpn = (i<<22) | (j<<12);
+
+				if(old->page_dir->dir[i]->table[j].present == 1){
+					// Copy over page from old addr space memory
+					free = get_free_cme(vpn, false);
+					paddr_t ppn = old->page_dir->dir[i]->table[j].ppn;
+					memcpy((void*)free, (void*)ppn, PAGE_SIZE);
+				}else{
+					// Copy over from disk
+					free = retrieve_from_disk(newas->page_dir->dir[i]->table[j].ppn, vpn);
+				}
+
+				if(free == 0)
+					return -1;
 				newas->page_dir->dir[i]->table[j].ppn = free;
 				// We are pulling into memory here and making it present
 				newas->page_dir->dir[i]->table[j].present = 1;
 
-				// Copy over page from old addr space
-				if(old->page_dir->dir[i]->table[j].present == 1){
-					paddr_t ppn = old->page_dir->dir[i]->table[j].ppn;
-					memcpy((void*)free, (void*)ppn, PAGE_SIZE);
-				}else{
-					// TODO page on disk, use copy function to pull page into dedicated swap space
-					// TODO copy out of dedicated swap space to free cme & fill in corresponding data
-					// TODO this may be some hairy synch
-				}
-
+				// We can free the core and the page at this point, if its evicted that is fine
 				core_set_free(PADDR_TO_CMI(free));
 				page_set_free(old->page_dir->dir[i], j);
 			}
@@ -151,7 +156,7 @@ as_destroy(struct addrspace *as)
 	for(int i = 0; i < 1024; i++){
 		if(as->page_dir->dir[i] != NULL){
 			for(int j = 0; j < 1024; j++){
-				// TODO dead lock here if eviction is coming in the other direction
+				// TODO dead lock here if eviction is coming in the other direction?
 				// figure out who has to give up first, probably the evictor
 				page_set_busy(as->page_dir->dir[i], j, true);
 
@@ -174,8 +179,7 @@ as_destroy(struct addrspace *as)
 					coremap.cm[cm_index].vpn = 0;
 
 					if(coremap.cm[cm_index].swap!=0){
-						// TODO clean data off disk (this is post cleaning deamon - pre eviction)
-
+						remove_from_disk(coremap.cm[cm_index].swap);
 						coremap.cm[cm_index].swap = 0;
 					}
 
@@ -184,8 +188,7 @@ as_destroy(struct addrspace *as)
 
 					core_set_free(cm_index);
 				}else{
-					// TODO page solely on disk, just clean off disk
-					// TODO this may be some hairy synch
+					remove_from_disk(as->page_dir->dir[i]->table[j].swap);
 				}
 
 				as->page_dir->dir[i]->table[j].valid = 0;

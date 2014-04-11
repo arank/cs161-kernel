@@ -5,12 +5,14 @@
 #include <bitmap.h>
 #include <coremap.h>
 #include <kern/errno.h>
-
-struct backing_store{
-	struct lock *lock;
-	struct bitmap* bm;
-	paddr_t swap;
-} *backing_store;
+#include <uio.h>
+#include <kern/iovec.h>
+#include <vnode.h>
+#include <kern/fcntl.h>
+#include <backingstore.h>
+#include <vfs.h>
+#include <current.h>
+#include <proc.h>
 
 int init_backing_store(void) {
 
@@ -22,7 +24,7 @@ int init_backing_store(void) {
     if (backing_store->swap==0) goto out;
 
     //TODO figure this out currently this bitmap size is the max our coremap and page table supports
-    backing_store->bm = bitmap_create((unsigned)33554432);
+    backing_store->bm = bitmap_create(MAX_BM);
     if (backing_store->bm == NULL) goto bm_out;
 
     backing_store->lock = lock_create("disk_lock");
@@ -41,31 +43,72 @@ out:
     return 1;
 }
 
+void remove_from_disk(int swap_index){
+	lock_acquire(backing_store->lock);
+	bitmap_unmark(backing_store->bm, swap_index);
+	lock_release(backing_store->lock);
+}
 
 
 // This assumes that the location has been set as busy by get free cme
 // returns with lock set on swap_addr's cme
-int retrieve_from_disk(int swap_index, vaddr_t swap_into){
+paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 	lock_acquire(backing_store->lock);
 	if(!bitmap_isset(backing_store->bm, swap_index)){
 		lock_release(backing_store->lock);
 		return 0;
 	}
     core_set_busy(PADDR_TO_CMI(backing_store->swap), true);
-	// TODO figure out how to retrieve from index and write into backing_store->swap
-	bitmap_unmark(backing_store->bm, swap_index);
+
+    struct vnode *node;
+    // TODO are these modes/flags correct (O_RDWR)
+    char *path = kstrdup(BACKING_STORE);
+    if(vfs_open(path, O_RDWR, O_RDWR, &node) != 0 || node == NULL) {
+    	core_set_free(PADDR_TO_CMI(backing_store->swap));
+    	lock_release(backing_store->lock);
+    	return 0;
+    }
+
+    struct iovec vec;
+	vec.iov_ubase = (userptr_t)PADDR_TO_KVADDR(backing_store->swap);
+	vec.iov_len = PAGE_SIZE;
+
+	struct uio io;
+	io.uio_iov = &vec;
+	io.uio_iovcnt = 1;
+	io.uio_segflg = UIO_SYSSPACE;
+	io.uio_offset = swap_index*PAGE_SIZE;
+	io.uio_resid = PAGE_SIZE;
+	io.uio_rw = UIO_READ;
+	if(curproc->pid == 0)
+		io.uio_space = NULL;
+	else
+		io.uio_space = curproc->p_addrspace;
+
+    if(VOP_READ(node, &io) != 0){
+    	core_set_free(PADDR_TO_CMI(backing_store->swap));
+		lock_release(backing_store->lock);
+		return 0;
+    }
+
+    vfs_close(node);
+
+    // Now the data is in our dedicated swap space so we can free it
+    bitmap_unmark(backing_store->bm, swap_index);
     lock_release(backing_store->lock);
+
     paddr_t swap_addr = get_free_cme(swap_into, false);
     if(swap_addr == 0){
     	core_set_free(PADDR_TO_CMI(backing_store->swap));
     	return 0;
     }
-    memcpy((void*)swap_addr, (void*)backing_store->swap, PAGE_SIZE);
+    memcpy((void *)PADDR_TO_KVADDR(swap_addr), (void *)PADDR_TO_KVADDR(backing_store->swap), PAGE_SIZE);
     core_set_free(PADDR_TO_CMI(backing_store->swap));
     return swap_addr;
 }
 
-// Assumes that cme for location is already locked
+// Assumes that cme for location is already locked, and returns with cme still locked
+// TODO zero pages on allocation to allow for isolation between procs?
 int write_to_disk(paddr_t location){
 	KASSERT(coremap.cm[PADDR_TO_CMI(location)].busybit == 1);
 	lock_acquire(backing_store->lock);
@@ -74,8 +117,40 @@ int write_to_disk(paddr_t location){
 	    	lock_release(backing_store->lock);
 	    	return -1;
 	}
-	// TODO Figure out how to put the page from location into spot
-	(void) location;
+
+	struct vnode *node;
+	// TODO are these modes/flags correct (O_RDWR)
+	char *path = kstrdup(BACKING_STORE);
+	if(vfs_open(path, O_RDWR, O_RDWR, &node) != 0 || node == NULL) {
+		lock_release(backing_store->lock);
+		return -1;
+	}
+
+	struct iovec iov;
+	iov.iov_ubase = (userptr_t)PADDR_TO_KVADDR(location);
+	iov.iov_len = PAGE_SIZE;
+
+	struct uio uio;
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	// TODO is this sys or user space?
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_offset = spot*PAGE_SIZE;
+	uio.uio_resid = PAGE_SIZE;
+	uio.uio_rw = UIO_WRITE;
+	if(curproc->pid == 0)
+		uio.uio_space = NULL;
+	else
+		uio.uio_space = curproc->p_addrspace;
+
+	if(VOP_WRITE(node, &uio) != 0){
+		lock_release(backing_store->lock);
+		return -1;
+	}
+
+	vfs_close(node);
+
+	// At this point the data is now on disk
 	lock_release(backing_store->lock);
-	return 0;
+	return spot;
 }

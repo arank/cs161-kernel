@@ -12,6 +12,7 @@
 #include <kern/errno.h>
 #include <spl.h>
 #include <addrspace.h>
+#include <backingstore.h>
 
 int stat_coremap(int nargs, char **args) {
     (void)nargs;
@@ -91,28 +92,88 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 	spinlock_acquire(&coremap.lock);
 	int index = coremap.last_allocated;
 	spinlock_release(&coremap.lock);
+	for(unsigned round = 0; round <3; round++){
+		for(unsigned i = 0; i < coremap.size; i++){
+			index = (index+1) % coremap.size;
+			if(core_set_busy(index, NO_WAIT) == 0 && coremap.cm[index].kern == 0){
+				// Check if in use
+				if (coremap.cm[index].use == 0) {
+					set_use_bit(index, 1);
+					if (is_kern) set_kern_bit(index, 1);
 
-	for(unsigned i = 0; i < coremap.size; i++){
-		index = (index+1) % coremap.size;
-		if(core_set_busy(index, NO_WAIT) == 0){
-			// Check if in use
-			if (coremap.cm[index].use == 0) {
-                set_use_bit(index, 1);
-                if (is_kern) set_kern_bit(index, 1);
+					coremap.cm[index].slen = 1;
+					coremap.cm[index].vpn = vpn;
+					coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
 
-                coremap.cm[index].slen = 1;
-				coremap.cm[index].vpn = vpn;
-				coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
+					spinlock_acquire(&coremap.lock);
+					//coremap.last_allocated = index;
+					kprintf("cmi: %zu; used: %zu\n", index, coremap.used);
+					spinlock_release(&coremap.lock);
 
-                spinlock_acquire(&coremap.lock);
-                //coremap.last_allocated = index;
-                kprintf("cmi: %zu; used: %zu\n", index, coremap.used);
-                spinlock_release(&coremap.lock);
+					return CMI_TO_PADDR(index);
 
-				return CMI_TO_PADDR(index);
+				// TODO write a helper function to abstract the next two functions
+				}else if(round >= 1 && coremap.cm[index].dirty == 0){
+					// Steal cleaned page and evict
+					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
+					struct addrspace *as;
+					int pdi = PDI(coremap.cm[index].vpn);
+					int pti = PTI(coremap.cm[index].vpn);
+
+					// Give up here to avoid deadlock
+					if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0){
+						core_set_free(index);
+						continue;
+					}
+
+					// TODO TLB shootdown this proc's stuff
+
+					as->page_dir->dir[pdi]->table[pti].present = 0;
+					as->page_dir->dir[pdi]->table[pti].swap = coremap.cm[index].swap;
+					coremap.cm[index].swap = 0;
+
+					// TODO Zero page here
+
+					page_set_free(as->page_dir->dir[pdi], pti);
+
+					coremap.cm[index].slen = 1;
+					coremap.cm[index].vpn = vpn;
+					coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
+
+					return CMI_TO_PADDR(index);
+
+				}else if(round >= 2){
+					//Write dirty page to disk and then evict
+					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
+					struct addrspace *as;
+					int pdi = PDI(coremap.cm[index].vpn);
+					int pti = PTI(coremap.cm[index].vpn);
+
+					// Give up here to avoid deadlock
+					if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0){
+						core_set_free(index);
+						continue;
+					}
+
+					// TODO TLB shootdown this proc's stuff
+
+					as->page_dir->dir[pdi]->table[pti].present = 0;
+					as->page_dir->dir[pdi]->table[pti].swap = write_to_disk(CMI_TO_PADDR(index));
+
+					// TODO Zero page here
+
+					page_set_free(as->page_dir->dir[pdi], pti);
+
+					coremap.cm[index].dirty = 0;
+					coremap.cm[index].slen = 1;
+					coremap.cm[index].vpn = vpn;
+					coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
+
+					return CMI_TO_PADDR(index);
+				}
+
+				core_set_free(index);
 			}
-			core_set_free(index);
-			// TODO add eviction later checking for clean pages, then cleaning up pages and evicting them
 		}
 	}
 
@@ -201,7 +262,6 @@ int core_set_free(int index){
 		return 0;
 	} else {    /* already set free */
         panic("busybit is already unset\n");
-		//spinlock_release(&coremap.lock);
 	}
 }
 
@@ -287,15 +347,17 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 		return -1;
 
     // Page exists but is not allocated
-	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0){
+	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0)
 		pt->table[pti].ppn = get_free_cme(vaddr, false);
-		if(pt->table[pti].ppn == 0)
-			return -1;
-		// We can free this because any eviction has to get the page table busy bit which is already set
-		core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
-	}else{
-		// TODO page on disk handle retrival later
-	}
+	else
+		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].swap, vaddr);
+
+	if(pt->table[pti].ppn == 0)
+		return -1;
+
+	// We can free this because any eviction has to get the page table busy bit which is already set
+	core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+
 	return 0;
 }
 

@@ -11,6 +11,7 @@ page_dir_init(){
 	if(pd->dir == NULL){
 		return NULL;
 	}
+	// TODO should this be KVADDR?
     memset(pd, 0, sizeof (struct page_dir));
     /*
 	for(int i = 0; i < PD_SIZE; i++)
