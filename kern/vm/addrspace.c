@@ -188,7 +188,7 @@ as_destroy(struct addrspace *as)
 
 					core_set_free(cm_index);
 				}else{
-					remove_from_disk(as->page_dir->dir[i]->table[j].swap);
+					remove_from_disk(as->page_dir->dir[i]->table[j].ppn);
 				}
 
 				as->page_dir->dir[i]->table[j].valid = 0;

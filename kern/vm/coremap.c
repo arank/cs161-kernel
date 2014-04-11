@@ -129,7 +129,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					// TODO TLB shootdown this proc's stuff
 
 					as->page_dir->dir[pdi]->table[pti].present = 0;
-					as->page_dir->dir[pdi]->table[pti].swap = coremap.cm[index].swap;
+					as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
 					coremap.cm[index].swap = 0;
 
 					// TODO Zero page here
@@ -158,7 +158,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					// TODO TLB shootdown this proc's stuff
 
 					as->page_dir->dir[pdi]->table[pti].present = 0;
-					as->page_dir->dir[pdi]->table[pti].swap = write_to_disk(CMI_TO_PADDR(index));
+					as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index));
 
 					// TODO Zero page here
 
@@ -350,7 +350,7 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0)
 		pt->table[pti].ppn = get_free_cme(vaddr, false);
 	else
-		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].swap, vaddr);
+		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
 
 	if(pt->table[pti].ppn == 0)
 		return -1;
