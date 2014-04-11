@@ -12,7 +12,6 @@ struct backing_store{
 	paddr_t swap;
 } *backing_store;
 
-// TODO  how to get disk size and location on disk to use
 int init_backing_store(void) {
 
     backing_store = kmalloc(sizeof *backing_store);
