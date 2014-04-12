@@ -16,23 +16,25 @@ struct child_data {
     struct semaphore *sem;
 };
 
-static 
+static
 struct proc *
 create_child(pid_t pid) {
     struct proc *child = proc_create(curproc->p_name);
     if (child == NULL) goto proc_out;
-    
+
+    procmap_add(pid, child);
+
     /* make a shared link between parent and child */
     child->parent = shared_link_create(pid);
     if (child->parent == NULL) goto parent_out;
     child->parent->ref_count++;
 
     /* copy address space */
-    struct addrspace *child_addrspace; 
+    struct addrspace *child_addrspace;
     int rv = as_copy(curproc->p_addrspace, &child_addrspace);
     if (rv == ENOMEM) goto as_out;
     child->p_addrspace = child_addrspace;
-    
+
     /* copy file descriptor pointers */
     for (int i = 0; i < OPEN_MAX; i++) {
         if (curproc->fd_table[i] != NULL) {
@@ -59,15 +61,15 @@ proc_out:
     return NULL;
 }
 
-static 
-int 
+static
+int
 get_next_child_index(struct proc *proc) {
     for (int i = 0; i < MAX_CLD; i++)
         if (proc->children[i] == NULL) return i;
-    return -1; 
+    return -1;
 }
 
-static 
+static
 void
 child_fork(void *data1, unsigned long data2) {
     (void)data2;
@@ -76,7 +78,7 @@ child_fork(void *data1, unsigned long data2) {
     struct trapframe tf = *child_data.tf;
     tf.tf_v0 = 0;
     tf.tf_a3 = 0;
-    tf.tf_epc += 4; 
+    tf.tf_epc += 4;
 
     as_activate();
 
@@ -94,7 +96,7 @@ pid_t sys_fork(struct trapframe *tf, pid_t *child_pid) {
     int index = get_next_child_index(curproc);
     if (index == -1) goto index_out;
 
-    struct semaphore *sem = sem_create("wait for child", 0);    
+    struct semaphore *sem = sem_create("wait for child", 0);
     if (sem == NULL) goto sem_out;
 
     struct child_data child_data;

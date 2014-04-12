@@ -30,8 +30,11 @@
 #ifndef _H_PID_TABLE_H_
 #define _H_PID_TABLE_H_
 
+struct proc;
+
 int init_pid_table(void);
 void destroy_pid_table(void);
+void procmap_add(unsigned pid, struct proc *proc);
 pid_t pid_get(void);
 void pid_destroy(pid_t pid);
 bool pid_in_use(pid_t pid);

@@ -72,7 +72,7 @@ proc_create(const char *name)
 {
 	struct proc *proc;
 
-	proc = kmalloc(sizeof(*proc));
+	proc = kmalloc(sizeof *proc);
 	if (proc == NULL) {
 		return NULL;
 	}
@@ -100,6 +100,7 @@ proc_create(const char *name)
             proc_destroy(proc);
             return NULL;
         }
+        procmap_add(proc->pid, proc);
 	}else{
 		proc->pid = 0;  /* kernel thread, 0 is set in pid_table in pid_init */
 	}
