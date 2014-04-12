@@ -86,6 +86,43 @@ vm_bootstrap(void)
     cm_bootstrap();
 }
 
+
+// Given a locked dirty cme, it cleans it to disk
+//int clean_cme(){
+//
+//}
+
+// Given a locked cme it forcibly frees it
+static int force_free_cme(int index, bool force){
+	struct addrspace *as;
+	int pdi = PDI(coremap.cm[index].vpn);
+	int pti = PTI(coremap.cm[index].vpn);
+
+	// Give up here to avoid deadlock
+	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0){
+		core_set_free(index);
+		return -1;
+	}
+
+	// TODO TLB shootdown this proc's stuff
+
+
+	as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
+	if(as->page_dir->dir[pdi]->table[pti].ppn == 0)
+		as->page_dir->dir[pdi]->table[pti].present = 1;
+	else
+		as->page_dir->dir[pdi]->table[pti].present = 0;
+
+	coremap.cm[index].swap = 0;
+
+	// Zero physical page
+	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
+
+	page_set_free(as->page_dir->dir[pdi], pti);
+
+	return 0;
+}
+
 // Returns with busy bit set on the entry
 paddr_t
 get_free_cme(vaddr_t vpn, bool is_kern) {
@@ -123,30 +160,8 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 				}else if(round >= 1 && coremap.cm[index].dirty == 0){
 					panic("evicting clean page\n");
 					// Steal cleaned page and evict
-					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
-					struct addrspace *as;
-					int pdi = PDI(coremap.cm[index].vpn);
-					int pti = PTI(coremap.cm[index].vpn);
 
-					// Give up here to avoid deadlock
-					if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0){
-						core_set_free(index);
-						continue;
-					}
 
-					// TODO TLB shootdown this proc's stuff
-					as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
-					if(as->page_dir->dir[pdi]->table[pti].ppn == 0)
-						as->page_dir->dir[pdi]->table[pti].present = 1;
-					else
-						as->page_dir->dir[pdi]->table[pti].present = 0;
-
-					coremap.cm[index].swap = 0;
-
-					// Zero physical page
-					memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
-
-					page_set_free(as->page_dir->dir[pdi], pti);
 
 					coremap.cm[index].slen = 1;
 					coremap.cm[index].vpn = vpn;
@@ -158,33 +173,6 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					panic("evicting dirty page\n");
 					//Write dirty page to disk and then evict
 					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
-					struct addrspace *as;
-					int pdi = PDI(coremap.cm[index].vpn);
-					int pti = PTI(coremap.cm[index].vpn);
-
-					// Give up here to avoid deadlock
-					if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0){
-						core_set_free(index);
-						continue;
-					}
-
-					// TODO TLB shootdown this proc's stuff
-
-					as->page_dir->dir[pdi]->table[pti].present = 0;
-
-					if(coremap.cm[index].swap == 0){
-						as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index), -1);
-						coremap.cm[index].swap = as->page_dir->dir[pdi]->table[pti].ppn;
-					}else{
-						write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
-					}
-
-					coremap.cm[index].swap = 0;
-
-					// Zero physical page
-					memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
-
-					page_set_free(as->page_dir->dir[pdi], pti);
 
 					coremap.cm[index].dirty = 0;
 					coremap.cm[index].slen = 1;
