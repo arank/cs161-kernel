@@ -181,7 +181,7 @@ as_destroy(struct addrspace *as)
 					coremap.cm[cm_index].vpn = 0;
 
 					if(coremap.cm[cm_index].swap!=0){
-						kprintf("clean disk remove on as destroy\n");
+						panic("clean disk remove on as destroy\n");
 						remove_from_disk(coremap.cm[cm_index].swap);
 						coremap.cm[cm_index].swap = 0;
 					}
@@ -191,7 +191,7 @@ as_destroy(struct addrspace *as)
 
 					core_set_free(cm_index);
 				}else{
-					kprintf("dirty disk remove on as destroy\n");
+					panic("dirty disk remove on as destroy\n");
 					remove_from_disk(as->page_dir->dir[i]->table[j].ppn);
 				}
 
@@ -315,34 +315,6 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 
 	*stackptr = USERSTACK;
 
-    /*
-	if(as->page_dir->dir[PDI(*stackptr)] == NULL)
-		page_table_add(PDI(*stackptr), as->page_dir);
-
-	int cur_index = PDI(*stackptr);
-	for(int i = 0, j = PTI(*stackptr); i < 17; i++, j--){
-
-		if(j < 0){
-			if(page_table_add(--cur_index, as->page_dir))
-				return -1;
-			j=1023;
-		}
-
-		// For last page add redzone
-		if(i == 16){
-			as->page_dir->dir[cur_index]->table[j].valid = 1;
-			as->page_dir->dir[cur_index]->table[j].read = 0;
-			as->page_dir->dir[cur_index]->table[j].write = 0;
-			as->page_dir->dir[cur_index]->table[j].exec = 0;
-		}else{
-			as->page_dir->dir[cur_index]->table[j].valid = 1;
-			as->page_dir->dir[cur_index]->table[j].present = 1;
-			as->page_dir->dir[cur_index]->table[j].read = 1;
-			as->page_dir->dir[cur_index]->table[j].write = 1;
-			as->page_dir->dir[cur_index]->table[j].exec = 1;
-		}
-	}
-    */
 	return 0;
 }
 
