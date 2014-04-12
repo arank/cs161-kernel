@@ -248,6 +248,7 @@ get_kpage_seq(unsigned npages) {
 vaddr_t
 alloc_kpages(int npages)
 {
+    KASERT(npages == 1);
 	paddr_t pa = get_kpage_seq(npages);
 	if (pa == 0) return 0;
 	memset((void *)PADDR_TO_KVADDR(pa), 0, PAGE_SIZE * npages);

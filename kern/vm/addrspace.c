@@ -62,6 +62,7 @@ as_create(void)
 	if(as->lock == NULL)
 		goto lock_out;
 
+    as->heap_start = as->heap_end = 0;
 	return as;
 
 lock_out:
@@ -250,8 +251,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 	// Calculate offset into dir, and define new table, set the addr to valid, plus the offset.
 	int pdi = PDI(vaddr);
     KASSERT(pdi != 0);
-	if(page_table_add(pdi, as->page_dir) == ENOMEM)
-		goto out;
+	if(page_table_add(pdi, as->page_dir) == ENOMEM) goto out;
 
 	int pages_to_alloc = (OFFSET(vaddr) + sz) / PAGE_SIZE;
 	if((OFFSET(vaddr) + sz) % PAGE_SIZE != 0)
