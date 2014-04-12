@@ -214,7 +214,6 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 1 && coremap.cm[index].dirty == 0){
-					panic("evicting clean page\n");
 					// Steal cleaned page and evict
 					if(evict_cme(index, EVICT_CLEAN)!=0){
 						core_set_free(index);
@@ -224,7 +223,6 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 2){
-					panic("evicting dirty page\n");
 					//Write dirty page to disk and then evict
 					if(evict_cme(index, EVICT_ALL)!=0){
 						core_set_free(index);
@@ -414,7 +412,6 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 		pt->table[pti].ppn = get_free_cme(vaddr, USER_CMI);
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
-		panic("TLB get from disk\n");
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
 		pt->table[pti].present = 1;
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
@@ -445,7 +442,7 @@ update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only_fault) {
 
 static int tlb_miss_on_load(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
-	if(validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
+	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
     update_tlb(pt->table[pti].ppn, vaddr, false, false);
 
@@ -455,7 +452,8 @@ static int tlb_miss_on_load(vaddr_t vaddr, struct page_table *pt){
 
 static int tbl_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
-	if(validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
+    //if (pt->table[pti].write == 0) return EFAULT;
+	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
@@ -494,7 +492,6 @@ done:
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-    //kprintf("fault: %zu - %x\n", faulttype, faultaddress);
     KASSERT(faultaddress != 0);
     KASSERT(faultaddress < MIPS_KSEG0);
 

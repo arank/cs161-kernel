@@ -38,8 +38,8 @@
 
 static struct {
     struct bitmap *pid_map;
-    //unsigned counter;
     struct lock *lock;
+    struct proc *proc_map[PID_MAX];
 } *pid_table;
 
 /* called in bootstrap */
@@ -54,10 +54,9 @@ int init_pid_table(void) {
     pid_table->lock = lock_create("pid_table_lock");
     if (pid_table->lock == NULL) goto lk_out;
 
-    //pid_table->counter = 0;
     // Set kernel proc's pid
     bitmap_mark(pid_table->pid_map, 0);
-    
+
     return 0;
 
 lk_out:
@@ -66,6 +65,13 @@ bm_out:
     kfree(pid_table);
 out:
     return 1;
+}
+
+void
+procmap_add(unsigned pid, struct proc *proc) {
+    lock_acquire(pid_table->lock);
+    pid_table->proc_map[pid] = proc;
+    lock_release(pid_table->lock);
 }
 
 /*
@@ -82,12 +88,12 @@ void destroy_pid_table(void) {
 
     //TODO: failing to destroy, thread.c:1028 line, KASSERT
     //lock_destroy(pid_table->lock);
-    kfree(pid_table); 
+    kfree(pid_table);
 }
 
 pid_t pid_get(void) {
     lock_acquire(pid_table->lock);
-    
+
     unsigned pid;
     if (bitmap_alloc(pid_table->pid_map, &pid) != ENOSPC){
     	lock_release(pid_table->lock);
@@ -104,6 +110,7 @@ void pid_destroy(pid_t pid) {
     // TODO: check that this thread holds the pid
     KASSERT(bitmap_isset(pid_table->pid_map, (unsigned)pid));
     bitmap_unmark(pid_table->pid_map, (unsigned)pid);
+    pid_table->proc_map[pid] = NULL;
     lock_release(pid_table->lock);
 }
 
