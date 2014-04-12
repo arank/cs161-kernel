@@ -74,6 +74,15 @@ procmap_add(unsigned pid, struct proc *proc) {
     lock_release(pid_table->lock);
 }
 
+struct proc *
+get_proc(unsigned pid) {
+    struct proc *proc = NULL;
+    lock_acquire(pid_table->lock);
+    proc = pid_table->proc_map[pid];
+    lock_release(pid_table->lock);
+    return proc;
+}
+
 /*
  * called in shutdown when there are no threads left except for the kernel
  * thread

@@ -9,13 +9,15 @@
 #include <kern/errno.h>
 
 int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
-    if (num_bytes < 0 && num_bytes % PAGE_SIZE != 0) return EINVAL;
+    if (num_bytes < 0) return EINVAL;
 
 	struct addrspace *as= curproc->p_addrspace;
 	vaddr_t prev_break = as->heap_end;
 
     // no nede to make a function call and acquire lock -> return immideately
     if (num_bytes == 0) goto done;
+
+    if (num_bytes % PAGE_SIZE != 0) return EINVAL;
 
 	// No multi-threaded processes but I'm still locking here to get the atomicity from the posix api
 	lock_acquire(as->lock);

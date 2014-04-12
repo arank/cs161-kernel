@@ -64,6 +64,7 @@ struct addrspace {
         struct lock *lock; // Used in as_copy or destroy
         vaddr_t heap_start;
         vaddr_t heap_end;
+        bool loading;
 #endif
 };
 
