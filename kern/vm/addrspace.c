@@ -127,7 +127,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 					memcpy((void*)PADDR_TO_KVADDR(free), (void*)PADDR_TO_KVADDR(ppn), PAGE_SIZE);
 				}else{
 					// Copy over from disk
-					kprintf("disk copy on as cpy\n");
+					panic("disk copy on as cpy\n");
 					free = retrieve_from_disk(newas->page_dir->dir[i]->table[j].ppn, vpn);
 				}
 
