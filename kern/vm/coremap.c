@@ -384,15 +384,16 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 
 static
 void
-update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only) {
+update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only_fault) {
     uint32_t elo = (pa & TLBLO_PPAGE) | TLBLO_VALID;
     if (dirty) elo |= TLBLO_DIRTY;
 
     uint32_t ehi = va & TLBHI_VPAGE;
     va &= PAGE_FRAME;
+
     int spl = splhigh();
 
-    if (read_only) {
+    if (read_only_fault) {
         int tlbi = tlb_probe(va, 0);
         (tlbi >= 0) ? tlb_write(ehi, elo, tlbi) : tlb_random(ehi, elo);
     } else
@@ -407,11 +408,8 @@ static int tlb_miss_on_load(vaddr_t vaddr){
 	int pti = PTI(vaddr);
 	if(validate_vaddr(vaddr, pt, pti) != 0)
 		return -1;
-    paddr_t paddr = pt->table[pti].ppn;
-    update_tlb(paddr, vaddr, false, false);
+    update_tlb(pt->table[pti].ppn, vaddr, false, false);
 
-	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
-	// TODO put pt->table[pti].ppn into the TLB
 	page_set_free(pt, pti);
 	return 0;
 }
@@ -423,11 +421,8 @@ static int tbl_miss_on_store(vaddr_t vaddr){
 	if(validate_vaddr(vaddr, pt, pti) != 0)
 		return -1;
 
-    paddr_t paddr = pt->table[pti].ppn;
-    update_tlb(paddr, vaddr, true, false);
+    update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
-	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
-	// TODO put pt->table[pti].ppn into the TLB
 	page_set_free(pt, pti);
 	return 0;
 }
@@ -437,14 +432,12 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 	int pti = PTI(vaddr);
 	if(validate_vaddr(vaddr, pt, pti) != 0) return -1;
 
-    paddr_t paddr = pt->table[pti].ppn;
-    update_tlb(paddr, vaddr, true, true);
-
-	// TODO do i even need to get the coremap lock here to set the dirty bit?
 	int cmi = PADDR_TO_CMI(pt->table[pti].ppn);
 	core_set_busy(cmi, true);
 	coremap.cm[cmi].dirty = 1;
 	core_set_free(cmi);
+
+    update_tlb(pt->table[pti].ppn, vaddr, true, true);
 
 	// TODO is it already in the TLB at this point? do I just have to change permissions?
 	// TODO should I free page before I get the coremap lock
@@ -455,6 +448,7 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
+    kprintf("fault: %zu - %x\n", faulttype, faultaddress);
     KASSERT(faultaddress != 0);
     KASSERT(faultaddress < MIPS_KSEG0);
 
