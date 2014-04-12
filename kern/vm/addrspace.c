@@ -63,6 +63,7 @@ as_create(void)
 		goto lock_out;
 
     as->heap_start = as->heap_end = 0;
+    as->loading = false;
 	return as;
 
 lock_out:
@@ -289,7 +290,7 @@ as_prepare_load(struct addrspace *as)
 	 * None
 	 */
 
-	(void)as;
+	as->loading = true;
 	return 0;
 }
 
@@ -300,7 +301,7 @@ as_complete_load(struct addrspace *as)
 	 * None
 	 */
 
-	(void)as;
+	as->loading = false;
 	return 0;
 }
 

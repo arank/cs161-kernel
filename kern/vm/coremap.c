@@ -4,7 +4,7 @@
 #include <lib.h>
 #include <coremap.h>
 #include <pagetable.h>
-
+#include <pid_table.h>
 #include <synch.h>
 #include <proc.h>
 #include <current.h>
@@ -459,7 +459,11 @@ int
 tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
-    //if (pt->table[pti].write == 0) return EFAULT;
+
+    unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
+    unsigned pid = coremap.cm[cmi].pid;
+    struct addrspace *as = get_proc(pid)->p_addrspace;
+    if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
 
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
