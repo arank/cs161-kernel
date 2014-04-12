@@ -4,6 +4,7 @@
 struct backing_store{
 	struct lock *lock;
 	struct bitmap* bm;
+	// TODO we don't need this
 	paddr_t swap;
 } *backing_store;
 

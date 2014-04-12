@@ -16,8 +16,6 @@
 
 int init_backing_store(void) {
 
-	// TODO init the disk device, with certain size
-
     backing_store = kmalloc(sizeof *backing_store);
     if (backing_store == NULL) goto out;
 

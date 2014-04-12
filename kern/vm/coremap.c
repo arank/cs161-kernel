@@ -100,6 +100,7 @@ void
 vm_bootstrap(void)
 {
     cm_bootstrap();
+    init_backing_store();
 }
 
 
@@ -241,7 +242,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 }
 
 
-
+// TODO re-write this
 static
 paddr_t
 get_kpage_seq(unsigned npages) {
