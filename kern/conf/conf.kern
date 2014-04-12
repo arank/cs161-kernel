@@ -342,6 +342,7 @@ file      vm/kmalloc.c
 file      vm/coremap.c
 file	  vm/pagetable.c
 file	  vm/backingstore.c
+file	  vm/cleaning_deamon.c
 optofffile dumbvm   vm/addrspace.c
 
 #

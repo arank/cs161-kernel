@@ -1,3 +1,5 @@
+#include <spinlock.h>
+
 #ifndef _H_COREMAP_H_
 #define _H_COREMAP_H_
 
@@ -5,6 +7,8 @@
 #define USER_CMI    0
 #define WAIT        1
 #define NO_WAIT     0
+#define EVICT_ALL	1
+#define EVICT_CLEAN 2
 
 void cm_bootstrap(void);
 
@@ -16,6 +20,8 @@ void set_dirty_bit(int index, int bitvalue);
 int core_set_busy(int index, bool wait);
 
 int core_set_free(int index);
+
+int clean_cme(int index);
 
 paddr_t get_free_cme(vaddr_t vpn, bool kern);
 

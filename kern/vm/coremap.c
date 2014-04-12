@@ -14,6 +14,8 @@
 #include <spl.h>
 #include <addrspace.h>
 #include <backingstore.h>
+#include <cleaning_deamon.h>
+
 
 int stat_coremap(int nargs, char **args) {
     (void)nargs;
@@ -33,6 +35,7 @@ int stat_coremap(int nargs, char **args) {
 }
 
 /* must be called with acquired spinlock */
+// TODO can we encapsulate getting and releasing the spinlock in these functions
 void
 set_use_bit(int index, int bitvalue) {
     coremap.cm[index].use = bitvalue;
@@ -57,6 +60,13 @@ void
 set_dirty_bit(int index, int bitvalue) {
     coremap.cm[index].dirty = bitvalue;
     (bitvalue) ? coremap.modified++ : coremap.modified--;
+    // Signal deamon
+    if(bitvalue){
+    	lock_acquire(deamon.lock);
+    	cv_signal(deamon.cv, deamon.lock);
+    	lock_release(deamon.lock);
+    }
+
 }
 
 void cm_bootstrap(void) {
@@ -93,33 +103,66 @@ vm_bootstrap(void)
 }
 
 
-// Given a locked dirty cme, it cleans it to disk
-//int clean_cme(){
-//
-//}
-
-// Given a locked cme it forcibly frees it
-static int force_free_cme(int index, bool force){
+// Given a locked non-kern dirty cme, it cleans it to disk
+int clean_cme(int index){
+	// TODO Somehow get address space/ page dir from coremap.cm[index].pid
 	struct addrspace *as;
 	int pdi = PDI(coremap.cm[index].vpn);
 	int pti = PTI(coremap.cm[index].vpn);
 
 	// Give up here to avoid deadlock
-	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0){
-		core_set_free(index);
+	// TODO must I lock here?
+	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0)
 		return -1;
-	}
 
 	// TODO TLB shootdown this proc's stuff
 
+	if(coremap.cm[index].swap == 0){
+		coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), 0);
+	}else{
+		write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
+	}
 
-	as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
-	if(as->page_dir->dir[pdi]->table[pti].ppn == 0)
-		as->page_dir->dir[pdi]->table[pti].present = 1;
-	else
+	spinlock_acquire(&coremap.lock);
+	set_dirty_bit(index, 0);
+	spinlock_release(&coremap.lock);
+
+	page_set_free(as->page_dir->dir[pdi], pti);
+
+	return 0;
+}
+
+// Given a locked non-kern cme it forcibly evicts it
+static int evict_cme(int index, int options){
+	// TODO Somehow get address space/ page dir from coremap.cm[index].pid
+	struct addrspace *as;
+	int pdi = PDI(coremap.cm[index].vpn);
+	int pti = PTI(coremap.cm[index].vpn);
+
+	// Give up here to avoid deadlock
+	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0)
+		return -1;
+
+	// TODO TLB shootdown this proc's stuff
+
+	// Page is clean
+	if(coremap.cm[index].dirty == 0){
+		// Reset swap to either 0 if symbolic or the dedicated swap addr if it is swapped
+		as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
+		if(as->page_dir->dir[pdi]->table[pti].ppn == 0)
+			as->page_dir->dir[pdi]->table[pti].present = 1;
+		else
+			as->page_dir->dir[pdi]->table[pti].present = 0;
+	}else if(options ==  EVICT_ALL){
+		// Evict all data to dedicated disk swap space, or assign new swap space and evict to there
 		as->page_dir->dir[pdi]->table[pti].present = 0;
-
-	coremap.cm[index].swap = 0;
+		if(coremap.cm[index].swap == 0){
+			as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index), 0);
+			coremap.cm[index].swap = as->page_dir->dir[pdi]->table[pti].ppn;
+		}else{
+			write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
+		}
+	}
 
 	// Zero physical page
 	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
@@ -127,6 +170,20 @@ static int force_free_cme(int index, bool force){
 	page_set_free(as->page_dir->dir[pdi], pti);
 
 	return 0;
+}
+
+// Updates cme to clean and new
+static void update_cme(int index, vaddr_t vpn, bool is_kern){
+	coremap.cm[index].swap = 0;
+	coremap.cm[index].slen = 1;
+	coremap.cm[index].vpn = vpn;
+	coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
+	if (coremap.cm[index].dirty==1){
+		spinlock_acquire(&coremap.lock);
+		set_dirty_bit(index, 0);
+		spinlock_release(&coremap.lock);
+	}
+	if (is_kern) set_kern_bit(index, 1);
 }
 
 // Returns with busy bit set on the entry
@@ -145,46 +202,35 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					core_set_free(index);
 					continue;
 				}
-
 				// Check if in use
 				if (coremap.cm[index].use == 0) {
 					set_use_bit(index, 1);
-					if (is_kern) set_kern_bit(index, 1);
 
-					coremap.cm[index].slen = 1;
-					coremap.cm[index].vpn = vpn;
-					coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
-
-					spinlock_acquire(&coremap.lock);
+					//spinlock_acquire(&coremap.lock);
 					//coremap.last_allocated = index;
-					kprintf("cmi: %zu; used: %zu\n", index, coremap.used);
-					spinlock_release(&coremap.lock);
+					//spinlock_release(&coremap.lock);
 
+					update_cme(index, vpn, is_kern);
 					return CMI_TO_PADDR(index);
 
-				// TODO write a helper function to abstract the next two functions
 				}else if(round >= 1 && coremap.cm[index].dirty == 0){
 					panic("evicting clean page\n");
 					// Steal cleaned page and evict
-
-
-
-					coremap.cm[index].slen = 1;
-					coremap.cm[index].vpn = vpn;
-					coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
-
+					if(evict_cme(index, EVICT_CLEAN)!=0){
+						core_set_free(index);
+						return 0;
+					}
+					update_cme(index, vpn, is_kern);
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 2){
 					panic("evicting dirty page\n");
 					//Write dirty page to disk and then evict
-					// TODO Somehow get address space/ page dir from coremap.cm[index].pid
-
-					coremap.cm[index].dirty = 0;
-					coremap.cm[index].slen = 1;
-					coremap.cm[index].vpn = vpn;
-					coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
-
+					if(evict_cme(index, EVICT_ALL)!=0){
+						core_set_free(index);
+						return 0;
+					}
+					update_cme(index, vpn, is_kern);
 					return CMI_TO_PADDR(index);
 				}
 
@@ -195,6 +241,8 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 
     return 0;   /* in this case busybit is unset */
 }
+
+
 
 static
 paddr_t
@@ -470,46 +518,3 @@ vm_fault(int faulttype, vaddr_t faultaddress)
     return -1;  /* should never get here */
 }
 
-/*
-static
-paddr_t
-get_kpage_seq(unsigned npages) {
-	// This globally locks to find kernel pages as it simplifies the process, and this function is used sparingly
-	// so it wont cause great slowdown
-	spinlock_acquire(&coremap.lock);
-
-	int index = coremap.last_allocated;
-	unsigned alloced = 0;
-	for(unsigned i = 0; i<(2*coremap.size) && alloced<npages; i++){
-		index = (index+1) % coremap.size;
-		if(coremap.cm[index].busybit == 1 || coremap.cm[index].kern == 1){
-			alloced = 0;
-			continue;
-		}else if (coremap.cm[index].use == 1){
-			//Only evict on second run through coremap
-			if(i>=coremap.size){
-				// TODO evict and set as not in use
-			}else{
-				alloced = 0;
-				continue;
-			}
-		}
-
-		// We are garunteed a clean cme here
-		coremap.cm[index].use = 1;
-		coremap.cm[index].vpn = 0;
-		coremap.cm[index].pid = 0;
-		coremap.cm[index].kern = 1;
-		alloced++;
-	}
-
-	if(alloced == npages){
-		coremap.last_allocated = index;
-		spinlock_release(&coremap.lock);
-		return CMI_TO_PADDR(index-alloced+1);
-	}else{
-		spinlock_release(&coremap.lock);
-		return 0;
-	}
-}
-*/

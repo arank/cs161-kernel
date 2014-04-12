@@ -115,9 +115,11 @@ int write_to_disk(paddr_t location, int index){
 	KASSERT(coremap.cm[PADDR_TO_CMI(location)].busybit == 1);
 	lock_acquire(backing_store->lock);
 	unsigned spot = index;
-	if(index < 0 && bitmap_alloc(backing_store->bm, &spot) == ENOSPC){
-	    lock_release(backing_store->lock);
-	    return -1;
+	if(index <= 0){
+		if(bitmap_alloc(backing_store->bm, &spot) == ENOSPC){
+			lock_release(backing_store->lock);
+			return -1;
+		}
 	}
 
 	struct vnode *node;
