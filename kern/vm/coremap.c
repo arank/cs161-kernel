@@ -123,6 +123,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					kprintf("cmi: %zu; used: %zu\n", index, coremap.used);
 					spinlock_release(&coremap.lock);
 
+                    memset((void *)PADDR_TO_KVADDR((CMI_TO_PADDR(index))), 0, PAGE_SIZE);
 					return CMI_TO_PADDR(index);
 
 				// TODO write a helper function to abstract the next two functions
@@ -249,6 +250,7 @@ alloc_kpages(int npages)
 {
 	paddr_t pa = get_kpage_seq(npages);
 	if (pa == 0) return 0;
+	memset((void *)PADDR_TO_KVADDR(pa), 0, PAGE_SIZE * npages);
 	return PADDR_TO_KVADDR(pa);
 }
 
@@ -313,7 +315,7 @@ kfree_one_page(unsigned cm_index) {
 	coremap.cm[cm_index].dirty = 0;
 
 	/* zero out physical page */
-	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
+	//memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 
 	core_set_free(cm_index);
 }
@@ -404,7 +406,9 @@ update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only_fault) {
     splx(spl);
 }
 
-static int tlb_miss_on_load(vaddr_t vaddr, struct page_table *pt){
+static
+int
+tlb_miss_on_load(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
@@ -414,10 +418,12 @@ static int tlb_miss_on_load(vaddr_t vaddr, struct page_table *pt){
 	return 0;
 }
 
-static int tbl_miss_on_store(vaddr_t vaddr, struct page_table *pt){
+static
+int
+tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
-    //if (pt->table[pti].write == 0) return EFAULT;
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
+    //if (pt->table[pti].write == 0) return EFAULT;
 
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
@@ -471,7 +477,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         	return tlb_miss_on_load(faultaddress, pt);
 
         case VM_FAULT_WRITE:
-            return tbl_miss_on_store(faultaddress, pt);
+            return tlb_miss_on_store(faultaddress, pt);
 
         default: panic ("bad faulttype\n");
     }

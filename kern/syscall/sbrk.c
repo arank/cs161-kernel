@@ -9,10 +9,11 @@
 #include <kern/errno.h>
 
 int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
-    if (num_bytes < 0 && num_bytes % PAGE_SIZE != 0) return EINVAL;
+    if (num_bytes < 0) return EINVAL;
 
 	struct addrspace *as= curproc->p_addrspace;
 	vaddr_t prev_break = as->heap_end;
+    if (num_bytes % PAGE_SIZE != 0) return EINVAL;
 
     // no nede to make a function call and acquire lock -> return immideately
     if (num_bytes == 0) goto done;

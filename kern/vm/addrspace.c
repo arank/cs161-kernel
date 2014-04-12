@@ -249,6 +249,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 {
 	// Calculate offset into dir, and define new table, set the addr to valid, plus the offset.
 	int pdi = PDI(vaddr);
+    KASSERT(pdi != 0);
 	if(page_table_add(pdi, as->page_dir) == ENOMEM)
 		goto out;
 

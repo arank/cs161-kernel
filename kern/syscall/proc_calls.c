@@ -100,8 +100,9 @@ void sys__exit(int exitcode) {
 	struct proc *proc = curproc;
 	// If there is a parent, set the exit code in the parent
 	if (proc->parent != NULL) {
-		proc->parent->exit_code = (exitcode == -1) 
-                                    ? _MKWAIT_SIG(exitcode) 
+//		proc->parent->exit_code = exitcode;
+		proc->parent->exit_code = (exitcode == -1)
+                                    ? _MKWAIT_SIG(exitcode)
                                     : _MKWAIT_EXIT(exitcode);
 		shared_link_destroy(PARENT, proc);
 	}
@@ -109,7 +110,7 @@ void sys__exit(int exitcode) {
 	proc_remthread(curthread);
 	proc_addthread(kproc, curthread);
     /* calls cleanup_data, which calls shared_link_destroy to destroy children */
-	proc_destroy(proc); 
+	proc_destroy(proc);
 	thread_exit();
 }
 

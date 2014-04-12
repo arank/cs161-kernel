@@ -133,7 +133,7 @@ syscall(struct trapframe *tf)
 	    case SYS_lseek:
         join32to64(tf->tf_a2, tf->tf_a3, &offset_in);    /* join pos argument */
         /* get whence from the stack */
-        err = copyin((const_userptr_t)(tf->tf_sp + 16), &whence, sizeof (uint32_t)); 
+        err = copyin((const_userptr_t)(tf->tf_sp + 16), &whence, sizeof (uint32_t));
         if (err) break;
 		err = sys_lseek (tf->tf_a0, (off_t)offset_in, (int)whence, (off_t *)&offset_out);
         split64to32(offset_out, (uint32_t *)&retval, &tf->tf_v1);
