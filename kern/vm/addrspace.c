@@ -271,6 +271,9 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
         as->page_dir->dir[pdi]->table[pti].exec = executable;
 	}
 
+    if ((vaddr + sz) < USERSTACK - (RED_ZONE * PAGE_SIZE) && as->heap_start < (vaddr + sz))
+        as->heap_start = as->heap_end = ROUNDUP (vaddr + sz, PAGE_SIZE);
+
 	return 0;
 
 out:
@@ -306,8 +309,8 @@ as_define_stack(struct addrspace *as, vaddr_t *stackptr)
 
 	/* Initial user-level stack pointer */
     // TODO error checking
-    as_define_region(as, USERSTACK - (17 * PAGE_SIZE), PAGE_SIZE, 1, 1, 0);
-    as_define_region(as, USERSTACK - (16 * PAGE_SIZE), 16 * PAGE_SIZE, 1, 1, 0);
+    as_define_region(as, USERSTACK - (RED_ZONE * PAGE_SIZE), PAGE_SIZE, 0, 0, 0);
+    as_define_region(as, USERSTACK - (STACK_PAGES * PAGE_SIZE), STACK_PAGES * PAGE_SIZE, 1, 1, 0);
 
 	*stackptr = USERSTACK;
 

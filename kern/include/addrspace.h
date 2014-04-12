@@ -37,8 +37,11 @@
 #include <vm.h>
 #include "opt-dumbvm.h"
 
-struct vnode;
+#define STACK_PAGES 18
+#define RED_ZONE    19
+#define TEXT_START  0x400000
 
+struct vnode;
 
 /*
  * Address space - data structure associated with the virtual memory
