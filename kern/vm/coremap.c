@@ -61,11 +61,11 @@ set_dirty_bit(int index, int bitvalue) {
     coremap.cm[index].dirty = bitvalue;
     (bitvalue) ? coremap.modified++ : coremap.modified--;
     // Signal deamon
-    if(bitvalue){
-    	lock_acquire(deamon.lock);
-    	cv_signal(deamon.cv, deamon.lock);
-    	lock_release(deamon.lock);
-    }
+//    if(bitvalue){
+//    	lock_acquire(deamon.lock);
+//    	cv_signal(deamon.cv, deamon.lock);
+//    	lock_release(deamon.lock);
+//    }
 
 }
 
