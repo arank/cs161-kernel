@@ -53,6 +53,12 @@ set_kern_bit(int index, int bitvalue) {
     (bitvalue) ? coremap.kernel++ : coremap.kernel--;
 }
 
+void
+set_dirty_bit(int index, int bitvalue) {
+    coremap.cm[index].dirty = bitvalue;
+    (bitvalue) ? coremap.modified++ : coremap.modified--;
+}
+
 void cm_bootstrap(void) {
     paddr_t lo;
     paddr_t hi;
@@ -134,7 +140,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 		for(unsigned i = 0; i < coremap.size; i++){
 			index = (index+1) % coremap.size;
 			// TODO we can probably wait here if this becomes an issue
-			if(core_set_busy(index, false) == 0){
+			if(core_set_busy(index, NO_WAIT) == 0){
 				if(coremap.cm[index].kern == 1){
 					core_set_free(index);
 					continue;
@@ -353,18 +359,17 @@ done:
 // Returns with the page table index locked, and a valid ppn that is in memory
 static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	page_set_busy(pt, pti, true);
-	if(pt->table[pti].valid != 1)
-		return -1;
+	if (pt->table[pti].valid != 1) return EFAULT;
 
     // Page exists but is not allocated
-	if(pt->table[pti].present==1 && pt->table[pti].ppn == 0){
-		pt->table[pti].ppn = get_free_cme(vaddr, false);
-		core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
-	}else if(pt->table[pti].present==0 && pt->table[pti].ppn > 0){
+	if (pt->table[pti].present == 1 && pt->table[pti].ppn == 0) {
+		pt->table[pti].ppn = get_free_cme(vaddr, USER_CMI);
+        core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
 		panic("TLB get from disk\n");
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
-		pt->table[pti].present=1;
-		core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+		pt->table[pti].present = 1;
+        core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	}
 
 	return 0;
@@ -372,15 +377,16 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 
 static
 void
-update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only) {
+update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only_fault) {
     uint32_t elo = (pa & TLBLO_PPAGE) | TLBLO_VALID;
     if (dirty) elo |= TLBLO_DIRTY;
 
     uint32_t ehi = va & TLBHI_VPAGE;
     va &= PAGE_FRAME;
+
     int spl = splhigh();
 
-    if (read_only) {
+    if (read_only_fault) {
         int tlbi = tlb_probe(va, 0);
         (tlbi >= 0) ? tlb_write(ehi, elo, tlbi) : tlb_random(ehi, elo);
     } else
@@ -389,50 +395,36 @@ update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only) {
     splx(spl);
 }
 
-static int tlb_miss_on_load(vaddr_t vaddr){
-	// TODO do I check permissions here?
-	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
+static int tlb_miss_on_load(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
-	if(validate_vaddr(vaddr, pt, pti) != 0)
-		return -1;
-    paddr_t paddr = pt->table[pti].ppn;
-    update_tlb(paddr, vaddr, false, false);
+	if(validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
-	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
-	// TODO put pt->table[pti].ppn into the TLB
+    update_tlb(pt->table[pti].ppn, vaddr, false, false);
+
 	page_set_free(pt, pti);
 	return 0;
 }
 
-static int tbl_miss_on_store(vaddr_t vaddr){
-	// TODO do I check permissions here?
-	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
+static int tbl_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
-	if(validate_vaddr(vaddr, pt, pti) != 0)
-		return -1;
+	if(validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
-    paddr_t paddr = pt->table[pti].ppn;
-    update_tlb(paddr, vaddr, true, false);
+    update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
-	// Page is now allocated at ppn and pt->pti is locked so it is safe from eviction
-	// TODO put pt->table[pti].ppn into the TLB
 	page_set_free(pt, pti);
 	return 0;
 }
 
-static int tlb_fault_readonly(vaddr_t vaddr){
-	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(vaddr)];
+static int tlb_fault_readonly(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
-	if(validate_vaddr(vaddr, pt, pti) != 0) return -1;
+	if(validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
-    paddr_t paddr = pt->table[pti].ppn;
-    update_tlb(paddr, vaddr, true, true);
-
-	// TODO do i even need to get the coremap lock here to set the dirty bit?
 	int cmi = PADDR_TO_CMI(pt->table[pti].ppn);
-	core_set_busy(cmi, true);
-	coremap.cm[cmi].dirty = 1;
+	core_set_busy(cmi, WAIT);
+    set_dirty_bit(cmi, 1);
 	core_set_free(cmi);
+
+    update_tlb(pt->table[pti].ppn, vaddr, true, true);
 
 	// TODO is it already in the TLB at this point? do I just have to change permissions?
 	// TODO should I free page before I get the coremap lock
@@ -440,29 +432,42 @@ static int tlb_fault_readonly(vaddr_t vaddr){
 	return 0;
 }
 
+static
+bool
+is_valid_addr(vaddr_t faultaddr, struct addrspace *as) {
+    if (faultaddr >= USERSTACK - (STACK_PAGES * PAGE_SIZE)) goto done;
+    if (faultaddr >= TEXT_START && faultaddr < as->heap_end) goto done;
+    return false;
+
+done:
+    return true;
+}
+
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
+    //kprintf("fault: %zu - %x\n", faulttype, faultaddress);
     KASSERT(faultaddress != 0);
     KASSERT(faultaddress < MIPS_KSEG0);
 
+    if (!is_valid_addr(faultaddress, curproc->p_addrspace)) return EFAULT;
+
+	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(faultaddress)];
+
     switch(faulttype) {
         case VM_FAULT_READONLY:
-        	tlb_fault_readonly(faultaddress);
-            break;
+        	return tlb_fault_readonly(faultaddress, pt);
 
         case VM_FAULT_READ:
-        	tlb_miss_on_load(faultaddress);
-            break;
+        	return tlb_miss_on_load(faultaddress, pt);
 
         case VM_FAULT_WRITE:
-        	tbl_miss_on_store(faultaddress);
-            break;
+            return tbl_miss_on_store(faultaddress, pt);
 
         default: panic ("bad faulttype\n");
     }
 
-    return 0;
+    return -1;  /* should never get here */
 }
 
 /*

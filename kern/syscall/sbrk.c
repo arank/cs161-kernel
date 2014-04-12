@@ -6,26 +6,33 @@
 #include <mips/vm.h>
 #include <addrspace.h>
 #include <proc.h>
+#include <kern/errno.h>
 
-int sys_sbrk(intptr_t num_bytes, vaddr_t *top){
-	if(num_bytes%PAGE_SIZE!=0)return -1;
+int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
+    if (num_bytes < 0) return EINVAL;
 
-	struct addrspace *p_addrspace= curproc->p_addrspace;
-	vaddr_t old_heap = p_addrspace->heap_end;
+	struct addrspace *as= curproc->p_addrspace;
+	vaddr_t prev_break = as->heap_end;
+    //if (((num_bytes + as->heap_end) % PAGE_SIZE) != 0) return EINVAL;
+
+    // no nede to make a function call and acquire lock -> return immideately
+    if (num_bytes == 0) goto done;
 
 	// No multi-threaded processes but I'm still locking here to get the atomicity from the posix api
-	lock_acquire(p_addrspace->lock);
+	lock_acquire(as->lock);
 
-	// We ran out of memory or heap ran into stack....
-	if (as_define_region(p_addrspace, p_addrspace->heap_end, (size_t)num_bytes, 1, 1, 1) != 0){
-		lock_release(p_addrspace->lock);
-		return -1;
+	// We ran out of memory or (given the amount of physical memory, we cannot
+    // grow heap till the red zone)
+	if (as_define_region(as, as->heap_end, (size_t)num_bytes, 1, 1, 1) != 0){
+		lock_release(as->lock);
+		return ENOMEM;
 	}
 
-	p_addrspace->heap_end += num_bytes;
+	as->heap_end += num_bytes;
 
-	lock_release(p_addrspace->lock);
+	lock_release(as->lock);
 
-	*top = old_heap;
+done:
+	*prev = prev_break;;
 	return 0;
 }
