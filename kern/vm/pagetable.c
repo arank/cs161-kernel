@@ -22,11 +22,10 @@ page_dir_init(){
 
 int page_table_add(int index, struct page_dir* pd){
 	if(pd->dir[index] != NULL)
-        return -1;
+        return -1;  /* we already have this table */
 
 	pd->dir[index] = kmalloc(sizeof(struct page_table));
-	if(pd->dir[index] == NULL)
-		goto out;
+	if(pd->dir[index] == NULL) goto out;
 
 	// TODO replace with memset
 	pd->dir[index]->lock = NULL;
@@ -34,16 +33,13 @@ int page_table_add(int index, struct page_dir* pd){
 	pd->dir[index]->table = NULL;
 
 	pd->dir[index]->lock = lock_create("page_table_lock");
-	if(pd->dir[index]->lock == NULL)
-		goto pt_out;
+	if(pd->dir[index]->lock == NULL) goto pt_out;
 
 	pd->dir[index]->cv = cv_create("page_table_cv");
-	if(pd->dir[index]->cv == NULL)
-		goto lock_out;
+	if(pd->dir[index]->cv == NULL) goto lock_out;
 
 	pd->dir[index]->table = kmalloc(sizeof(struct pte) * PT_SIZE);
-	if(pd->dir[index]->table == NULL)
-		goto cv_out;
+	if(pd->dir[index]->table == NULL) goto cv_out;
 
 	// Null all entries in page table
 	for(int i = 0; i < PT_SIZE; i++)

@@ -15,6 +15,7 @@ void set_use_bit(int index, int bitvalue);
 void set_busy_bit(int index, int bitvalue);
 void set_kern_bit(int index, int bitvalue);
 void set_dirty_bit(int index, int bitvalue);
+vaddr_t alloc_kpages(int npages);
 
 int core_set_busy(int index, bool wait);
 
