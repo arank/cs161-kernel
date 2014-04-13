@@ -111,48 +111,35 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 // TODO zero pages on allocation to allow for isolation between procs?
 int write_to_disk(paddr_t location, int index){
 	KASSERT(coremap.cm[PADDR_TO_CMI(location)].busybit == 1);
+
 	lock_acquire(backing_store->lock);
-	unsigned spot = index;
-	if(index <= 0){
-		if(bitmap_alloc(backing_store->bm, &spot) == ENOSPC){
+	unsigned offset = index;
+	if (index <= 0) {
+		if (bitmap_alloc(backing_store->bm, &offset) == ENOSPC) {
 			lock_release(backing_store->lock);
 			return -1;
 		}
 	}
 
-	struct vnode *node;
-	// TODO are these modes/flags correct (O_RDWR)
+	struct vnode *bs;
 	char *path = kstrdup(BACKING_STORE);
-	if(vfs_open(path, O_RDWR, O_RDWR, &node) != 0 || node == NULL) {
+	if(vfs_open(path, O_RDWR, 0, &bs) != 0 || bs == NULL) {
 		lock_release(backing_store->lock);
 		return -1;
 	}
 
 	struct iovec iov;
-	iov.iov_ubase = (userptr_t)PADDR_TO_KVADDR(location);
-	iov.iov_len = PAGE_SIZE;
-
 	struct uio uio;
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	// TODO is this sys or user space?
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_offset = spot*PAGE_SIZE;
-	uio.uio_resid = PAGE_SIZE;
-	uio.uio_rw = UIO_WRITE;
-	if(curproc->pid == 0)
-		uio.uio_space = NULL;
-	else
-		uio.uio_space = curproc->p_addrspace;
+    uio_kinit(&iov, &uio, (void *)PADDR_TO_KVADDR(location), PAGE_SIZE, offset * PAGE_SIZE, UIO_WRITE);
 
-	if(VOP_WRITE(node, &uio) != 0){
+	if (VOP_WRITE(bs, &uio) != 0){
 		lock_release(backing_store->lock);
 		return -1;
 	}
 
-	vfs_close(node);
+	vfs_close(bs);
 
 	// At this point the data is now on disk
 	lock_release(backing_store->lock);
-	return spot;
+	return offset;
 }
