@@ -107,8 +107,8 @@ vm_bootstrap(void){
 int clean_cme(int index){
 	KASSERT(coremap.cm[index].pid!=0);
 	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
-	int pdi = PDI(coremap.cm[index].vpn);
-	int pti = PTI(coremap.cm[index].vpn);
+	int pdi = PPN_PDI(coremap.cm[index].vpn);
+	int pti = PPN_PTI(coremap.cm[index].vpn);
 
 	// Give up here to avoid deadlock
 	// TODO must I lock here?
@@ -136,8 +136,8 @@ int clean_cme(int index){
 static int evict_cme(int index){
 	KASSERT(coremap.cm[index].pid!=0);
 	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
-	int pdi = PDI(coremap.cm[index].vpn);
-	int pti = PTI(coremap.cm[index].vpn);
+	int pdi = PPN_PDI(coremap.cm[index].vpn);
+	int pti = PPN_PTI(coremap.cm[index].vpn);
 
 	// Give up here to avoid deadlock
 	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0)
@@ -383,6 +383,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 
     int cmi = PADDR_TO_CMI(ts->ppn);
     if (coremap.cm[cmi].use == 0) goto done;
+    // TODO Ivan is this correct
     uint32_t vpn = (coremap.cm[cmi].vpn << 12) & TLBHI_VPAGE;
     int rv = tlb_probe(vpn, 0);
     if (rv >= 0)
