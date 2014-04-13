@@ -94,8 +94,8 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 		if(newas->page_dir == NULL)
 			return ENOMEM;
 
-	for(int i=0; i<PD_SIZE; i++){
-		if(old->page_dir->dir[i]!=NULL){
+	for(int i=1; i<PD_SIZE; i++){
+		if(old->page_dir->dir[i] != NULL){
 			if (page_table_add(i, newas->page_dir) == ENOMEM)
 				return ENOMEM;
 			for(int j=0; j<PT_SIZE; j++){
