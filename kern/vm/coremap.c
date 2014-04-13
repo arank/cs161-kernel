@@ -133,7 +133,7 @@ int clean_cme(int index){
 }
 
 // Given a locked non-kern cme it forcibly evicts it
-static int evict_cme(int index, int options){
+static int evict_cme(int index){
 	KASSERT(coremap.cm[index].pid!=0);
 	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
 	int pdi = PDI(coremap.cm[index].vpn);
@@ -153,7 +153,7 @@ static int evict_cme(int index, int options){
 			as->page_dir->dir[pdi]->table[pti].present = 1;
 		else
 			as->page_dir->dir[pdi]->table[pti].present = 0;
-	}else if(options ==  EVICT_ALL){
+	}else{
 		// Evict all data to dedicated disk swap space, or assign new swap space and evict to there
 		as->page_dir->dir[pdi]->table[pti].present = 0;
 		if(coremap.cm[index].swap == 0){
@@ -164,9 +164,6 @@ static int evict_cme(int index, int options){
 		}
 	}
 
-	// Zero physical page
-	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
-
 	page_set_free(as->page_dir->dir[pdi], pti);
 
 	return 0;
@@ -176,18 +173,18 @@ static int evict_cme(int index, int options){
 static void update_cme(int index, vaddr_t vpn, bool is_kern){
 	coremap.cm[index].swap = 0;
 	coremap.cm[index].slen = 1;
-	coremap.cm[index].vpn = vpn;
+	coremap.cm[index].vpn = vpn >> 12;
 	coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
 	spinlock_acquire(&coremap.lock);
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
+//	coremap.last_allocated = index;
 	spinlock_release(&coremap.lock);
 }
 
-// Returns with busy bit set on the entry
+// Returns with busy bit set on the entry, on fail it returns 0
 paddr_t
 get_free_cme(vaddr_t vpn, bool is_kern) {
-
 	spinlock_acquire(&coremap.lock);
 	int index = coremap.last_allocated;
 	spinlock_release(&coremap.lock);
@@ -196,6 +193,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 			index = (index+1) % coremap.size;
 			// TODO we can probably wait here if this becomes an issue
 			if(core_set_busy(index, NO_WAIT) == 0){
+				// Free core if kernel
 				if(coremap.cm[index].kern == 1){
 					core_set_free(index);
 					continue;
@@ -203,42 +201,33 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 				// Check if in use
 				if (coremap.cm[index].use == 0) {
 					set_use_bit(index, 1);
-
-					//spinlock_acquire(&coremap.lock);
-					//coremap.last_allocated = index;
-					//spinlock_release(&coremap.lock);
-
-                    memset((void *)PADDR_TO_KVADDR((CMI_TO_PADDR(index))), 0, PAGE_SIZE);
-					update_cme(index, vpn, is_kern);
-					return CMI_TO_PADDR(index);
-
+					goto out;
 				}else if(round >= 1 && coremap.cm[index].dirty == 0){
-					panic("bad alloc");
 					// Steal cleaned page and evict
-					if(evict_cme(index, EVICT_CLEAN)!=0){
+					if(evict_cme(index) != 0){
 						core_set_free(index);
 						return 0;
 					}
-					update_cme(index, vpn, is_kern);
-					return CMI_TO_PADDR(index);
-
+					goto out;
 				}else if(round >= 2){
-					panic("bad alloc");
 					//Write dirty page to disk and then evict
-					if(evict_cme(index, EVICT_ALL)!=0){
+					if(evict_cme(index) != 0){
 						core_set_free(index);
 						return 0;
 					}
-					update_cme(index, vpn, is_kern);
-					return CMI_TO_PADDR(index);
+					goto out;
 				}
-
 				core_set_free(index);
 			}
 		}
 	}
-
     return 0;   /* in this case busybit is unset */
+
+out:
+	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
+	update_cme(index, vpn, is_kern);
+	return CMI_TO_PADDR(index);
+
 }
 
 
@@ -414,7 +403,6 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 		pt->table[pti].ppn = get_free_cme(vaddr, USER_CMI);
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
-		panic("accessing disk");
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
 		pt->table[pti].present = 1;
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));

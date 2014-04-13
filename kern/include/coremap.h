@@ -7,8 +7,6 @@
 #define USER_CMI    0
 #define WAIT        1
 #define NO_WAIT     0
-#define EVICT_ALL	1
-#define EVICT_CLEAN 2
 
 void cm_bootstrap(void);
 void cleaning_bootstrap(void);
