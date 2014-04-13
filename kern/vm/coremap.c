@@ -106,8 +106,8 @@ vm_bootstrap(void) {
 int clean_cme(int index){
 	KASSERT(coremap.cm[index].pid!=0);
 	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
-	int pdi = PPN_PDI(coremap.cm[index].vpn);
-	int pti = PPN_PTI(coremap.cm[index].vpn);
+	int pdi = VPN_PDI(coremap.cm[index].vpn);
+	int pti = VPN_PTI(coremap.cm[index].vpn);
 
 	// Give up here to avoid deadlock
 	// TODO must I lock here?
@@ -117,13 +117,6 @@ int clean_cme(int index){
 	flush_ppn(CMI_TO_PADDR(index));
 
     coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
-    /* the above line appears to be the same
-	if(coremap.cm[index].swap == 0){
-		coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), 0);
-	}else{
-		write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
-	}
-    */
 	spinlock_acquire(&coremap.lock);
 	set_dirty_bit(index, 0);
 	spinlock_release(&coremap.lock);
@@ -137,8 +130,8 @@ int clean_cme(int index){
 static int evict_cme(int index){
 	KASSERT(coremap.cm[index].pid!=0);
 	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
-	int pdi = PPN_PDI(coremap.cm[index].vpn);
-	int pti = PPN_PTI(coremap.cm[index].vpn);
+	int pdi = VPN_PDI(coremap.cm[index].vpn);
+	int pti = VPN_PTI(coremap.cm[index].vpn);
 
 	// Give up here to avoid deadlock
 	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0)
@@ -154,24 +147,15 @@ static int evict_cme(int index){
         as->page_dir->dir[pdi]->table[pti].present =
             (as->page_dir->dir[pdi]->table[pti].ppn == 0) ? 1 : 0;
 
-        /*
-		if(as->page_dir->dir[pdi]->table[pti].ppn == 0)
-			as->page_dir->dir[pdi]->table[pti].present = 1;
-		else
-			as->page_dir->dir[pdi]->table[pti].present = 0;
-        */
 	}else{
 		// Evict all data to dedicated disk swap space, or assign new swap space and evict to there
-        coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
 		as->page_dir->dir[pdi]->table[pti].present = 0;
-        /* line above seems to be the same
 		if(coremap.cm[index].swap == 0){
 			as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index), 0);
 			coremap.cm[index].swap = as->page_dir->dir[pdi]->table[pti].ppn;
 		}else{
-			write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
+			as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
 		}
-        */
 	}
 
 	page_set_free(as->page_dir->dir[pdi], pti);
@@ -185,7 +169,6 @@ static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	coremap.cm[index].slen = 1;
 	coremap.cm[index].vpn = vaddr >> 12;
 	coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
-    //if (is_kern == false) panic("first user level page\n");
 	spinlock_acquire(&coremap.lock);
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
@@ -323,13 +306,12 @@ int core_set_busy(int index, bool wait) {
 
 int core_set_free(int index){
 	spinlock_acquire(&coremap.lock);
-	if(coremap.cm[index].busybit == 1) {
-        set_busy_bit(index, 0);
-		spinlock_release(&coremap.lock);
-		return 0;
-	} else {    /* already set free */
-        panic("busybit is already unset\n");
-	}
+	if(coremap.cm[index].busybit == 0)
+		panic("busybit is already unset\n");
+
+	set_busy_bit(index, 0);
+	spinlock_release(&coremap.lock);
+	return 0;
 }
 
 static

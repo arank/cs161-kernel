@@ -74,8 +74,8 @@
 #define PDI(vaddr) ((int)(vaddr>>22))
 #define PTI(vaddr) ((int)(vaddr>>12) & 0x3FF)
 #define OFFSET(vaddr) ((int)(vaddr & 0xFFF))
-#define PPN_PDI(vaddr) ((int) vaddr>>10)
-#define PPN_PTI(vaddr) ((int) vaddr & 0x3FF)
+#define VPN_PDI(vaddr) ((int) vaddr>>10)
+#define VPN_PTI(vaddr) ((int) vaddr & 0x3FF)
 
 /*
  * The top of user space. (Actually, the address immediately above the

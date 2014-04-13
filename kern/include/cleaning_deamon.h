@@ -4,4 +4,4 @@ struct deamon {
     struct cv *cv;
 } deamon;
 
-void start_deamon_thread(unsigned upper);
+void cleaning_bootstrap(void);

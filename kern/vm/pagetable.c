@@ -28,6 +28,11 @@ int page_table_add(int index, struct page_dir* pd){
 	if(pd->dir[index] == NULL)
 		goto out;
 
+	// TODO replace with memset
+	pd->dir[index]->lock = NULL;
+	pd->dir[index]->cv = NULL;
+	pd->dir[index]->table = NULL;
+
 	pd->dir[index]->lock = lock_create("page_table_lock");
 	if(pd->dir[index]->lock == NULL)
 		goto pt_out;
@@ -59,9 +64,12 @@ int page_table_add(int index, struct page_dir* pd){
 int page_dir_destroy(struct page_dir* pd){
 	for(int i = 0; i < PD_SIZE; i++){
 		if(pd->dir[i] != NULL){
-			lock_destroy(pd->dir[i]->lock);
-			cv_destroy(pd->dir[i]->cv);
-			kfree(pd->dir[i]->table);
+			if(pd->dir[i]->lock != NULL)
+				lock_destroy(pd->dir[i]->lock);
+			if(pd->dir[i]->cv != NULL)
+				cv_destroy(pd->dir[i]->cv);
+			if(pd->dir[i]->table != NULL)
+				kfree(pd->dir[i]->table);
 		}
 	}
 	kfree(pd);
