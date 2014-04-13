@@ -449,7 +449,7 @@ malloc(size_t size)
 		return NULL;
 	}
 
-	if (mh != NULL) {
+	if (mh != NULL && !mh->mh_inuse) {
 		/* update old header */
 		mh->mh_nextblock = M_MKFIELD(M_NEXTOFF(mh) + morespace);
 		mh->mh_inuse = 1;
