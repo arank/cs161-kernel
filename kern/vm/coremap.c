@@ -176,8 +176,9 @@ static int evict_cme(int index, int options){
 static void update_cme(int index, vaddr_t vpn, bool is_kern){
 	coremap.cm[index].swap = 0;
 	coremap.cm[index].slen = 1;
-	coremap.cm[index].vpn = vpn;
+	coremap.cm[index].vpn = vpn >> 12;
 	coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
+    //if (is_kern == false) panic("first user level page\n");
 	spinlock_acquire(&coremap.lock);
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
@@ -187,11 +188,14 @@ static void update_cme(int index, vaddr_t vpn, bool is_kern){
 // Returns with busy bit set on the entry
 paddr_t
 get_free_cme(vaddr_t vpn, bool is_kern) {
+    if (is_kern == false && vpn == 0)
+        panic ("kern is false, vpn is 0\n");
 
 	spinlock_acquire(&coremap.lock);
 	int index = coremap.last_allocated;
 	spinlock_release(&coremap.lock);
-	for(unsigned round = 0; round <3; round++){
+
+	for(unsigned round = 0; round < 3; round++){
 		for(unsigned i = 0; i < coremap.size; i++){
 			index = (index+1) % coremap.size;
 			// TODO we can probably wait here if this becomes an issue
@@ -210,12 +214,12 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 
                     memset((void *)PADDR_TO_KVADDR((CMI_TO_PADDR(index))), 0, PAGE_SIZE);
 					update_cme(index, vpn, is_kern);
+                    kprintf("cme(%s): %zu\n", is_kern ? "kern" : "user", index);
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 1 && coremap.cm[index].dirty == 0){
-					panic("bad alloc");
 					// Steal cleaned page and evict
-					if(evict_cme(index, EVICT_CLEAN)!=0){
+					if (evict_cme(index, EVICT_CLEAN) != 0) {
 						core_set_free(index);
 						return 0;
 					}
@@ -223,7 +227,6 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 2){
-					panic("bad alloc");
 					//Write dirty page to disk and then evict
 					if(evict_cme(index, EVICT_ALL)!=0){
 						core_set_free(index);
@@ -412,9 +415,9 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
     // Page exists but is not allocated
 	if (pt->table[pti].present == 1 && pt->table[pti].ppn == 0) {
 		pt->table[pti].ppn = get_free_cme(vaddr, USER_CMI);
+        if (pt->table[pti].ppn == 0) return ENOMEM;
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
-		panic("accessing disk");
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
 		pt->table[pti].present = 1;
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
@@ -464,7 +467,7 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
     unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
     unsigned pid = coremap.cm[cmi].pid;
     struct addrspace *as = get_proc(pid)->p_addrspace;
-    if (pt->table[pti].write == 2 && !as->loading) return EFAULT;
+    if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
 
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
@@ -478,7 +481,7 @@ static int tlb_fault_readonly(vaddr_t vaddr, struct page_table *pt){
     unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
     unsigned pid = coremap.cm[cmi].pid;
     struct addrspace *as = get_proc(pid)->p_addrspace;
-    if (pt->table[pti].write == 2 && !as->loading) return EFAULT;
+    if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
 
 	core_set_busy(cmi, WAIT);
     set_dirty_bit(cmi, 1);

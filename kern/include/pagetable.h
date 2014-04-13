@@ -9,10 +9,9 @@ struct pte {
 	uint32_t busybit    : 1;
     uint32_t present    : 1;
     uint32_t valid      : 1;
-    uint32_t read       : 1;
-    uint32_t write      : 1;
-    uint32_t exec       : 1;
-    uint32_t junk       : 6;
+    uint32_t read       : 3;
+    uint32_t write      : 3;
+    uint32_t exec       : 3;
 };
 
 struct page_table {

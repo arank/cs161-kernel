@@ -110,8 +110,6 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                     = old->page_dir->dir[i]->table[j].write;
 				newas->page_dir->dir[i]->table[j].exec
                     = old->page_dir->dir[i]->table[j].exec;
-				newas->page_dir->dir[i]->table[j].junk
-                    = old->page_dir->dir[i]->table[j].junk;
 				newas->page_dir->dir[i]->table[j].present =
 						old->page_dir->dir[i]->table[j].present;
 
@@ -125,6 +123,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				if(old->page_dir->dir[i]->table[j].present == 1){
 					// Copy over page from old addr space memory
 					free = get_free_cme(vpn, false);
+                    if (free == 0) return ENOMEM;
 					paddr_t ppn = old->page_dir->dir[i]->table[j].ppn;
 					memcpy((void*)PADDR_TO_KVADDR(free), (void*)PADDR_TO_KVADDR(ppn), PAGE_SIZE);
 				}else{
