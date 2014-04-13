@@ -18,6 +18,9 @@ static struct vnode *bs;
 
 int init_backing_store(void) {
 
+    if(vfs_open(kstrdup("lhd0raw:"), O_RDWR, 0, &bs) != 0)
+        panic ("vfs_open failed\n");
+
     backing_store = kmalloc(sizeof *backing_store);
     if (backing_store == NULL) goto out;
 
@@ -34,8 +37,6 @@ int init_backing_store(void) {
 
     //Set 0 to in use, as that is reserved
     bitmap_mark(backing_store->bm, 0);
-
-    if(vfs_open(kstrdup(BACKING_STORE), O_RDWR, 0, &bs) != 0) goto lk_out;
 
     return 0;
 
@@ -95,7 +96,7 @@ int write_to_disk(paddr_t location, int index){
 
 	lock_acquire(backing_store->lock);
 	unsigned offset = index;
-    // TODO: What are we doing here when index is 0?
+
 	if (index <= 0) {
 		if (bitmap_alloc(backing_store->bm, &offset) == ENOSPC) {
 			lock_release(backing_store->lock);

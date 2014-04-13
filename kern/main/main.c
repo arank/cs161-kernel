@@ -117,7 +117,6 @@ boot(void)
 	hardclock_bootstrap();
 	vfs_bootstrap();
 	kheap_nextgeneration();
-    init_backing_store();
 //	cleaning_bootstrap();
 
 	/* Probe and initialize devices. Interrupts should come on. */
@@ -140,6 +139,7 @@ boot(void)
 
 	/* Default bootfs - but ignore failure, in case emu0 doesn't exist */
 	vfs_setbootfs("emu0");
+    init_backing_store();
 
 	kheap_nextgeneration();
 
