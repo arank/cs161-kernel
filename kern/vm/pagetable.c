@@ -64,7 +64,6 @@ int page_dir_destroy(struct page_dir* pd){
 				cv_destroy(pd->dir[i]->cv);
 			if(pd->dir[i]->table != NULL)
 				kfree(pd->dir[i]->table);
-			kfree(pd->dir[i]);
 		}
 	}
 	kfree(pd);
