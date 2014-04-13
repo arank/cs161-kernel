@@ -8,8 +8,6 @@ struct backing_store{
 	paddr_t swap;
 } *backing_store;
 
-
-
 int init_backing_store(void);
 
 void remove_from_disk(int swap_index);

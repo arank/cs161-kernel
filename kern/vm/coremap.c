@@ -98,9 +98,8 @@ void cm_bootstrap(void) {
 }
 
 void
-vm_bootstrap(void){
+vm_bootstrap(void) {
     cm_bootstrap();
-    init_backing_store();
 }
 
 // Given a locked non-kern dirty cme, it cleans it to disk
@@ -117,12 +116,14 @@ int clean_cme(int index){
 
 	flush_ppn(CMI_TO_PADDR(index));
 
+    coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
+    /* the above line appears to be the same
 	if(coremap.cm[index].swap == 0){
 		coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), 0);
 	}else{
 		write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
 	}
-
+    */
 	spinlock_acquire(&coremap.lock);
 	set_dirty_bit(index, 0);
 	spinlock_release(&coremap.lock);
@@ -149,19 +150,28 @@ static int evict_cme(int index){
 	if(coremap.cm[index].dirty == 0){
 		// Reset swap to either 0 if symbolic or the dedicated swap addr if it is swapped
 		as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
+
+        as->page_dir->dir[pdi]->table[pti].present =
+            (as->page_dir->dir[pdi]->table[pti].ppn == 0) ? 1 : 0;
+
+        /*
 		if(as->page_dir->dir[pdi]->table[pti].ppn == 0)
 			as->page_dir->dir[pdi]->table[pti].present = 1;
 		else
 			as->page_dir->dir[pdi]->table[pti].present = 0;
+        */
 	}else{
 		// Evict all data to dedicated disk swap space, or assign new swap space and evict to there
+        coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
 		as->page_dir->dir[pdi]->table[pti].present = 0;
+        /* line above seems to be the same
 		if(coremap.cm[index].swap == 0){
 			as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index), 0);
 			coremap.cm[index].swap = as->page_dir->dir[pdi]->table[pti].ppn;
 		}else{
 			write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
 		}
+        */
 	}
 
 	page_set_free(as->page_dir->dir[pdi], pti);
@@ -170,10 +180,10 @@ static int evict_cme(int index){
 }
 
 // Updates cme to clean and new
-static void update_cme(int index, vaddr_t vpn, bool is_kern){
+static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	coremap.cm[index].swap = 0;
 	coremap.cm[index].slen = 1;
-	coremap.cm[index].vpn = vpn >> 12;
+	coremap.cm[index].vpn = vaddr >> 12;
 	coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
     //if (is_kern == false) panic("first user level page\n");
 	spinlock_acquire(&coremap.lock);
@@ -343,9 +353,6 @@ kfree_one_page(unsigned cm_index) {
 	coremap.cm[cm_index].ref = 0;
 	coremap.cm[cm_index].dirty = 0;
 
-	/* zero out physical page */
-	//memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
-
 	core_set_free(cm_index);
 }
 
@@ -387,7 +394,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 
     int cmi = PADDR_TO_CMI(ts->ppn);
     if (coremap.cm[cmi].use == 0) goto done;
-    // TODO Ivan is this correct
+    // TODO Ivan is this correct: yes, we I'll show you tomorrow
     uint32_t vpn = (coremap.cm[cmi].vpn << 12) & TLBHI_VPAGE;
     int rv = tlb_probe(vpn, 0);
     if (rv >= 0)

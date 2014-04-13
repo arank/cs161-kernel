@@ -52,6 +52,7 @@
 #include <version.h>
 #include <pid_table.h>
 #include <coremap.h>
+#include <backingstore.h>
 #include "autoconf.h"  // for pseudoconfig
 
 
@@ -116,6 +117,7 @@ boot(void)
 	hardclock_bootstrap();
 	vfs_bootstrap();
 	kheap_nextgeneration();
+    init_backing_store();
 //	cleaning_bootstrap();
 
 	/* Probe and initialize devices. Interrupts should come on. */

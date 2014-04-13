@@ -14,6 +14,8 @@
 #include <current.h>
 #include <proc.h>
 
+static struct vnode *bs;
+
 int init_backing_store(void) {
 
     backing_store = kmalloc(sizeof *backing_store);
@@ -32,6 +34,8 @@ int init_backing_store(void) {
 
     //Set 0 to in use, as that is reserved
     bitmap_mark(backing_store->bm, 0);
+
+    if(vfs_open(kstrdup(BACKING_STORE), O_RDWR, 0, &bs) != 0) goto lk_out;
 
     return 0;
 
@@ -60,38 +64,15 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 	}
     core_set_busy(PADDR_TO_CMI(backing_store->swap), true);
 
-    struct vnode *node;
-    // TODO are these modes/flags correct (O_RDWR)
-    char *path = kstrdup(BACKING_STORE);
-    if(vfs_open(path, O_RDWR, O_RDWR, &node) != 0 || node == NULL) {
-    	core_set_free(PADDR_TO_CMI(backing_store->swap));
-    	lock_release(backing_store->lock);
-    	return 0;
-    }
+	struct iovec iov;
+	struct uio uio;
+    uio_kinit(&iov, &uio, (void *)PADDR_TO_KVADDR(backing_store->swap), PAGE_SIZE, swap_index * PAGE_SIZE, UIO_READ);
 
-    struct iovec vec;
-	vec.iov_ubase = (userptr_t)PADDR_TO_KVADDR(backing_store->swap);
-	vec.iov_len = PAGE_SIZE;
-
-	struct uio io;
-	io.uio_iov = &vec;
-	io.uio_iovcnt = 1;
-	io.uio_segflg = UIO_SYSSPACE;
-	io.uio_offset = swap_index*PAGE_SIZE;
-	io.uio_resid = PAGE_SIZE;
-	io.uio_rw = UIO_READ;
-	if(curproc->pid == 0)
-		io.uio_space = NULL;
-	else
-		io.uio_space = curproc->p_addrspace;
-
-    if(VOP_READ(node, &io) != 0){
+    if (VOP_READ(bs, &uio) != 0) {
     	core_set_free(PADDR_TO_CMI(backing_store->swap));
 		lock_release(backing_store->lock);
 		return 0;
     }
-
-    vfs_close(node);
 
     // Now the data is in our dedicated swap space so we can free it
     bitmap_unmark(backing_store->bm, swap_index);
@@ -114,18 +95,12 @@ int write_to_disk(paddr_t location, int index){
 
 	lock_acquire(backing_store->lock);
 	unsigned offset = index;
+    // TODO: What are we doing here when index is 0?
 	if (index <= 0) {
 		if (bitmap_alloc(backing_store->bm, &offset) == ENOSPC) {
 			lock_release(backing_store->lock);
 			return -1;
 		}
-	}
-
-	struct vnode *bs;
-	char *path = kstrdup(BACKING_STORE);
-	if(vfs_open(path, O_RDWR, 0, &bs) != 0 || bs == NULL) {
-		lock_release(backing_store->lock);
-		return -1;
 	}
 
 	struct iovec iov;
@@ -136,8 +111,6 @@ int write_to_disk(paddr_t location, int index){
 		lock_release(backing_store->lock);
 		return -1;
 	}
-
-	vfs_close(bs);
 
 	// At this point the data is now on disk
 	lock_release(backing_store->lock);
