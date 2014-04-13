@@ -286,10 +286,6 @@ out:
 int
 as_prepare_load(struct addrspace *as)
 {
-	/*
-	 * None
-	 */
-
 	as->loading = true;
 	return 0;
 }
@@ -297,10 +293,6 @@ as_prepare_load(struct addrspace *as)
 int
 as_complete_load(struct addrspace *as)
 {
-	/*
-	 * None
-	 */
-
 	as->loading = false;
 	return 0;
 }

@@ -424,9 +424,9 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 
 static
 void
-update_tlb(paddr_t pa, vaddr_t va, bool dirty, bool read_only_fault) {
+update_tlb(paddr_t pa, vaddr_t va, bool modified, bool read_only_fault) {
     uint32_t elo = (pa & TLBLO_PPAGE) | TLBLO_VALID;
-    if (dirty) elo |= TLBLO_DIRTY;
+    if (modified) elo |= TLBLO_DIRTY;
 
     uint32_t ehi = va & TLBHI_VPAGE;
     va &= PAGE_FRAME;
@@ -463,7 +463,7 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
     unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
     unsigned pid = coremap.cm[cmi].pid;
     struct addrspace *as = get_proc(pid)->p_addrspace;
-    if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
+    if (pt->table[pti].write == 2 && !as->loading) return EFAULT;
 
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
@@ -473,18 +473,18 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 
 static int tlb_fault_readonly(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
-	if(validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
-	int cmi = PADDR_TO_CMI(pt->table[pti].ppn);
+    unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
+    unsigned pid = coremap.cm[cmi].pid;
+    struct addrspace *as = get_proc(pid)->p_addrspace;
+    if (pt->table[pti].write == 2 && !as->loading) return EFAULT;
+
 	core_set_busy(cmi, WAIT);
     set_dirty_bit(cmi, 1);
 	core_set_free(cmi);
 
     update_tlb(pt->table[pti].ppn, vaddr, true, true);
 
-	// TODO is it already in the TLB at this point? do I just have to change permissions?
-	// TODO should I free page before I get the coremap lock
-	page_set_free(pt, pti);
 	return 0;
 }
 
