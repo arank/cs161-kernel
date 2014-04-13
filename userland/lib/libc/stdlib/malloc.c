@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+ * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009, 2014
  *	The President and Fellows of Harvard College.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,9 +37,10 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>  // for uintptr_t on non-OS/161 platforms
 #include <unistd.h>
 #include <err.h>
-#include <stdint.h>  // for uintptr_t on non-OS/161 platforms
+#include <assert.h>
 
 #undef MALLOCDEBUG
 
@@ -93,11 +94,11 @@ struct mheader {
 	 * 64-bit platform. size_t is 64 bits (8 bytes)
 	 * Block size is 16 bytes.
 	 */
-	unsigned mh_prevblock:62;
+	unsigned mh_prevblock:60;
 	unsigned mh_pad:1;
 	unsigned mh_magic1:3;
 
-	unsigned mh_nextblock:62;
+	unsigned mh_nextblock:60;
 	unsigned mh_inuse:1;
 	unsigned mh_magic2:3;
 
@@ -133,6 +134,19 @@ struct mheader {
 
 #define M_MKFIELD(off)	((off)>>MBLOCKSHIFT)
 
+/*
+ * System page size. In POSIX you're supposed to call
+ * sysconf(_SC_PAGESIZE). If _SC_PAGESIZE isn't defined, as on OS/161,
+ * assume 4K.
+ */
+
+#ifdef _SC_PAGESIZE
+static size_t __malloc_pagesize;
+#define PAGE_SIZE __malloc_pagesize
+#else
+#define PAGE_SIZE 4096
+#endif
+
 ////////////////////////////////////////////////////////////
 
 /*
@@ -166,6 +180,11 @@ __malloc_init(void)
 	if (__heapbase!=0 || __heaptop!=0) {
 		errx(1, "malloc: Internal error - bad init call");
 	}
+
+	/* Get the page size, if needed. */
+#ifdef _SC_PAGESIZE
+	__malloc_pagesize = sysconf(_SC_PAGESIZE);
+#endif
 
 	/* Use sbrk to find the base of the heap. */
 	x = sbrk(0);
@@ -335,6 +354,8 @@ malloc(size_t size)
 	struct mheader *mh;
 	uintptr_t i;
 	size_t rightprevblock;
+	size_t morespace;
+	void *p;
 
 	if (__heapbase==0) {
 		__malloc_init();
@@ -359,6 +380,7 @@ malloc(size_t size)
 	 * Check to make sure the next/previous sizes all agree.
 	 */
 	rightprevblock = 0;
+	mh = NULL;
 	for (i=__heapbase; i<__heaptop; i += M_NEXTOFF(mh)) {
 		mh = (struct mheader *) i;
 		if (!M_OK(mh)) {
@@ -406,19 +428,49 @@ malloc(size_t size)
 
 	/*
 	 * Didn't find anything. Expand the heap.
+	 *
+	 * If the heap is nonempty and the top block (the one mh is
+	 * left pointing to after the above loop) is free, we can
+	 * expand it. Otherwise we need a new block.
 	 */
+	if (mh != NULL && !mh->mh_inuse) {
+		assert(size > M_SIZE(mh));
+		morespace = size - M_SIZE(mh);
+	}
+	else {
+		morespace = MBLOCKSIZE + size;
+	}
 
-	mh = __malloc_sbrk(size + MBLOCKSIZE);
-	if (mh == NULL) {
+	/* Round the amount of space we ask for up to a whole page. */
+	morespace = PAGE_SIZE * ((morespace + PAGE_SIZE - 1) / PAGE_SIZE); 
+
+	p = __malloc_sbrk(morespace);
+	if (p == NULL) {
 		return NULL;
 	}
 
-	mh->mh_prevblock = rightprevblock;
-	mh->mh_magic1 = MMAGIC;
-	mh->mh_magic2 = MMAGIC;
-	mh->mh_pad = 0;
-	mh->mh_inuse = 1;
-	mh->mh_nextblock = M_MKFIELD(size + MBLOCKSIZE);
+	if (mh != NULL) {
+		/* update old header */
+		mh->mh_nextblock = M_MKFIELD(M_NEXTOFF(mh) + morespace);
+		mh->mh_inuse = 1;
+	}
+	else {
+		/* fill out new header */
+		mh = p;
+		mh->mh_prevblock = rightprevblock;
+		mh->mh_magic1 = MMAGIC;
+		mh->mh_magic2 = MMAGIC;
+		mh->mh_pad = 0;
+		mh->mh_inuse = 1;
+		mh->mh_nextblock = M_MKFIELD(morespace);
+	}
+
+	/*
+	 * Either way, try splitting the block we got as because of
+	 * the page rounding it might be quite a bit bigger than we
+	 * needed.
+	 */
+	__malloc_split(mh, size);
 
 #ifdef MALLOCDEBUG
 	warnx("malloc: allocating at %p", M_DATA(mh));
