@@ -1241,6 +1241,28 @@ ipi_tlbshootdown(struct cpu *target, const struct tlbshootdown *mapping)
 }
 
 void
+flush_ppn(paddr_t ppn){
+	if(ppn != 0){
+		struct tlbshootdown *tb = kmalloc(sizeof(struct tlbshootdown));
+		tb->ppn = ppn;
+		tb->tlb_sem = sem_create("tlb_sem", 0);
+		int numcpus = cpuarray_num(&allcpus);
+		// Shootdown this entry on all processors
+		for(int i=0; i<numcpus; i++){
+			ipi_tlbshootdown(cpuarray_get(&allcpus, i), tb);
+		}
+		// Wait for all processors to respond
+		for(int i=0; i<numcpus; i++){
+			P(tb->tlb_sem);
+		}
+		// Cleanup
+		sem_destroy(tb->tlb_sem);
+		kfree(tb);
+	}
+}
+
+
+void
 interprocessor_interrupt(void)
 {
 	uint32_t bits;

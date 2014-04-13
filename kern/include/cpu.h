@@ -167,6 +167,8 @@ void ipi_send(struct cpu *target, int code);
 void ipi_broadcast(int code);
 void ipi_tlbshootdown(struct cpu *target, const struct tlbshootdown *mapping);
 
+void flush_ppn(paddr_t ppn);
+
 void interprocessor_interrupt(void);
 
 

@@ -15,6 +15,7 @@
 #include <addrspace.h>
 #include <backingstore.h>
 #include <cleaning_deamon.h>
+#include <cpu.h>
 
 
 int stat_coremap(int nargs, char **args) {
@@ -97,17 +98,15 @@ void cm_bootstrap(void) {
 }
 
 void
-vm_bootstrap(void)
-{
+vm_bootstrap(void){
     cm_bootstrap();
     init_backing_store();
 }
 
-
 // Given a locked non-kern dirty cme, it cleans it to disk
 int clean_cme(int index){
-	// TODO Somehow get address space/ page dir from coremap.cm[index].pid
-	struct addrspace *as;
+	KASSERT(coremap.cm[index].pid!=0);
+	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
 	int pdi = PDI(coremap.cm[index].vpn);
 	int pti = PTI(coremap.cm[index].vpn);
 
@@ -116,7 +115,7 @@ int clean_cme(int index){
 	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0)
 		return -1;
 
-	// TODO TLB shootdown this proc's stuff
+	flush_ppn(CMI_TO_PADDR(index));
 
 	if(coremap.cm[index].swap == 0){
 		coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), 0);
@@ -135,8 +134,8 @@ int clean_cme(int index){
 
 // Given a locked non-kern cme it forcibly evicts it
 static int evict_cme(int index, int options){
-	// TODO Somehow get address space/ page dir from coremap.cm[index].pid
-	struct addrspace *as;
+	KASSERT(coremap.cm[index].pid!=0);
+	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
 	int pdi = PDI(coremap.cm[index].vpn);
 	int pti = PTI(coremap.cm[index].vpn);
 
@@ -144,7 +143,7 @@ static int evict_cme(int index, int options){
 	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0)
 		return -1;
 
-	// TODO TLB shootdown this proc's stuff
+	flush_ppn(CMI_TO_PADDR(index));
 
 	// Page is clean
 	if(coremap.cm[index].dirty == 0){
@@ -179,12 +178,10 @@ static void update_cme(int index, vaddr_t vpn, bool is_kern){
 	coremap.cm[index].slen = 1;
 	coremap.cm[index].vpn = vpn;
 	coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
-	if (coremap.cm[index].dirty==1){
-		spinlock_acquire(&coremap.lock);
-		set_dirty_bit(index, 0);
-		spinlock_release(&coremap.lock);
-	}
+	spinlock_acquire(&coremap.lock);
+	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
+	spinlock_release(&coremap.lock);
 }
 
 // Returns with busy bit set on the entry
@@ -211,11 +208,12 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					//coremap.last_allocated = index;
 					//spinlock_release(&coremap.lock);
 
-                    //memset((void *)PADDR_TO_KVADDR((CMI_TO_PADDR(index))), 0, PAGE_SIZE);
+                    memset((void *)PADDR_TO_KVADDR((CMI_TO_PADDR(index))), 0, PAGE_SIZE);
 					update_cme(index, vpn, is_kern);
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 1 && coremap.cm[index].dirty == 0){
+					panic("bad alloc");
 					// Steal cleaned page and evict
 					if(evict_cme(index, EVICT_CLEAN)!=0){
 						core_set_free(index);
@@ -225,6 +223,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 					return CMI_TO_PADDR(index);
 
 				}else if(round >= 2){
+					panic("bad alloc");
 					//Write dirty page to disk and then evict
 					if(evict_cme(index, EVICT_ALL)!=0){
 						core_set_free(index);
@@ -395,7 +394,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 
     int cmi = PADDR_TO_CMI(ts->ppn);
     if (coremap.cm[cmi].use == 0) goto done;
-    uint32_t vpn = (cmi << 12) & TLBHI_VPAGE;
+    uint32_t vpn = (coremap.cm[cmi].vpn << 12) & TLBHI_VPAGE;
     int rv = tlb_probe(vpn, 0);
     if (rv >= 0)
         tlb_write(TLBHI_INVALID(rv), TLBLO_INVALID(), rv);
@@ -415,6 +414,7 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 		pt->table[pti].ppn = get_free_cme(vaddr, USER_CMI);
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
+		panic("accessing disk");
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
 		pt->table[pti].present = 1;
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
@@ -461,10 +461,10 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
-    unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
-    unsigned pid = coremap.cm[cmi].pid;
-    struct addrspace *as = get_proc(pid)->p_addrspace;
-    if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
+//    unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
+//    unsigned pid = coremap.cm[cmi].pid;
+//    struct addrspace *as = get_proc(pid)->p_addrspace;
+//    if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
 
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 

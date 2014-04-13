@@ -36,6 +36,16 @@ void start_deamon_thread(unsigned upper){
 			cv_wait(deamon.cv, deamon.lock);
 		}
 		run_deamon();
+		lock_release(deamon.lock);
 	}
-
 }
+
+//void cleaning_bootstrap(void){
+//	int result = thread_fork("Eviction Deamon" /* thread name */,
+//				kproc /* new process */,
+//				start_deamon_thread /* thread function */,
+//				"start_deamon_thread"/* thread arg */,
+//				1 /* thread arg */);
+//	if (result)
+//		kprintf("deamon thread_fork failed: %s\n", strerror(result));
+//}

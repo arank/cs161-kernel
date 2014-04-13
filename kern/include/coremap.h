@@ -11,6 +11,7 @@
 #define EVICT_CLEAN 2
 
 void cm_bootstrap(void);
+void cleaning_bootstrap(void);
 
 void set_use_bit(int index, int bitvalue);
 void set_busy_bit(int index, int bitvalue);
