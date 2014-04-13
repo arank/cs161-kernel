@@ -117,13 +117,7 @@ int clean_cme(int index){
 	flush_ppn(CMI_TO_PADDR(index));
 
     coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
-    /* the above line appears to be the same
-	if(coremap.cm[index].swap == 0){
-		coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), 0);
-	}else{
-		write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
-	}
-    */
+
 	spinlock_acquire(&coremap.lock);
 	set_dirty_bit(index, 0);
 	spinlock_release(&coremap.lock);
@@ -147,31 +141,17 @@ static int evict_cme(int index){
 	flush_ppn(CMI_TO_PADDR(index));
 
 	// Page is clean
-	if(coremap.cm[index].dirty == 0){
+	if (coremap.cm[index].dirty == 0) {
 		// Reset swap to either 0 if symbolic or the dedicated swap addr if it is swapped
 		as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
 
         as->page_dir->dir[pdi]->table[pti].present =
             (as->page_dir->dir[pdi]->table[pti].ppn == 0) ? 1 : 0;
-
-        /*
-		if(as->page_dir->dir[pdi]->table[pti].ppn == 0)
-			as->page_dir->dir[pdi]->table[pti].present = 1;
-		else
-			as->page_dir->dir[pdi]->table[pti].present = 0;
-        */
-	}else{
+	} else {
 		// Evict all data to dedicated disk swap space, or assign new swap space and evict to there
         coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
+        as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
 		as->page_dir->dir[pdi]->table[pti].present = 0;
-        /* line above seems to be the same
-		if(coremap.cm[index].swap == 0){
-			as->page_dir->dir[pdi]->table[pti].ppn = write_to_disk(CMI_TO_PADDR(index), 0);
-			coremap.cm[index].swap = as->page_dir->dir[pdi]->table[pti].ppn;
-		}else{
-			write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
-		}
-        */
 	}
 
 	page_set_free(as->page_dir->dir[pdi], pti);
@@ -185,18 +165,18 @@ static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	coremap.cm[index].slen = 1;
 	coremap.cm[index].vpn = vaddr >> 12;
 	coremap.cm[index].pid = (is_kern) ? 0 : curproc->pid;
-    //if (is_kern == false) panic("first user level page\n");
 	spinlock_acquire(&coremap.lock);
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
 //	coremap.last_allocated = index;
+    kprintf("cme: %zu (%s)\n", index, (is_kern) ? "kern" : "user");
 	spinlock_release(&coremap.lock);
 }
 
 // Returns with busy bit set on the entry, on fail it returns 0
 paddr_t
-get_free_cme(vaddr_t vpn, bool is_kern) {
-    if (is_kern == false && vpn == 0)
+get_free_cme(vaddr_t vaddr, bool is_kern) {
+    if (is_kern == false && vaddr == 0)
         panic ("kern is false, vpn is 0\n");
 
 	spinlock_acquire(&coremap.lock);
@@ -207,7 +187,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 		for(unsigned i = 0; i < coremap.size; i++){
 			index = (index+1) % coremap.size;
 			// TODO we can probably wait here if this becomes an issue
-			if(core_set_busy(index, NO_WAIT) == 0){
+			if(core_set_busy(index, WAIT) == 0){
 				if(coremap.cm[index].kern == 1) { // Free core if kernel
 					core_set_free(index);
 					continue;
@@ -239,7 +219,7 @@ get_free_cme(vaddr_t vpn, bool is_kern) {
 
 out:
 	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
-	update_cme(index, vpn, is_kern);
+	update_cme(index, vaddr, is_kern);
 	return CMI_TO_PADDR(index);
 
 }
@@ -285,11 +265,10 @@ get_kpage_seq(unsigned npages) {
 
 /* Allocate/free some kernel-space virtual pages */
 vaddr_t
-alloc_kpages(int npages)
-{
+alloc_kpages(int npages) {
 	paddr_t pa = get_kpage_seq(npages);
 	if (pa == 0) return 0;
-	memset((void *)PADDR_TO_KVADDR(pa), 0, PAGE_SIZE * npages);
+	//memset((void *)PADDR_TO_KVADDR(pa), 0, PAGE_SIZE * npages);
 	return PADDR_TO_KVADDR(pa);
 }
 
@@ -353,6 +332,7 @@ kfree_one_page(unsigned cm_index) {
 	coremap.cm[cm_index].ref = 0;
 	coremap.cm[cm_index].dirty = 0;
 
+	//memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 	core_set_free(cm_index);
 }
 

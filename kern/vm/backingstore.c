@@ -25,8 +25,8 @@ int init_backing_store(void) {
     if (backing_store == NULL) goto out;
 
     // Create dedicated swap space to temporarily pull data into before flushing to evictable user page
-    backing_store->swap = get_free_cme((vaddr_t)0, true);
-    if (backing_store->swap==0) goto out;
+    backing_store->swap = alloc_kpages(1);
+    if (backing_store->swap == 0) goto out;
 
     //TODO figure this out currently this bitmap size is the max our coremap and page table supports
     backing_store->bm = bitmap_create(MAX_BM);
