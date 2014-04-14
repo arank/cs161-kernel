@@ -53,6 +53,7 @@
 #include <pid_table.h>
 #include <coremap.h>
 #include <backingstore.h>
+#include <cleaning_deamon.h>
 #include "autoconf.h"  // for pseudoconfig
 
 
@@ -140,6 +141,7 @@ boot(void)
 	/* Default bootfs - but ignore failure, in case emu0 doesn't exist */
 	vfs_setbootfs("emu0");
     init_backing_store();
+//    cleaning_bootstrap();
 
 	kheap_nextgeneration();
 

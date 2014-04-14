@@ -36,12 +36,12 @@ static void start_deamon_thread(void *ptr, unsigned long nargs){
 
 	while(1){
 		// Less than or equal to as full mem used by kernel would result in an infinite loop otherwise
+		lock_acquire(deamon.lock);
 		while((coremap.modified*4)<=((coremap.used - coremap.kernel)*3)){
-			lock_acquire(deamon.lock);
 			cv_wait(deamon.cv, deamon.lock);
 		}
-		run_deamon();
 		lock_release(deamon.lock);
+		run_deamon();
 	}
 }
 

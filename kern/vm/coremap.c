@@ -62,7 +62,8 @@ set_dirty_bit(int index, int bitvalue) {
     coremap.cm[index].dirty = bitvalue;
     (bitvalue) ? coremap.modified++ : coremap.modified--;
     // Signal deamon
-//    if(bitvalue){
+    // TODO is it safe to do this in here
+//    if(bitvalue && ((coremap.modified*4)>((coremap.used - coremap.kernel)*3))){
 //    	lock_acquire(deamon.lock);
 //    	cv_signal(deamon.cv, deamon.lock);
 //    	lock_release(deamon.lock);
@@ -147,6 +148,7 @@ static int evict_cme(int index){
 
         as->page_dir->dir[pdi]->table[pti].present =
             (as->page_dir->dir[pdi]->table[pti].ppn == 0) ? 1 : 0;
+
 	} else {
 		// Evict all data to dedicated disk swap space, or assign new swap space and evict to there
         coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
@@ -168,7 +170,7 @@ static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	spinlock_acquire(&coremap.lock);
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
-//	coremap.last_allocated = index;
+	coremap.last_allocated = index;
     kprintf("cme: %zu (%s)\n", index, (is_kern) ? "kern" : "user");
 	spinlock_release(&coremap.lock);
 }
@@ -187,7 +189,7 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
 		for(unsigned i = 0; i < coremap.size; i++){
 			index = (index+1) % coremap.size;
 			// TODO we can probably wait here if this becomes an issue
-			if(core_set_busy(index, WAIT) == 0){
+			if(core_set_busy(index, NO_WAIT) == 0){
 				if(coremap.cm[index].kern == 1) { // Free core if kernel
 					core_set_free(index);
 					continue;
@@ -199,13 +201,13 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
 				} else if (round >= 1 && coremap.cm[index].dirty == 0) {
 					if (evict_cme(index) != 0) { // Steal cleaned page and evict
 						core_set_free(index);
-						return 0;
+						continue;
 					}
 					goto out;
 				} else if (round >= 2) {
 					if (evict_cme(index) != 0) { // Write dirty page to disk and then evict
 						core_set_free(index);
-						return 0;
+						continue;
 					}
 					goto out;
 				}
@@ -396,6 +398,7 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
+		if(pt->table[pti].ppn == 0) return ENOMEM;
 		pt->table[pti].present = 1;
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	}
@@ -445,6 +448,10 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
     unsigned pid = coremap.cm[cmi].pid;
     struct addrspace *as = get_proc(pid)->p_addrspace;
     if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
+
+    core_set_busy(cmi, WAIT);
+	set_dirty_bit(cmi, 1);
+	core_set_free(cmi);
 
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
