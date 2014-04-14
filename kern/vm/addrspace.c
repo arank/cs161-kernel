@@ -134,7 +134,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 
 				if(free == 0)
 					return -1;
-				newas->page_dir->dir[i]->table[j].ppn = free;
+				newas->page_dir->dir[i]->table[j].ppn = PADDR_TO_CMI(free);
 				// We are pulling into memory here and making it present
 				newas->page_dir->dir[i]->table[j].present = 1;
 
