@@ -117,6 +117,6 @@ int write_to_disk(paddr_t location, int index){
 		return -1;
 
 	// At this point the data is now on disk
-    kprintf("written to disk: cme %zu, swap_offset %zu\n", index, offset);
+    kprintf("written to disk: cme %zu, swap_offset %zu\n", PADDR_TO_CMI(location), offset);
 	return offset;
 }

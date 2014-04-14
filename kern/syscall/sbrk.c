@@ -15,26 +15,37 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 	struct addrspace *as= curproc->p_addrspace;
 	vaddr_t prev_break = as->heap_end;
 
-    // no nede to make a function call and acquire lock -> return immideately
+    // no need to make a function call and acquire lock -> return immideately
     if (num_bytes == 0) goto done;
 
     if (num_bytes % PAGE_SIZE != 0) return EINVAL;
 
-    // check if we have enough space to accomodate the new page tables
-//    if ((unsigned)((num_bytes/PAGE_SIZE)/PT_SIZE) > (coremap.size - coremap.used)) return ENOMEM;
-
-	// No multi-threaded processes but I'm still locking here to get the atomicity from the posix api
-//	lock_acquire(as->lock);
-
 
 	// We ran out of memory or (given the amount of physical memory, we cannot
     // grow heap till the red zone)
-	if (as_define_region(as, as->heap_end, (size_t)num_bytes, 1, 1, 1) != 0)
+    bool allocated[PD_SIZE];
+	for(int i = 0; i < PD_SIZE; i++)
+		allocated[i] = false;
+
+	// TODO ensure there is space for user to have at least 2-3 pages to return error to
+	// TODO is it safe to set to the beggining of the next page (for allocing last page)?
+	if(expand_as(as, as->heap_end, (size_t)num_bytes, 1, 1, 1, allocated) != 0){
+		for(int i =0; i < PD_SIZE; i++){
+			if(allocated[i]){
+				if(as->page_dir->dir[i]->lock != NULL)
+					lock_destroy(as->page_dir->dir[i]->lock);
+				if(as->page_dir->dir[i]->cv != NULL)
+					cv_destroy(as->page_dir->dir[i]->cv);
+				if(as->page_dir->dir[i]->table != NULL)
+					kfree(as->page_dir->dir[i]->table);
+				kfree(as->page_dir->dir[i]);
+				as->page_dir->dir[i] = NULL;
+			}
+		}
+
 		return ENOMEM;
+	}
 
-	//as->heap_end += num_bytes;
-
-//	lock_release(as->lock);
 
 done:
 	*prev = prev_break;

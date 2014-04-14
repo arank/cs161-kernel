@@ -232,6 +232,41 @@ as_deactivate(void)
 	 */
 }
 
+int expand_as(struct addrspace *as, vaddr_t vaddr, size_t sz,
+		 int readable, int writeable, int executable, bool* allocated)
+{
+	// TODO is this the right offset to jump by to get to the start of the next page?
+	for(unsigned i = 0; i < sz; i += (PAGE_SIZE - OFFSET((vaddr+i)))){
+		int pdi = PDI((vaddr+i));
+		int pti = PTI((vaddr+i));
+
+		int ret = page_table_add(pdi, as->page_dir);
+		if(ret == ENOMEM)
+			return -1;
+
+		if(ret == 0)
+			allocated[pdi] = true;
+
+		if(as->page_dir->dir[pdi]->table[pti].valid == 1)
+			continue;
+
+		as->page_dir->dir[pdi]->table[pti].ppn = 0;
+		as->page_dir->dir[pdi]->table[pti].valid = 1;
+		as->page_dir->dir[pdi]->table[pti].present = 1;
+		as->page_dir->dir[pdi]->table[pti].read = readable;
+		as->page_dir->dir[pdi]->table[pti].write = writeable;
+		as->page_dir->dir[pdi]->table[pti].exec = executable;
+
+	}
+
+	if ((vaddr + sz) < USERSTACK - (RED_ZONE * PAGE_SIZE) && as->heap_start < (vaddr + sz))
+		as->heap_start = as->heap_end = ROUNDUP (vaddr + sz, PAGE_SIZE);
+
+
+	return 0;
+}
+
+
 /*
  * Set up a segment at virtual address VADDR of size MEMSIZE. The
  * segment in memory extends from VADDR up to (but not including)
@@ -248,35 +283,17 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		 int readable, int writeable, int executable)
 {
 
+	bool allocated[PD_SIZE];
+
+	// TODO ensure there is space for user to have at least 2-3 pages to return error to
 	// TODO is it safe to set to the beggining of the next page (for allocing last page)?
-	for(unsigned i = 0; i < sz; i += (PAGE_SIZE - OFFSET((vaddr+i)))){
-		int pdi = PDI((vaddr+i));
-		int pti = PTI((vaddr+i));
-
-		if(page_table_add(pdi, as->page_dir) == ENOMEM)
-			goto out;
-
-		if(as->page_dir->dir[pdi]->table[pti].valid == 1)
-			continue;
-
-		as->page_dir->dir[pdi]->table[pti].ppn = 0;
-		as->page_dir->dir[pdi]->table[pti].valid = 1;
-		as->page_dir->dir[pdi]->table[pti].present = 1;
-		as->page_dir->dir[pdi]->table[pti].read = readable;
-		as->page_dir->dir[pdi]->table[pti].write = writeable;
-		as->page_dir->dir[pdi]->table[pti].exec = executable;
-
+	if(expand_as(as, vaddr, sz, readable, writeable, executable, allocated) != 0){
+		page_dir_destroy(as->page_dir);
+		return -1;
 	}
-
-    if ((vaddr + sz) < USERSTACK - (RED_ZONE * PAGE_SIZE) && as->heap_start < (vaddr + sz))
-        as->heap_start = as->heap_end = ROUNDUP (vaddr + sz, PAGE_SIZE);
-
 
 	return 0;
 
-out:
-	page_dir_destroy(as->page_dir);
-	return -1;
 }
 
 int
