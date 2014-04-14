@@ -205,6 +205,7 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
                     if (coremap.cm[index].ref == 1) { //clock heuristic
                         set_ref_bit(index, 0);
 						core_set_free(index);
+                        index = (index+1) % coremap.size;
                         continue;
                     }
 
@@ -223,6 +224,7 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
 
 				core_set_free(index);
 			}
+
 		}
 	}
 

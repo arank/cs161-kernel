@@ -15,6 +15,7 @@
 #include <proc.h>
 
 static struct vnode *bs;
+extern struct semaphore *tlb_sem;
 
 int init_backing_store(void) {
 
@@ -36,11 +37,16 @@ int init_backing_store(void) {
     backing_store->lock = lock_create("disk_lock");
     if (backing_store->lock == NULL) goto lk_out;
 
+    tlb_sem = sem_create("tlb_sem", 0);
+    if (tlb_sem == NULL) goto tlb_out;
+
     //Set 0 to in use, as that is reserved
     bitmap_mark(backing_store->bm, 0);
 
     return 0;
 
+tlb_out:
+    lock_destroy(backing_store->lock);
 lk_out:
     bitmap_destroy(backing_store->bm);
 bm_out:
@@ -111,5 +117,6 @@ int write_to_disk(paddr_t location, int index){
 		return -1;
 
 	// At this point the data is now on disk
+    kprintf("written to disk: cme %zu, swap_offset %zu\n", index, offset);
 	return offset;
 }
