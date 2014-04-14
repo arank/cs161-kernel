@@ -120,7 +120,7 @@ int clean_cme(int index){
 	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0)
 		return -1;
 
-	flush_ppn(CMI_TO_PADDR(index));
+	flush_ppn(index);
 
     coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
 
@@ -144,7 +144,7 @@ static int evict_cme(int index){
 	if(page_set_busy(as->page_dir->dir[pdi], pti, false) != 0)
 		return -1;
 
-	flush_ppn(CMI_TO_PADDR(index));
+	flush_ppn(index);
 
 	// Page is clean
 	if (coremap.cm[index].dirty == 0) {
@@ -300,15 +300,11 @@ int core_set_busy(int index, bool wait) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0) {
         set_busy_bit(index, 1);
-        if (index == 124)
-            kprintf("setting busy: %d\n", index);
 		spinlock_release(&coremap.lock);
 	}else if(wait){
 		// At this point busy wait for the bit to be open by sleeping till it's available
         wait_for_busy(index);
         set_busy_bit(index, 1);
-        if (index == 124)
-            kprintf("setting busy: %d\n", index);
 		spinlock_release(&coremap.lock);
 	}else{
 		spinlock_release(&coremap.lock);
@@ -324,8 +320,6 @@ int core_set_free(int index){
 		panic("busybit is already unset: %d\n", index);
     }
 	set_busy_bit(index, 0);
-    if (index == 124)
-        kprintf("setting free: %d\n", index);
 	spinlock_release(&coremap.lock);
 	return 0;
 }
@@ -391,7 +385,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 {
     int spl = splhigh();
 
-    int cmi = PADDR_TO_CMI(ts->ppn);
+    int cmi = ts->ppn;
     if (coremap.cm[cmi].use == 0) goto done;
     // TODO Ivan is this correct: yes, we I'll show you tomorrow
     uint32_t vpn = (coremap.cm[cmi].vpn << 12) & TLBHI_VPAGE;
@@ -411,16 +405,16 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 
     // Page exists but is not allocated
 	if (pt->table[pti].present == 1 && pt->table[pti].ppn == 0) {
-		pt->table[pti].ppn = get_free_cme(vaddr, USER_CMI);
+		pt->table[pti].ppn = PADDR_TO_CMI(get_free_cme(vaddr, USER_CMI));
         if (pt->table[pti].ppn == 0) return ENOMEM;
-        set_ref_bit(PADDR_TO_CMI(pt->table[pti].ppn), 1);
-        core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+        set_ref_bit(pt->table[pti].ppn, 1);
+        core_set_free(pt->table[pti].ppn);
 	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
-		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
-		if(pt->table[pti].ppn == 0) return ENOMEM;
+
+		pt->table[pti].ppn = PADDR_TO_CMI(retrieve_from_disk(pt->table[pti].ppn, vaddr));
 		pt->table[pti].present = 1;
-        set_ref_bit(PADDR_TO_CMI(pt->table[pti].ppn), 1);
-        core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
+        set_ref_bit(pt->table[pti].ppn, 1);
+        core_set_free(pt->table[pti].ppn);
 	}
 
 
@@ -430,7 +424,7 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 static
 void
 update_tlb(paddr_t pa, vaddr_t va, bool modified, bool read_only_fault) {
-    uint32_t elo = (pa & TLBLO_PPAGE) | TLBLO_VALID;
+    uint32_t elo = (CMI_TO_PADDR(pa) & TLBLO_PPAGE) | TLBLO_VALID;
     if (modified) elo |= TLBLO_DIRTY;
 
     uint32_t ehi = va & TLBHI_VPAGE;
@@ -465,7 +459,7 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
-    unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
+    unsigned cmi = pt->table[pti].ppn;
     unsigned pid = coremap.cm[cmi].pid;
     struct addrspace *as = get_proc(pid)->p_addrspace;
     if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
@@ -483,7 +477,7 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 static int tlb_fault_readonly(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
 
-    unsigned cmi = PADDR_TO_CMI(pt->table[pti].ppn);
+    unsigned cmi = pt->table[pti].ppn;
     unsigned pid = coremap.cm[cmi].pid;
     struct addrspace *as = get_proc(pid)->p_addrspace;
     if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
