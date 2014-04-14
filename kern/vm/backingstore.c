@@ -25,7 +25,7 @@ int init_backing_store(void) {
     if (backing_store == NULL) goto out;
 
     // Create dedicated swap space to temporarily pull data into before flushing to evictable user page
-    backing_store->swap = get_free_cme((vaddr_t)0, true);
+    backing_store->swap = get_free_cme((vaddr_t)0, KERNEL_CMI);
     if (backing_store->swap == 0) goto out;
     core_set_free(PADDR_TO_CMI(backing_store->swap));
 
@@ -100,17 +100,15 @@ int write_to_disk(paddr_t location, int index){
 			return -1;
 		}
 	}
+    lock_release(backing_store->lock);
 
 	struct iovec iov;
 	struct uio uio;
     uio_kinit(&iov, &uio, (void *)PADDR_TO_KVADDR(location), PAGE_SIZE, offset * PAGE_SIZE, UIO_WRITE);
 
-	if (VOP_WRITE(bs, &uio) != 0){
-		lock_release(backing_store->lock);
+	if (VOP_WRITE(bs, &uio) != 0)
 		return -1;
-	}
 
 	// At this point the data is now on disk
-	lock_release(backing_store->lock);
 	return offset;
 }

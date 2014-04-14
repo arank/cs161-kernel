@@ -21,7 +21,7 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
     if (num_bytes % PAGE_SIZE != 0) return EINVAL;
 
     // check if we have enough space to accomodate the new page tables
-    if ((unsigned)((num_bytes/4096)/1024) >= (coremap.size - coremap.used)) return ENOMEM;
+    if ((unsigned)((num_bytes/PAGE_SIZE)/PT_SIZE) > (coremap.size - coremap.used)) return ENOMEM;
 
 	// No multi-threaded processes but I'm still locking here to get the atomicity from the posix api
 	lock_acquire(as->lock);
@@ -33,11 +33,11 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 		return ENOMEM;
 	}
 
-	as->heap_end += num_bytes;
+	//as->heap_end += num_bytes;
 
 	lock_release(as->lock);
 
 done:
-	*prev = prev_break;;
+	*prev = prev_break;
 	return 0;
 }
