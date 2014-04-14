@@ -21,7 +21,6 @@
 int stat_coremap(int nargs, char **args) {
     (void)nargs;
     (void)args;
-	spinlock_acquire(&coremap.lock);
 
     kprintf("coremap.kernel: %d\n"
             "coremap.used: %d\n"
@@ -32,7 +31,6 @@ int stat_coremap(int nargs, char **args) {
             coremap.kernel, coremap.used, coremap.size, coremap.busy,
             coremap.ref, coremap.last_allocated);
 
-	spinlock_release(&coremap.lock);
     return 0;
 }
 
