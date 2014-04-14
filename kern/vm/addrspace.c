@@ -172,11 +172,13 @@ as_destroy(struct addrspace *as)
 
 					KASSERT(coremap.cm[cm_index].kern == 0);
 					set_use_bit(cm_index, 0);
+                    set_ref_bit(cm_index, 0);
+                    //set_dirty_bit(cm_index, 0);
+
 					coremap.cm[cm_index].dirty = 0;
 					coremap.cm[cm_index].slen = 0;
 					coremap.cm[cm_index].seq = 0;
 					coremap.cm[cm_index].junk = 0;
-					coremap.cm[cm_index].ref = 0;
 					coremap.cm[cm_index].pid = 0;
 					coremap.cm[cm_index].vpn = 0;
 

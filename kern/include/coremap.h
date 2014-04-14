@@ -27,6 +27,8 @@ paddr_t get_free_cme(vaddr_t vpn, bool kern);
 
 int stat_coremap(int nargs, char **args);
 
+void set_ref_bit(int index, int bitvalue);
+void set_use_bit(int index, int bitvalue);
 
 struct cme {
     uint32_t vpn:       20,
@@ -48,11 +50,10 @@ struct coremap {
     unsigned modified;
 
     unsigned kernel;
-    //unsigned user;
     unsigned busy;
     unsigned used;
     //unsigned swap;
-    //unsigned ref;
+    unsigned ref;
 
     unsigned size;
     struct cme *cm;
@@ -60,4 +61,3 @@ struct coremap {
 } coremap;
 
 #endif
-

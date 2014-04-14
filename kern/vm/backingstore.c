@@ -25,8 +25,9 @@ int init_backing_store(void) {
     if (backing_store == NULL) goto out;
 
     // Create dedicated swap space to temporarily pull data into before flushing to evictable user page
-    backing_store->swap = alloc_kpages(1);
+    backing_store->swap = get_free_cme((vaddr_t)0, KERNEL_CMI);
     if (backing_store->swap == 0) goto out;
+    core_set_free(PADDR_TO_CMI(backing_store->swap));
 
     //TODO figure this out currently this bitmap size is the max our coremap and page table supports
     backing_store->bm = bitmap_create(MAX_BM);
@@ -63,6 +64,8 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 		lock_release(backing_store->lock);
 		return 0;
 	}
+    lock_release(backing_store->lock);
+
     core_set_busy(PADDR_TO_CMI(backing_store->swap), true);
 
 	struct iovec iov;
@@ -71,13 +74,8 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 
     if (VOP_READ(bs, &uio) != 0) {
     	core_set_free(PADDR_TO_CMI(backing_store->swap));
-		lock_release(backing_store->lock);
 		return 0;
     }
-
-    // Now the data is in our dedicated swap space so we can free it
-    bitmap_unmark(backing_store->bm, swap_index);
-    lock_release(backing_store->lock);
 
     paddr_t swap_addr = get_free_cme(swap_into, false);
     if(swap_addr == 0){
@@ -103,17 +101,15 @@ int write_to_disk(paddr_t location, int index){
 			return -1;
 		}
 	}
+    lock_release(backing_store->lock);
 
 	struct iovec iov;
 	struct uio uio;
     uio_kinit(&iov, &uio, (void *)PADDR_TO_KVADDR(location), PAGE_SIZE, offset * PAGE_SIZE, UIO_WRITE);
 
-	if (VOP_WRITE(bs, &uio) != 0){
-		lock_release(backing_store->lock);
+	if (VOP_WRITE(bs, &uio) != 0)
 		return -1;
-	}
 
 	// At this point the data is now on disk
-	lock_release(backing_store->lock);
 	return offset;
 }

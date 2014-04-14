@@ -27,9 +27,10 @@ int stat_coremap(int nargs, char **args) {
             "coremap.used: %d\n"
             "coremap.size: %d\n"
             "coremap.busy: %d\n"
+            "coremap.ref: %d\n"
             "coremap.last_alloc: %d\n",
             coremap.kernel, coremap.used, coremap.size, coremap.busy,
-            coremap.last_allocated);
+            coremap.ref, coremap.last_allocated);
 
 	spinlock_release(&coremap.lock);
     return 0;
@@ -68,6 +69,12 @@ set_dirty_bit(int index, int bitvalue) {
 //    	lock_release(deamon.lock);
 //    }
 
+}
+
+void
+set_ref_bit(int index, int bitvalue) {
+    coremap.cm[index].ref = bitvalue;
+    (bitvalue) ? coremap.ref++ : coremap.ref--;
 }
 
 void cm_bootstrap(void) {
@@ -168,8 +175,8 @@ static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	spinlock_acquire(&coremap.lock);
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
-//	coremap.last_allocated = index;
-    kprintf("cme: %zu (%s)\n", index, (is_kern) ? "kern" : "user");
+	coremap.last_allocated = index;
+    //kprintf("cme: %zu (%s)\n", index, (is_kern) ? "kern" : "user");
 	spinlock_release(&coremap.lock);
 }
 
@@ -186,8 +193,8 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
 	for(unsigned round = 0; round < 3; round++){
 		for(unsigned i = 0; i < coremap.size; i++){
 			index = (index+1) % coremap.size;
-			// TODO we can probably wait here if this becomes an issue
-			if(core_set_busy(index, WAIT) == 0){
+
+			if(core_set_busy(index, NO_WAIT) == 0){
 				if(coremap.cm[index].kern == 1) { // Free core if kernel
 					core_set_free(index);
 					continue;
@@ -197,15 +204,20 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
 					set_use_bit(index, 1);
 					goto out;
 				} else if (round >= 1 && coremap.cm[index].dirty == 0) {
+                    if (coremap.cm[index].ref == 1) { //clock heuristic
+                        set_ref_bit(index, 0);
+                        continue;
+                    }
+
 					if (evict_cme(index) != 0) { // Steal cleaned page and evict
 						core_set_free(index);
-						return 0;
+                        continue;
 					}
 					goto out;
 				} else if (round >= 2) {
 					if (evict_cme(index) != 0) { // Write dirty page to disk and then evict
 						core_set_free(index);
-						return 0;
+                        continue;
 					}
 					goto out;
 				}
@@ -393,12 +405,15 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	if (pt->table[pti].present == 1 && pt->table[pti].ppn == 0) {
 		pt->table[pti].ppn = get_free_cme(vaddr, USER_CMI);
         if (pt->table[pti].ppn == 0) return ENOMEM;
+        set_ref_bit(PADDR_TO_CMI(pt->table[pti].ppn), 1);
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
 		pt->table[pti].ppn = retrieve_from_disk(pt->table[pti].ppn, vaddr);
 		pt->table[pti].present = 1;
+        set_ref_bit(PADDR_TO_CMI(pt->table[pti].ppn), 1);
         core_set_free(PADDR_TO_CMI(pt->table[pti].ppn));
 	}
+
 
 	return 0;
 }
@@ -446,6 +461,10 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
     struct addrspace *as = get_proc(pid)->p_addrspace;
     if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
 
+	core_set_busy(cmi, WAIT);
+    set_dirty_bit(cmi, 1);
+	core_set_free(cmi);
+
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
 	page_set_free(pt, pti);
@@ -483,8 +502,9 @@ done:
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-    KASSERT(faultaddress != 0);
-    KASSERT(faultaddress < MIPS_KSEG0);
+    if (faultaddress > MIPS_KSEG0 || faultaddress == 0) return -1;
+    //KASSERT(faultaddress != 0);
+    //KASSERT(faultaddress < MIPS_KSEG0);
 
     if (!is_valid_addr(faultaddress, curproc->p_addrspace)) return EFAULT;
 
