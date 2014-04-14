@@ -24,7 +24,7 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 //    if ((unsigned)((num_bytes/PAGE_SIZE)/PT_SIZE) > (coremap.size - coremap.used)) return ENOMEM;
 
 	// No multi-threaded processes but I'm still locking here to get the atomicity from the posix api
-	lock_acquire(as->lock);
+//	lock_acquire(as->lock);
 
 
 	// We ran out of memory or (given the amount of physical memory, we cannot
@@ -33,6 +33,8 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 		return ENOMEM;
 
 	//as->heap_end += num_bytes;
+
+//	lock_release(as->lock);
 
 done:
 	*prev = prev_break;

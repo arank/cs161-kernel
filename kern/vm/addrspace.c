@@ -247,31 +247,30 @@ int
 as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		 int readable, int writeable, int executable)
 {
-	// Calculate offset into dir, and define new table, set the addr to valid, plus the offset.
-	int pdi = PDI(vaddr);
-    KASSERT(pdi != 0);
-	if(page_table_add(pdi, as->page_dir) == ENOMEM) goto out;
 
-	int pages_to_alloc = (OFFSET(vaddr) + sz) / PAGE_SIZE;
+	// TODO is it safe to set to the beggining of the next page (for allocing last page)?
+	for(unsigned i = 0; i < sz; i += (PAGE_SIZE - OFFSET((vaddr+i)))){
+		int pdi = PDI((vaddr+i));
+		int pti = PTI((vaddr+i));
 
-	for(int i = 0, pti = PTI(vaddr); i < pages_to_alloc; i++, pti++){
+		if(page_table_add(pdi, as->page_dir) == ENOMEM)
+			goto out;
 
-		if(pti == PT_SIZE){
-			if(page_table_add(++pdi, as->page_dir) == ENOMEM)
-				goto out;
-			pti = 0;
-		}
+		if(as->page_dir->dir[pdi]->table[pti].valid == 1)
+			continue;
 
 		as->page_dir->dir[pdi]->table[pti].ppn = 0;
 		as->page_dir->dir[pdi]->table[pti].valid = 1;
 		as->page_dir->dir[pdi]->table[pti].present = 1;
-        as->page_dir->dir[pdi]->table[pti].read = readable;
-        as->page_dir->dir[pdi]->table[pti].write = writeable;
-        as->page_dir->dir[pdi]->table[pti].exec = executable;
+		as->page_dir->dir[pdi]->table[pti].read = readable;
+		as->page_dir->dir[pdi]->table[pti].write = writeable;
+		as->page_dir->dir[pdi]->table[pti].exec = executable;
+
 	}
 
     if ((vaddr + sz) < USERSTACK - (RED_ZONE * PAGE_SIZE) && as->heap_start < (vaddr + sz))
         as->heap_start = as->heap_end = ROUNDUP (vaddr + sz, PAGE_SIZE);
+
 
 	return 0;
 
