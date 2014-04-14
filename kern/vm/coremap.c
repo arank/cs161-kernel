@@ -423,11 +423,13 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 
 static
 void
-update_tlb(paddr_t pa, vaddr_t va, bool modified, bool read_only_fault) {
-    uint32_t elo = (CMI_TO_PADDR(pa) & TLBLO_PPAGE) | TLBLO_VALID;
+update_tlb(uint32_t ppn, vaddr_t va, bool modified, bool read_only_fault) {
+    uint32_t ehi = va & TLBHI_VPAGE;
+
+    // We store the PPN (NUMBER!!!) in TLB, not Physical Address
+    uint32_t elo = ((ppn << 12) & TLBLO_PPAGE) | TLBLO_VALID;
     if (modified) elo |= TLBLO_DIRTY;
 
-    uint32_t ehi = va & TLBHI_VPAGE;
     va &= PAGE_FRAME;
 
     int spl = splhigh();
@@ -459,14 +461,13 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
-    unsigned cmi = pt->table[pti].ppn;
-    unsigned pid = coremap.cm[cmi].pid;
+    unsigned pid = coremap.cm[pt->table[pti].ppn].pid;
     struct addrspace *as = get_proc(pid)->p_addrspace;
     if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
 
-	core_set_busy(cmi, WAIT);
-    set_dirty_bit(cmi, 1);
-	core_set_free(cmi);
+	core_set_busy(pt->table[pti].ppn, WAIT);
+    set_dirty_bit(pt->table[pti].ppn, 1);
+	core_set_free(pt->table[pti].ppn);
 
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
@@ -477,7 +478,7 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 static int tlb_fault_readonly(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
 
-    unsigned cmi = pt->table[pti].ppn;
+    uint32_t cmi = pt->table[pti].ppn;
     unsigned pid = coremap.cm[cmi].pid;
     struct addrspace *as = get_proc(pid)->p_addrspace;
     if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
@@ -506,8 +507,6 @@ int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
     if (faultaddress > MIPS_KSEG0 || faultaddress == 0) return -1;
-    //KASSERT(faultaddress != 0);
-    //KASSERT(faultaddress < MIPS_KSEG0);
 
     if (!is_valid_addr(faultaddress, curproc->p_addrspace)) return EFAULT;
 
