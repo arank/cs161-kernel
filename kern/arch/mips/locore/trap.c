@@ -237,7 +237,6 @@ mips_trap(struct trapframe *tf)
 		break;
 	case EX_TLBS:
 		if (vm_fault(VM_FAULT_WRITE, tf->tf_vaddr)==0) {
-            //kprintf("fault_write: %zu\n", tf->tf_vaddr);
 			goto done;
 		}
 		break;

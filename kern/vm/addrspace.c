@@ -166,7 +166,7 @@ as_destroy(struct addrspace *as)
 
 				if(as->page_dir->dir[i]->table[j].present == 1) {
                     if (as->page_dir->dir[i]->table[j].ppn == 0) continue;
-					int cm_index = PADDR_TO_CMI(as->page_dir->dir[i]->table[j].ppn);
+					int cm_index = as->page_dir->dir[i]->table[j].ppn;
 					// busily wait to get lock on memory
 					core_set_busy(cm_index, true);
 
