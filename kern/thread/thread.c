@@ -79,6 +79,7 @@ static struct wchanarray allwchans;
 /* Used to wait for secondary CPUs to come online. */
 static struct semaphore *cpu_startup_sem;
 
+struct semaphore *tlb_sem;
 ////////////////////////////////////////////////////////////
 
 /*
@@ -1242,22 +1243,20 @@ ipi_tlbshootdown(struct cpu *target, const struct tlbshootdown *mapping)
 
 void
 flush_ppn(paddr_t ppn){
-	if(ppn != 0){
-		struct tlbshootdown *tb = kmalloc(sizeof(struct tlbshootdown));
-		tb->ppn = ppn;
-		tb->tlb_sem = sem_create("tlb_sem", 0);
+	if (ppn != 0) {
+        // no need to kmalloc this since we're waiting P() for every CPU
+		struct tlbshootdown tb;
+		tb.ppn = ppn;
+		tb.tlb_sem = tlb_sem;
 		int numcpus = cpuarray_num(&allcpus);
+
 		// Shootdown this entry on all processors
-		for(int i=0; i<numcpus; i++){
-			ipi_tlbshootdown(cpuarray_get(&allcpus, i), tb);
-		}
+		for (int i=0; i < numcpus; i++)
+			ipi_tlbshootdown(cpuarray_get(&allcpus, i), &tb);
+
 		// Wait for all processors to respond
-		for(int i=0; i<numcpus; i++){
-			P(tb->tlb_sem);
-		}
-		// Cleanup
-		sem_destroy(tb->tlb_sem);
-		kfree(tb);
+		for (int i=0; i < numcpus; i++)
+			P(tb.tlb_sem);
 	}
 }
 
