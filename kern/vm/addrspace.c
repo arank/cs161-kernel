@@ -253,8 +253,6 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 	if(page_table_add(pdi, as->page_dir) == ENOMEM) goto out;
 
 	int pages_to_alloc = (OFFSET(vaddr) + sz) / PAGE_SIZE;
-	if((OFFSET(vaddr) + sz) % PAGE_SIZE != 0)
-		pages_to_alloc++;
 
 	for(int i = 0, pti = PTI(vaddr); i < pages_to_alloc; i++, pti++){
 

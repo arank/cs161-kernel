@@ -397,10 +397,10 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
     int cmi = ts->ppn;
     if (coremap.cm[cmi].use == 0) goto done;
     // TODO Ivan is this correct: yes, we I'll show you tomorrow
-    uint32_t vpn = (coremap.cm[cmi].vpn << 12) & TLBHI_VPAGE;
-    int rv = tlb_probe(vpn, 0);
-    if (rv >= 0)
-        tlb_write(TLBHI_INVALID(rv), TLBLO_INVALID(), rv);
+    uint32_t ehi = (coremap.cm[cmi].vpn << 12) & TLBHI_VPAGE;
+    int entry = tlb_probe(ehi, 0);
+    if (entry >= 0)
+        tlb_write(TLBHI_INVALID(entry), TLBLO_INVALID(), entry);
 
 done:
     V(ts->tlb_sem); /* don't know where we should P() */
@@ -410,7 +410,7 @@ done:
 // Returns with the page table index locked, and a valid ppn that is in memory
 static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	page_set_busy(pt, pti, true);
-	if (pt->table[pti].valid != 1) return EFAULT;
+	//if (pt->table[pti].valid != 1) return EFAULT;
 
 	// Check for un-initalized paddr
 	KASSERT(pt->table[pti].present != 0 || pt->table[pti].ppn != 0);
@@ -438,7 +438,6 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	}
 
 	KASSERT(pt->table[pti].busybit == 1);
-
 	// Page is now in memory and no validation is nessecary
 	return 0;
 }
@@ -469,6 +468,8 @@ static
 int
 tlb_miss_on_load(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
+    KASSERT(pti >= 0 && pti < PT_SIZE);
+
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
     update_tlb(pt->table[pti].ppn, vaddr, false, false);
@@ -481,6 +482,8 @@ static
 int
 tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
+    KASSERT(pti >= 0 && pti < PT_SIZE);
+
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
     unsigned pid = coremap.cm[pt->table[pti].ppn].pid;
@@ -500,6 +503,7 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 
 static int tlb_fault_readonly(vaddr_t vaddr, struct page_table *pt){
 	int pti = PTI(vaddr);
+    KASSERT(pti >= 0 && pti < PT_SIZE);
 
     uint32_t cmi = pt->table[pti].ppn;
     unsigned pid = coremap.cm[cmi].pid;
@@ -533,7 +537,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
     if (!is_valid_addr(faultaddress, curproc->p_addrspace)) return EFAULT;
 
-	struct page_table *pt = curproc->p_addrspace->page_dir->dir[PDI(faultaddress)];
+    uint32_t pdi = PDI(faultaddress);
+    KASSERT(pdi > 0 && pdi < PD_SIZE);
+
+	struct page_table *pt = curproc->p_addrspace->page_dir->dir[pdi];
 
     switch(faulttype) {
         case VM_FAULT_READONLY:
