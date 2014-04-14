@@ -301,13 +301,15 @@ int core_set_busy(int index, bool wait) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0) {
         set_busy_bit(index, 1);
-    kprintf("setting busy: %d\n", index);
+        if (index == 124)
+            kprintf("setting busy: %d\n", index);
 		spinlock_release(&coremap.lock);
 	}else if(wait){
 		// At this point busy wait for the bit to be open by sleeping till it's available
         wait_for_busy(index);
         set_busy_bit(index, 1);
-    kprintf("setting busy: %d\n", index);
+        if (index == 124)
+            kprintf("setting busy: %d\n", index);
 		spinlock_release(&coremap.lock);
 	}else{
 		spinlock_release(&coremap.lock);
@@ -318,11 +320,13 @@ int core_set_busy(int index, bool wait) {
 
 int core_set_free(int index){
 	spinlock_acquire(&coremap.lock);
-	if(coremap.cm[index].busybit == 0)
+	if(coremap.cm[index].busybit == 0) {
+        stat_coremap(0, NULL);
 		panic("busybit is already unset: %d\n", index);
-
+    }
 	set_busy_bit(index, 0);
-kprintf("setting free: %d\n", index);
+    if (index == 124)
+        kprintf("setting free: %d\n", index);
 	spinlock_release(&coremap.lock);
 	return 0;
 }
