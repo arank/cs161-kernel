@@ -206,6 +206,7 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
 				} else if (round >= 1 && coremap.cm[index].dirty == 0) {
                     if (coremap.cm[index].ref == 1) { //clock heuristic
                         set_ref_bit(index, 0);
+						core_set_free(index);
                         continue;
                     }
 
@@ -232,6 +233,7 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
 out:
 	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
 	update_cme(index, vaddr, is_kern);
+    KASSERT(coremap.cm[index].busybit == 1);
 	return CMI_TO_PADDR(index);
 
 }
@@ -299,11 +301,13 @@ int core_set_busy(int index, bool wait) {
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0) {
         set_busy_bit(index, 1);
+    kprintf("setting busy: %d\n", index);
 		spinlock_release(&coremap.lock);
 	}else if(wait){
 		// At this point busy wait for the bit to be open by sleeping till it's available
         wait_for_busy(index);
         set_busy_bit(index, 1);
+    kprintf("setting busy: %d\n", index);
 		spinlock_release(&coremap.lock);
 	}else{
 		spinlock_release(&coremap.lock);
@@ -315,9 +319,10 @@ int core_set_busy(int index, bool wait) {
 int core_set_free(int index){
 	spinlock_acquire(&coremap.lock);
 	if(coremap.cm[index].busybit == 0)
-		panic("busybit is already unset\n");
+		panic("busybit is already unset: %d\n", index);
 
 	set_busy_bit(index, 0);
+kprintf("setting free: %d\n", index);
 	spinlock_release(&coremap.lock);
 	return 0;
 }

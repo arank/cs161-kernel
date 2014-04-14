@@ -33,7 +33,7 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 		return ENOMEM;
 	}
 
-	as->heap_end += num_bytes;
+	//as->heap_end += num_bytes;
 
 	lock_release(as->lock);
 
