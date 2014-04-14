@@ -111,6 +111,10 @@ vm_bootstrap(void) {
 // Given a locked non-kern dirty cme, it cleans it to disk
 int clean_cme(int index){
 	KASSERT(coremap.cm[index].pid!=0);
+	KASSERT(coremap.cm[index].kern != 1);
+	KASSERT(coremap.cm[index].dirty == 1);
+	KASSERT(coremap.cm[index].busybit == 1);
+
 	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
 	int pdi = VPN_PDI(coremap.cm[index].vpn);
 	int pti = VPN_PTI(coremap.cm[index].vpn);
@@ -136,6 +140,9 @@ int clean_cme(int index){
 // Given a locked non-kern cme it forcibly evicts it
 static int evict_cme(int index){
 	KASSERT(coremap.cm[index].pid!=0);
+	KASSERT(coremap.cm[index].kern != 1);
+	KASSERT(coremap.cm[index].busybit == 1);
+
 	struct addrspace *as = get_proc(coremap.cm[index].pid)->p_addrspace;
 	int pdi = VPN_PDI(coremap.cm[index].vpn);
 	int pti = VPN_PTI(coremap.cm[index].vpn);
@@ -405,21 +412,34 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	page_set_busy(pt, pti, true);
 	if (pt->table[pti].valid != 1) return EFAULT;
 
+	// Check for un-initalized paddr
+	KASSERT(pt->table[pti].present != 0 || pt->table[pti].ppn != 0);
+
     // Page exists but is not allocated
 	if (pt->table[pti].present == 1 && pt->table[pti].ppn == 0) {
+
 		pt->table[pti].ppn = PADDR_TO_CMI(get_free_cme(vaddr, USER_CMI));
         if (pt->table[pti].ppn == 0) return ENOMEM;
+
         set_ref_bit(pt->table[pti].ppn, 1);
+
         core_set_free(pt->table[pti].ppn);
+
+    // Page on disk
 	} else if(pt->table[pti].present == 0 && pt->table[pti].ppn > 0) {
 
 		pt->table[pti].ppn = PADDR_TO_CMI(retrieve_from_disk(pt->table[pti].ppn, vaddr));
+		if(pt->table[pti].ppn == 0) return ENOMEM;
+
 		pt->table[pti].present = 1;
         set_ref_bit(pt->table[pti].ppn, 1);
+
         core_set_free(pt->table[pti].ppn);
 	}
 
+	KASSERT(pt->table[pti].busybit == 1);
 
+	// Page is now in memory and no validation is nessecary
 	return 0;
 }
 

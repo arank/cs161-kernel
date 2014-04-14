@@ -124,17 +124,16 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 					// Copy over page from old addr space memory
 					free = get_free_cme(vpn, false);
                     if (free == 0) return ENOMEM;
-					paddr_t ppn = old->page_dir->dir[i]->table[j].ppn;
+					paddr_t ppn = CMI_TO_PADDR(old->page_dir->dir[i]->table[j].ppn);
 					memcpy((void*)PADDR_TO_KVADDR(free), (void*)PADDR_TO_KVADDR(ppn), PAGE_SIZE);
 				}else{
 					// Copy over from disk
-					panic("disk copy on as cpy\n");
 					free = retrieve_from_disk(newas->page_dir->dir[i]->table[j].ppn, vpn);
 				}
 
 				if(free == 0)
 					return -1;
-				newas->page_dir->dir[i]->table[j].ppn = free;
+				newas->page_dir->dir[i]->table[j].ppn = PADDR_TO_CMI(free);
 				// We are pulling into memory here and making it present
 				newas->page_dir->dir[i]->table[j].present = 1;
 
@@ -173,9 +172,8 @@ as_destroy(struct addrspace *as)
 					KASSERT(coremap.cm[cm_index].kern == 0);
 					set_use_bit(cm_index, 0);
                     set_ref_bit(cm_index, 0);
-                    //set_dirty_bit(cm_index, 0);
+                    set_dirty_bit(cm_index, 0);
 
-					coremap.cm[cm_index].dirty = 0;
 					coremap.cm[cm_index].slen = 0;
 					coremap.cm[cm_index].seq = 0;
 					coremap.cm[cm_index].junk = 0;
@@ -193,7 +191,6 @@ as_destroy(struct addrspace *as)
 
 					core_set_free(cm_index);
 				}else{
-					panic("dirty disk remove on as destroy\n");
 					remove_from_disk(as->page_dir->dir[i]->table[j].ppn);
 				}
 
@@ -267,6 +264,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 			pti = 0;
 		}
 
+		as->page_dir->dir[pdi]->table[pti].ppn = 0;
 		as->page_dir->dir[pdi]->table[pti].valid = 1;
 		as->page_dir->dir[pdi]->table[pti].present = 1;
         as->page_dir->dir[pdi]->table[pti].read = readable;

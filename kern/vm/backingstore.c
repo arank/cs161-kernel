@@ -89,6 +89,7 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
     }
     memcpy((void *)PADDR_TO_KVADDR(swap_addr), (void *)PADDR_TO_KVADDR(backing_store->swap), PAGE_SIZE);
     core_set_free(PADDR_TO_CMI(backing_store->swap));
+    KASSERT(coremap.cm[PADDR_TO_CMI(swap_addr)].busybit == 1);
     return swap_addr;
 }
 
