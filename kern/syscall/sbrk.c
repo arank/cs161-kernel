@@ -25,12 +25,11 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 
 	// TODO ensure there is space for user to have at least 2-3 pages to return error to
 	// TODO is it safe to set to the beggining of the next page (for allocing last page)?
-    kprintf("start = %x, end = %x, sz: %d\n", as->heap_start, as->heap_end, (int)num_bytes);
     vaddr_t cur_heap_end = as->heap_end;
 	if(expand_as(as, as->heap_end, (size_t)num_bytes, 1, 1, 1, allocated) != 0){
 		for(int i =0; i < PD_SIZE; i++){
 			if(allocated[i]){
-                kprintf("allocated pdi: %d\n", i);
+                //kprintf("allocated pdi: %d\n", i);
 				if(as->page_dir->dir[i]->lock != NULL)
 					lock_destroy(as->page_dir->dir[i]->lock);
 				if(as->page_dir->dir[i]->cv != NULL)
@@ -45,6 +44,8 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 
 		return ENOMEM;
 	}
+
+    kprintf("start = %x, end = %x, sz: %d\n", as->heap_start, as->heap_end, (int)num_bytes);
 done:
 	*prev = prev_break;
 	return 0;

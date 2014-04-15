@@ -244,9 +244,10 @@ int expand_as(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		if(ret == ENOMEM)
 			return -1;
 
-		if(ret == 0 && allocated != NULL)
+		if(ret == 0 && allocated != NULL) {
+            kprintf("allocated pdi: %d\n", pdi);
 			allocated[pdi] = true;
-
+        }
 		if(as->page_dir->dir[pdi]->table[pti].valid == 1)
 			continue;
 

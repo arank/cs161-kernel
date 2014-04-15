@@ -410,7 +410,7 @@ done:
 // Returns with the page table index locked, and a valid ppn that is in memory
 static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 	page_set_busy(pt, pti, true);
-	//if (pt->table[pti].valid != 1) return EFAULT;
+	if (pt->table[pti].valid != 1) return EFAULT;
 
 	// Check for un-initalized paddr
 	KASSERT(pt->table[pti].present != 0 || pt->table[pti].ppn != 0);

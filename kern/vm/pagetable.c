@@ -50,6 +50,7 @@ int page_table_add(int index, struct page_dir* pd){
 		pd->dir[index]->lock = NULL;
 		pd->dir[index]->cv = NULL;
 		pd->dir[index]->table = NULL;
+        pd->dir[index] = NULL;
 		return ENOMEM;
 }
 
