@@ -38,6 +38,8 @@ int stat_coremap(int nargs, char **args) {
 // TODO can we encapsulate getting and releasing the spinlock in these functions
 void
 set_use_bit(int index, int bitvalue) {
+    //if (coremap.cm[index].use == 1)
+        //kprintf("index %d set free\n", index);
     coremap.cm[index].use = bitvalue;
     (bitvalue) ? coremap.used++ : coremap.used--;
 }
@@ -184,7 +186,7 @@ static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
 	coremap.last_allocated = index;
-    kprintf("cme: %zu (%s) vaddr: %x\n", index, (is_kern) ? "kern" : "user", vaddr);
+    //kprintf("cme: %zu (%s) vaddr: %x\n", index, (is_kern) ? "kern" : "user", vaddr);
 	spinlock_release(&coremap.lock);
 }
 

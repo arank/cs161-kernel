@@ -65,8 +65,8 @@ struct cpu {
 	 * Protected by the runqueue lock.
 	 */
 	bool c_isidle;			/* True if this cpu is idle */
-	//struct threadlist c_runqueue;	/* Run queue for this cpu */
-    struct mlfq c_mlfq;
+	struct threadlist c_runqueue;	/* Run queue for this cpu */
+    //struct mlfq c_mlfq;
 	struct spinlock c_runqueue_lock;
 
 	/*

@@ -84,7 +84,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	}
 
 	// TODO do we need a lock on this function?
-	//lock_acquire(old->lock);
+	lock_acquire(old->lock);
 
 	// Copy heap pointers
 	newas->heap_end = old->heap_end;
@@ -150,7 +150,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 		}
 	}
 
-	//lock_release(old->lock);
+	lock_release(old->lock);
 
 	*ret = newas;
 	return 0;
@@ -180,10 +180,11 @@ as_destroy(struct addrspace *as)
 					core_set_busy(cm_index, true);
 
 					KASSERT(coremap.cm[cm_index].kern == 0);
+                    KASSERT(coremap.cm[cm_index].use == 1); // just in case
 					set_use_bit(cm_index, 0);
-                    set_ref_bit(cm_index, 0);
                     set_dirty_bit(cm_index, 0);
 
+                    coremap.cm[cm_index].ref = 0;
 					coremap.cm[cm_index].slen = 0;
 					coremap.cm[cm_index].seq = 0;
 					coremap.cm[cm_index].junk = 0;
@@ -191,7 +192,7 @@ as_destroy(struct addrspace *as)
 					coremap.cm[cm_index].vpn = 0;
 
 					if(coremap.cm[cm_index].swap!=0){
-						panic("clean disk remove on as destroy\n");
+						//panic("clean disk remove on as destroy\n");
 						remove_from_disk(coremap.cm[cm_index].swap);
 						coremap.cm[cm_index].swap = 0;
 					}
@@ -206,7 +207,6 @@ as_destroy(struct addrspace *as)
 
 				as->page_dir->dir[i]->table[j].valid = 0;
 				page_set_free(as->page_dir->dir[i], j);
-
 			}
 		}
 	}
@@ -255,7 +255,7 @@ int expand_as(struct addrspace *as, vaddr_t vaddr, size_t sz,
 			return -1;
 
 		if(ret == 0 && allocated != NULL) {
-            kprintf("allocated pdi: %d\n", pdi);
+            //kprintf("allocated pdi: %d\n", pdi);
 			allocated[pdi] = true;
         }
 		if(as->page_dir->dir[pdi]->table[pti].valid == 1)
