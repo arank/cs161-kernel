@@ -30,8 +30,8 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 		for(int i =0; i < PD_SIZE; i++){
 			if(allocated[i]){
                 //kprintf("allocated pdi: %d\n", i);
-				if(as->page_dir->dir[i]->lock != NULL)
-					lock_destroy(as->page_dir->dir[i]->lock);
+				//if(as->page_dir->dir[i]->lock != NULL)
+					//lock_destroy(as->page_dir->dir[i]->lock);
 				if(as->page_dir->dir[i]->cv != NULL)
 					cv_destroy(as->page_dir->dir[i]->cv);
 				if(as->page_dir->dir[i]->table != NULL)

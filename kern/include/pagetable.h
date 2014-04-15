@@ -15,7 +15,7 @@ struct pte {
 };
 
 struct page_table {
-	struct lock *lock;
+	struct spinlock lock;
 	struct cv *cv;
 	struct pte* table;
 };

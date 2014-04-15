@@ -397,7 +397,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 
     int cmi = ts->ppn;
     if (coremap.cm[cmi].use == 0) goto done;
-    // TODO Ivan is this correct: yes, we I'll show you tomorrow
+    KASSERT(coremap.cm[cmi].busybit == 1);
     uint32_t ehi = (coremap.cm[cmi].vpn << 12) & TLBHI_VPAGE;
     int entry = tlb_probe(ehi, 0);
     if (entry >= 0)

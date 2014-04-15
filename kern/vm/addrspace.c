@@ -84,7 +84,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	}
 
 	// TODO do we need a lock on this function?
-	lock_acquire(old->lock);
+	//lock_acquire(old->lock);
 
 	// Copy heap pointers
 	newas->heap_end = old->heap_end;
@@ -99,13 +99,13 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 			if (page_table_add(i, newas->page_dir) == ENOMEM)
 				return ENOMEM;
 
-//			if(i == 35)
-//				panic("I am dead for you\n");
-
 			for(int j=0; j<PT_SIZE; j++){
+                //kprintf("pdi: %d, pti: %d\n", i, j);
 				page_set_busy(old->page_dir->dir[i], j, true);
 
 				// Copy everything but the location of the physical page
+				newas->page_dir->dir[i]->table[j].busybit = 0;
+
 				newas->page_dir->dir[i]->table[j].valid
                     = old->page_dir->dir[i]->table[j].valid;
 				newas->page_dir->dir[i]->table[j].read
@@ -118,9 +118,10 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 						old->page_dir->dir[i]->table[j].present;
 
 				// If not allocated or only symbolically linked
-				if(old->page_dir->dir[i]->table[j].ppn == 0)
+				if(old->page_dir->dir[i]->table[j].ppn == 0) {
+                    page_set_free(old->page_dir->dir[i], j);
 					continue;
-
+                }
 				paddr_t free;
 				vaddr_t vpn = (i<<22) | (j<<12);
 
@@ -133,10 +134,9 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				}else{
 					// Copy over from disk
 					free = retrieve_from_disk(newas->page_dir->dir[i]->table[j].ppn, vpn);
+                    if (free == 0) return -1;
 				}
 
-				if(free == 0)
-					return -1;
 				newas->page_dir->dir[i]->table[j].ppn = PADDR_TO_CMI(free);
 				// We are pulling into memory here and making it present
 				newas->page_dir->dir[i]->table[j].present = 1;
@@ -148,7 +148,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 		}
 	}
 
-	lock_release(old->lock);
+	//lock_release(old->lock);
 
 	*ret = newas;
 	return 0;
