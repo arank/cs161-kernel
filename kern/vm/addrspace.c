@@ -244,7 +244,7 @@ int expand_as(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		if(ret == ENOMEM)
 			return -1;
 
-		if(ret == 0)
+		if(ret == 0 && allocated != NULL)
 			allocated[pdi] = true;
 
 		if(as->page_dir->dir[pdi]->table[pti].valid == 1)
@@ -259,9 +259,11 @@ int expand_as(struct addrspace *as, vaddr_t vaddr, size_t sz,
 
 	}
 
-	if ((vaddr + sz) < USERSTACK - (RED_ZONE * PAGE_SIZE) && as->heap_start < (vaddr + sz))
-		as->heap_start = as->heap_end = ROUNDUP (vaddr + sz, PAGE_SIZE);
-
+	if ((vaddr + sz) < USERSTACK - (RED_ZONE * PAGE_SIZE) && as->heap_start < (vaddr + sz)) {
+        as->heap_end = ROUNDUP (vaddr + sz, PAGE_SIZE);
+        kprintf("heap_ajusted to: %x\n", as->heap_end);
+        if (allocated == NULL) as->heap_start = as->heap_end;
+    }
 
 	return 0;
 }
@@ -283,11 +285,9 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		 int readable, int writeable, int executable)
 {
 
-	bool allocated[PD_SIZE];
-
 	// TODO ensure there is space for user to have at least 2-3 pages to return error to
 	// TODO is it safe to set to the beggining of the next page (for allocing last page)?
-	if(expand_as(as, vaddr, sz, readable, writeable, executable, allocated) != 0){
+	if(expand_as(as, vaddr, sz, readable, writeable, executable, NULL) != 0){
 		page_dir_destroy(as->page_dir);
 		return -1;
 	}
