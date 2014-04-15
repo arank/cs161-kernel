@@ -82,20 +82,24 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 		return 0;
     }
 
+    kprintf("97 used: %d\n", coremap.cm[97].use);
     paddr_t swap_addr = get_free_cme(swap_into, false);
     if(swap_addr == 0){
     	core_set_free(PADDR_TO_CMI(backing_store->swap));
     	return 0;
     }
+    //kprintf("copying form %zu to %zu\n", PADDR_TO_KVADDR(swap_addr), PADDR_TO_KVADDR(backing_store->swap));
     memcpy((void *)PADDR_TO_KVADDR(swap_addr), (void *)PADDR_TO_KVADDR(backing_store->swap), PAGE_SIZE);
     core_set_free(PADDR_TO_CMI(backing_store->swap));
     KASSERT(coremap.cm[PADDR_TO_CMI(swap_addr)].busybit == 1);
+    kprintf("retrieved from disk: vaddr %zu, cme %zu, swap_index %d\n", swap_into, PADDR_TO_CMI(swap_addr), swap_index);
     return swap_addr;
 }
 
 // Assumes that cme for location is already locked, and returns with cme still locked
 // TODO zero pages on allocation to allow for isolation between procs?
 int write_to_disk(paddr_t location, int index){
+    kprintf("index write_to_disk %d\n", index);
 	KASSERT(coremap.cm[PADDR_TO_CMI(location)].busybit == 1);
 
 	lock_acquire(backing_store->lock);
@@ -117,6 +121,6 @@ int write_to_disk(paddr_t location, int index){
 		return -1;
 
 	// At this point the data is now on disk
-    //kprintf("written to disk: cme %zu, swap_offset %zu\n", PADDR_TO_CMI(location), offset);
+    kprintf("written to disk: cme %zu, swap_index %zu\n", PADDR_TO_CMI(location), offset);
 	return offset;
 }

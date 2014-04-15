@@ -141,7 +141,7 @@ int clean_cme(int index){
 
 // Given a locked non-kern cme it forcibly evicts it
 static int evict_cme(int index){
-	KASSERT(coremap.cm[index].pid!=0);
+	KASSERT(coremap.cm[index].pid != 0);
 	KASSERT(coremap.cm[index].kern != 1);
 	KASSERT(coremap.cm[index].busybit == 1);
 
@@ -165,9 +165,13 @@ static int evict_cme(int index){
 
 	} else {
 		// Evict all data to dedicated disk swap space, or assign new swap space and evict to there
-        coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
+        int ret = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
+
+        coremap.cm[index].swap = ret;
         as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
+
         KASSERT(as->page_dir->dir[pdi]->table[pti].ppn != 0);
+
 		as->page_dir->dir[pdi]->table[pti].present = 0;
 	}
 
@@ -187,6 +191,7 @@ static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	if (is_kern) set_kern_bit(index, 1);
 	coremap.last_allocated = index;
     //kprintf("cme: %zu (%s) vaddr: %x\n", index, (is_kern) ? "kern" : "user", vaddr);
+    set_use_bit(index, 1);
 	spinlock_release(&coremap.lock);
 }
 
@@ -210,24 +215,26 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
 				}
 
 				if (coremap.cm[index].use == 0) { // Check if in use
-					set_use_bit(index, 1);
+					//set_use_bit(index, 1); set it in update_cme
 					goto out;
 				} else if (round >= 1 && coremap.cm[index].dirty == 0) {
                     if (coremap.cm[index].ref == 1) { //clock heuristic
                         set_ref_bit(index, 0);
 						core_set_free(index);
-                        index = (index+1) % coremap.size;
+                        index = (index+3) % coremap.size;
                         continue;
                     }
 
 					if (evict_cme(index) != 0) { // Steal cleaned page and evict
 						core_set_free(index);
+                        if (index == 97) kprintf(" round 2 index = 97\n");
                         continue;
 					}
 					goto out;
 				} else if (round >= 2) {
 					if (evict_cme(index) != 0) { // Write dirty page to disk and then evict
 						core_set_free(index);
+                        if (index == 97) kprintf(" round 3 index = 97\n");
 						continue;
 					}
 					goto out;
@@ -242,6 +249,8 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
     return 0;   /* in this case busybit is unset */
 
 out:
+
+
 	memset((void *)PADDR_TO_KVADDR(CMI_TO_PADDR(index)), 0, PAGE_SIZE);
 	update_cme(index, vaddr, is_kern);
     KASSERT(coremap.cm[index].busybit == 1);
@@ -265,7 +274,7 @@ get_kpage_seq(unsigned npages) {
     unsigned count = 1; /* initial count set to 1, because we got one cme */
     // TODO change to garuntee continuity; possible livelock if we have fewer
     // free pages than npages that we need we'll loop forever; but now we never
-    // call this function
+    // call this loop yet
     while (count != npages) {
         next_pa = get_free_cme((vaddr_t)0, KERNEL_CMI);
         if (next_pa == 0) {    /* out of free pages */
@@ -475,6 +484,7 @@ tlb_miss_on_load(vaddr_t vaddr, struct page_table *pt){
 
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
+    KASSERT(pt->table[pti].present == 1);
     update_tlb(pt->table[pti].ppn, vaddr, false, false);
 
 	page_set_free(pt, pti);
@@ -498,6 +508,7 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
     set_dirty_bit(pt->table[pti].ppn, 1);
 	core_set_free(pt->table[pti].ppn);
 
+    KASSERT(pt->table[pti].present == 1);
     update_tlb(pt->table[pti].ppn, vaddr, true, false);
 
 	page_set_free(pt, pti);
@@ -517,7 +528,9 @@ static int tlb_fault_readonly(vaddr_t vaddr, struct page_table *pt){
     set_dirty_bit(cmi, 1);
 	core_set_free(cmi);
 
+    KASSERT(pt->table[pti].present == 1);
     update_tlb(pt->table[pti].ppn, vaddr, true, true);
+    set_ref_bit(pt->table[pti].ppn, 1);
 
 	return 0;
 }
@@ -536,7 +549,7 @@ done:
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-    if (faultaddress > MIPS_KSEG0 || faultaddress == 0) return -1;
+    if (faultaddress > MIPS_KSEG0 || faultaddress < TEXT_START) return -1;
 
     if (!is_valid_addr(faultaddress, curproc->p_addrspace)) return EFAULT;
 
