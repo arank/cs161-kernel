@@ -165,6 +165,7 @@ static int evict_cme(int index){
 		// Evict all data to dedicated disk swap space, or assign new swap space and evict to there
         coremap.cm[index].swap = write_to_disk(CMI_TO_PADDR(index), (int)coremap.cm[index].swap);
         as->page_dir->dir[pdi]->table[pti].ppn = coremap.cm[index].swap;
+        KASSERT(as->page_dir->dir[pdi]->table[pti].ppn != 0);
 		as->page_dir->dir[pdi]->table[pti].present = 0;
 	}
 
@@ -183,7 +184,7 @@ static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
 	coremap.last_allocated = index;
-    kprintf("cme: %zu (%s)\n", index, (is_kern) ? "kern" : "user");
+    kprintf("cme: %zu (%s) vaddr: %x\n", index, (is_kern) ? "kern" : "user", vaddr);
 	spinlock_release(&coremap.lock);
 }
 
