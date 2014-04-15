@@ -322,7 +322,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		 int readable, int writeable, int executable)
 {
 
-	kprintf("as_define_region vaddr:%x sz:%d\n", vaddr, sz);
+//	kprintf("as_define_region vaddr:%x sz:%d\n", vaddr, sz);
 
 	if(expand_as(as, vaddr, sz, readable, writeable, executable, NULL) != 0){
 		page_dir_destroy(as->page_dir);
