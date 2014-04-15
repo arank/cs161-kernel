@@ -56,7 +56,7 @@ struct proc_link {
     struct cv *cv;
 };
 
-#define MAX_CLD 10
+#define MAX_CLD 30
 
 struct proc {
 	char *p_name;			        /* Name of this process */

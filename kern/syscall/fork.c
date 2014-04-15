@@ -11,6 +11,8 @@
 #include <pid_table.h>
 #include <mips/trapframe.h>
 
+#include <coremap.h>
+
 struct child_data {
     struct trapframe *tf;
     struct semaphore *sem;
@@ -27,6 +29,7 @@ create_child(pid_t pid) {
     /* make a shared link between parent and child */
     child->parent = shared_link_create(pid);
     if (child->parent == NULL) goto parent_out;
+
     child->parent->ref_count++;
 
     /* copy address space */

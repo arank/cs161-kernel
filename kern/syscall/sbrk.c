@@ -45,7 +45,7 @@ int sys_sbrk(intptr_t num_bytes, vaddr_t *prev){
 		return ENOMEM;
 	}
 
-    //kprintf("start = %x, end = %x, sz: %d\n", as->heap_start, as->heap_end, (int)num_bytes);
+//    kprintf("start = %x, end = %x, sz: %d\n", as->heap_start, as->heap_end, (int)num_bytes);
 done:
 	*prev = prev_break;
 	return 0;
