@@ -98,6 +98,10 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 		if(old->page_dir->dir[i] != NULL){
 			if (page_table_add(i, newas->page_dir) == ENOMEM)
 				return ENOMEM;
+
+//			if(i == 35)
+//				panic("I am dead for you\n");
+
 			for(int j=0; j<PT_SIZE; j++){
 				page_set_busy(old->page_dir->dir[i], j, true);
 
@@ -244,6 +248,9 @@ int expand_as(struct addrspace *as, vaddr_t vaddr, size_t sz,
 		if(ret == ENOMEM)
 			return -1;
 
+//		if(pdi == 35)
+//			panic("I am dead for you\n");
+
 		if(ret == 0)
 			allocated[pdi] = true;
 
@@ -260,7 +267,7 @@ int expand_as(struct addrspace *as, vaddr_t vaddr, size_t sz,
 	}
 
 	if ((vaddr + sz) < USERSTACK - (RED_ZONE * PAGE_SIZE) && as->heap_start < (vaddr + sz))
-		as->heap_start = as->heap_end = ROUNDUP (vaddr + sz, PAGE_SIZE);
+		as->heap_end = ROUNDUP (vaddr + sz, PAGE_SIZE);
 
 
 	return 0;
