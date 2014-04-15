@@ -97,7 +97,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	for(int i=1; i<PD_SIZE; i++){
 		if(old->page_dir->dir[i] != NULL){
 			if (page_table_add(i, newas->page_dir) == ENOMEM)
-				return ENOMEM;
+				goto out;
 
 			for(int j=0; j<PT_SIZE; j++){
                 //kprintf("pdi: %d, pti: %d\n", i, j);
@@ -122,19 +122,21 @@ as_copy(struct addrspace *old, struct addrspace **ret)
                     page_set_free(old->page_dir->dir[i], j);
 					continue;
                 }
+
 				paddr_t free;
 				vaddr_t vpn = (i<<22) | (j<<12);
 
 				if(old->page_dir->dir[i]->table[j].present == 1){
 					// Copy over page from old addr space memory
 					free = get_free_cme(vpn, false);
-                    if (free == 0) return ENOMEM;
+                    if (free == 0) goto out;
+
 					paddr_t ppn = CMI_TO_PADDR(old->page_dir->dir[i]->table[j].ppn);
 					memcpy((void*)PADDR_TO_KVADDR(free), (void*)PADDR_TO_KVADDR(ppn), PAGE_SIZE);
 				}else{
 					// Copy over from disk
 					free = retrieve_from_disk(newas->page_dir->dir[i]->table[j].ppn, vpn);
-                    if (free == 0) return -1;
+					if(free == 0) goto out;
 				}
 
 				newas->page_dir->dir[i]->table[j].ppn = PADDR_TO_CMI(free);
@@ -152,6 +154,10 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 
 	*ret = newas;
 	return 0;
+
+out:
+	page_dir_destroy(newas->page_dir);
+	return ENOMEM;
 }
 
 void
