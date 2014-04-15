@@ -1,0 +1,11 @@
+--- userland/lib/libc/stdlib/malloc.c	Tue Apr 01 15:39:10 2014 -0400
++++ userland/lib/libc/stdlib/malloc.c	Thu Apr 10 19:41:16 2014 -0400
+@@ -449,7 +449,7 @@
+ 		return NULL;
+ 	}
+ 
+-	if (mh != NULL) {
++	if (mh != NULL && !mh->mh_inuse) {
+ 		/* update old header */
+ 		mh->mh_nextblock = M_MKFIELD(M_NEXTOFF(mh) + morespace);
+ 		mh->mh_inuse = 1;
