@@ -184,7 +184,7 @@ static void update_cme(int index, vaddr_t vaddr, bool is_kern){
 	if (coremap.cm[index].dirty==1) set_dirty_bit(index, 0);
 	if (is_kern) set_kern_bit(index, 1);
 	coremap.last_allocated = index;
-    kprintf("cme: %zu (%s) vaddr: %x\n", index, (is_kern) ? "kern" : "user", vaddr);
+//    kprintf("cme: %zu (%s) vaddr: %x\n", index, (is_kern) ? "kern" : "user", vaddr);
 	spinlock_release(&coremap.lock);
 }
 

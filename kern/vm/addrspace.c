@@ -72,16 +72,19 @@ out:
 	return NULL;
 }
 
-// TODO add cleanup on error code
+// Clean up is done up a level with as destroy
 int
 as_copy(struct addrspace *old, struct addrspace **ret)
 {
 	struct addrspace *newas;
 
 	newas = as_create();
-	if (newas==NULL) {
+	if (newas==NULL){
+		kprintf("Failed to as_copy %d\n", coremap.size-coremap.used);
 		return ENOMEM;
 	}
+
+	*ret = newas;
 
 	// TODO do we need a lock on this function?
 	lock_acquire(old->lock);
@@ -92,7 +95,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 
 	newas->page_dir = page_dir_init();
 		if(newas->page_dir == NULL)
-			return ENOMEM;
+			goto out;
 
 	for(int i=1; i<PD_SIZE; i++){
 		if(old->page_dir->dir[i] != NULL){
@@ -129,14 +132,20 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				if(old->page_dir->dir[i]->table[j].present == 1){
 					// Copy over page from old addr space memory
 					free = get_free_cme(vpn, false);
-                    if (free == 0) goto out;
+                    if (free == 0) {
+                    	page_set_free(old->page_dir->dir[i], j);
+                    	goto out;
+                    }
 
 					paddr_t ppn = CMI_TO_PADDR(old->page_dir->dir[i]->table[j].ppn);
 					memcpy((void*)PADDR_TO_KVADDR(free), (void*)PADDR_TO_KVADDR(ppn), PAGE_SIZE);
 				}else{
 					// Copy over from disk
 					free = retrieve_from_disk(newas->page_dir->dir[i]->table[j].ppn, vpn);
-					if(free == 0) goto out;
+					if(free == 0) {
+						page_set_free(old->page_dir->dir[i], j);
+						goto out;
+					}
 				}
 
 				newas->page_dir->dir[i]->table[j].ppn = PADDR_TO_CMI(free);
@@ -151,30 +160,44 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	}
 
 	lock_release(old->lock);
-
-	*ret = newas;
 	return 0;
 
 out:
-	page_dir_destroy(newas->page_dir);
+	lock_release(old->lock);
+	kprintf("Failed to as_copy %d\n", coremap.size-coremap.used);
 	return ENOMEM;
 }
 
 void
 as_destroy(struct addrspace *as)
 {
-	// free all cme entries
+	if(as == NULL)
+		return;
+
+	if(as->lock != NULL)
+		lock_destroy(as->lock);
+
+	// free all cme entries if there is a page dir initialized
+	if(as->page_dir != NULL)
 	for(int i = 0; i < 1024; i++){
 		if(as->page_dir->dir[i] != NULL){
 			for(int j = 0; j < 1024; j++){
-				// TODO dead lock here if eviction is coming in the other direction?
 				// figure out who has to give up first, probably the evictor
 				page_set_busy(as->page_dir->dir[i], j, true);
 
-                if (as->page_dir->dir[i]->table[j].valid != 1) continue;
+				// If not in use continue
+                if (as->page_dir->dir[i]->table[j].valid != 1) {
+                	page_set_free(as->page_dir->dir[i], j);
+                	continue;
+                }
 
 				if(as->page_dir->dir[i]->table[j].present == 1) {
-                    if (as->page_dir->dir[i]->table[j].ppn == 0) continue;
+					// If symbolic continue
+                    if (as->page_dir->dir[i]->table[j].ppn == 0){
+                    	page_set_free(as->page_dir->dir[i], j);
+                    	continue;
+                    }
+
 					int cm_index = as->page_dir->dir[i]->table[j].ppn;
 					// busily wait to get lock on memory
 					core_set_busy(cm_index, true);
@@ -191,7 +214,6 @@ as_destroy(struct addrspace *as)
 					coremap.cm[cm_index].vpn = 0;
 
 					if(coremap.cm[cm_index].swap!=0){
-						panic("clean disk remove on as destroy\n");
 						remove_from_disk(coremap.cm[cm_index].swap);
 						coremap.cm[cm_index].swap = 0;
 					}
@@ -200,6 +222,8 @@ as_destroy(struct addrspace *as)
 					memset((void*)PADDR_TO_KVADDR(CMI_TO_PADDR(cm_index)), 0, PAGE_SIZE);
 
 					core_set_free(cm_index);
+
+				// Page is not present but valid so it must be on disk
 				}else{
 					remove_from_disk(as->page_dir->dir[i]->table[j].ppn);
 				}
@@ -211,7 +235,9 @@ as_destroy(struct addrspace *as)
 		}
 	}
 
-	page_dir_destroy(as->page_dir);
+	if(as->page_dir != NULL)
+		page_dir_destroy(as->page_dir);
+
 	kfree(as);
 }
 

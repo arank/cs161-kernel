@@ -30,10 +30,8 @@ create_child(pid_t pid) {
     child->parent->ref_count++;
 
     /* copy address space */
-    struct addrspace *child_addrspace;
-    int rv = as_copy(curproc->p_addrspace, &child_addrspace);
+    int rv = as_copy(curproc->p_addrspace, &child->p_addrspace);
     if (rv == ENOMEM) goto as_out;
-    child->p_addrspace = child_addrspace;
 
     /* copy file descriptor pointers */
     for (int i = 0; i < OPEN_MAX; i++) {
