@@ -30,10 +30,9 @@ create_child(pid_t pid) {
     child->parent->ref_count++;
 
     /* copy address space */
-    struct addrspace *child_addrspace;
-    int rv = as_copy(curproc->p_addrspace, &child_addrspace);
+    KASSERT(child->p_addrspace == NULL);
+    int rv = as_copy(curproc->p_addrspace, &child->p_addrspace);
     if (rv == ENOMEM) goto as_out;
-    child->p_addrspace = child_addrspace;
 
     /* copy file descriptor pointers */
     for (int i = 0; i < OPEN_MAX; i++) {
@@ -106,6 +105,7 @@ pid_t sys_fork(struct trapframe *tf, pid_t *child_pid) {
     int rv = thread_fork("child", child, child_fork, &child_data, 0);
     if (rv) goto thread_out;
 
+    // Need to move up and not dereference child or wait with a semaphore
     curproc->children[index] = child->parent;
     curproc->children[index]->ref_count++;
 
