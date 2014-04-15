@@ -79,7 +79,7 @@ static struct lock *con_userlock_write = NULL;
  * console is set up. Upon console setup they are dumped
  * to the actual console; thenceforth this space is unused.
  */
-#define DELAYBUFSIZE  1024
+#define DELAYBUFSIZE  2048
 static char delayed_outbuf[DELAYBUFSIZE];
 static size_t delayed_outbuf_pos=0;
 
