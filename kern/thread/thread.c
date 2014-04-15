@@ -190,6 +190,7 @@ cpu_create(unsigned hardware_number)
 	c->c_curthread = NULL;
 	threadlist_init(&c->c_zombies);
 	c->c_hardclocks = 0;
+	c->c_spinlocks = 0;
 
 	c->c_isidle = false;
 	threadlist_init(&c->c_runqueue);
