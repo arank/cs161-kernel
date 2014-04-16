@@ -1,0 +1,91 @@
+Script started on Wed Apr 16 02:42:43 2014
+[?1034h[1m[32m[jharvard@appliance ~/cs161/os161[35m (master +)[32m]$(B[m kr
+sys161: System/161 release 1.99.07, compiled Jan 30 2014 13:37:01
+
+OS/161 base system version 1.99.07
+Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+   President and Fellows of Harvard College.  All rights reserved.
+
+OctoCat OS system version 0 (ASST3 #217)
+
+7900k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+cpu1: MIPS/161 (System/161 2.x) features 0x0
+buffers: max count 4096; max size 2048k
+OS/161 kernel [? for menu]: [   p y   p tr estbin/matmult
+matmult finished.
+answer is: 8772192 (should be 8772192)
+Passed.
+Operation took 1.690072320 seconds
+OS/161 kernel [? for menu]: p testbin/prallelvm        arallelvm
+Job size approximately 58800 bytes
+Forking 24 jobs; total load 1378k
+Process 0 (pid 2) starting computation...
+Process 1 (pid 4) starting computation...
+Process 2 (pid 6) starting computation...
+Process 3 (pid 8) starting computation...
+Process 1 answer 356204544: passed
+Process 4 (pid 10) starting computation...
+Process 0 answer -1337312809: passed
+Process 2 answer -537881911: passed
+Process 5 (pid 12) starting computation...
+Process 3 answer -65406976: passed
+Process 6 (pid 14) starting computation...
+Process 7 (pid 16) starting computation...
+Process 4 answer 1952063315: passed
+Process 5 answer -843894784: passed
+Process 8 (pid 18) starting computation...
+Process 9 (pid 20) starting computation...
+Process 7 answer -993925120: passed
+Process 6 answer 1597000869: passed
+Process 10 (pid 22) starting computation...
+Process 11 (pid 24) starting computation...
+Process 8 answer 838840559: passed
+Process 12 (pid 26) starting computation...
+Process 13 (pid 28) starting computation...
+Process 9 answer -1616928768: passed
+Process 14 (pid 30) starting computation...
+Process 10 answer -182386335: passed
+Process 15 (pid 32) starting computation...
+Process 16 (pid 34) starting computation...
+Process 11 answer -364554240: passed
+Process 17 (pid 36) starting computation...
+Process 18 (pid 38) starting computation...
+Process 19 (pid 40) starting computation...
+Process 17 answer 0: passed
+Process 13 answer -61403136: passed
+Process 20 (pid 42) starting computation...
+Process 21 (pid 44) starting computation...
+Process 14 answer 295326333: passed
+Process 22 (pid 46) starting computation...
+Process 23 (pid 48) starting computation...
+Process 15 answer 1488013312: passed
+Process 12 answer 251084843: passed
+Process 18 answer -1901440647: passed
+Process 19 answer -1488013312: passed
+Process 16 answer 1901440647: passed
+Process 20 answer -295326333: passed
+Process 21 answer 61403136: passed
+Process 22 answer -251084843: passed
+Process 23 answer 364554240: passed
+Test complete
+Operation took 10.627790200 seconds
+OS/161 kernel [? for menu]: 
+[1m[32m[jharvard@appliance ~/cs161/os161[35m (master +)[32m]$(B[m exit
+exit
+
+Script done on Wed Apr 16 02:43:48 2014
