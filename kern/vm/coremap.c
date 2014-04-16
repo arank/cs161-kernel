@@ -225,16 +225,16 @@ get_free_cme(vaddr_t vaddr, bool is_kern) {
                         continue;
                     }
 
+                    //if (index == 97) kprintf(" round 2 index = 97\n");
 					if (evict_cme(index) != 0) { // Steal cleaned page and evict
 						core_set_free(index);
-                        if (index == 97) kprintf(" round 2 index = 97\n");
                         continue;
 					}
 					goto out;
 				} else if (round >= 2) {
+                    //if (index == 97) kprintf(" round 3 index = 97\n");
 					if (evict_cme(index) != 0) { // Write dirty page to disk and then evict
 						core_set_free(index);
-                        if (index == 97) kprintf(" round 3 index = 97\n");
 						continue;
 					}
 					goto out;
@@ -457,6 +457,8 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 static
 void
 update_tlb(uint32_t ppn, vaddr_t va, bool modified, bool read_only_fault) {
+    if (ppn < 70) panic ("ppn is too low\n");
+
     uint32_t ehi = va & TLBHI_VPAGE;
 
     // We store the PPN (NUMBER!!!) in TLB, not Physical Address
@@ -539,7 +541,7 @@ static
 bool
 is_valid_addr(vaddr_t faultaddr, struct addrspace *as) {
     if (faultaddr >= USERSTACK - (STACK_PAGES * PAGE_SIZE)) goto done;
-    if (faultaddr >= TEXT_START && faultaddr < as->heap_end) goto done;
+    if (faultaddr >= TEXT_START && faultaddr <= as->heap_end) goto done;
     return false;
 
 done:
@@ -549,7 +551,11 @@ done:
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-    if (faultaddress > MIPS_KSEG0 || faultaddress < TEXT_START) return -1;
+    if (faultaddress == 21020) {
+        kprintf("here\n");
+    }
+
+    if (faultaddress > MIPS_KSEG0 || faultaddress < TEXT_START) return EFAULT;
 
     if (!is_valid_addr(faultaddress, curproc->p_addrspace)) return EFAULT;
 

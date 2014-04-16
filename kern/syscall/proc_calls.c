@@ -96,14 +96,12 @@ pid_t sys_getpid(pid_t *pid){
     return 0;
 }
 
-void sys__exit(int exitcode) {
+void sys__exit(int exitcode, bool crash) {
 	struct proc *proc = curproc;
 	// If there is a parent, set the exit code in the parent
 	if (proc->parent != NULL) {
 //		proc->parent->exit_code = exitcode;
-		proc->parent->exit_code = (exitcode == -1)
-                                    ? _MKWAIT_SIG(exitcode)
-                                    : _MKWAIT_EXIT(exitcode);
+		proc->parent->exit_code = (crash) ? _MKWAIT_SIG(exitcode) : _MKWAIT_EXIT(exitcode);
 		shared_link_destroy(PARENT, proc);
 	}
 	// Add thread to the kernel
