@@ -348,6 +348,8 @@ int core_set_free(int index){
 static
 void
 kfree_one_page(unsigned cm_index) {
+    if (cm_index <= 70) panic ("freeing kernel code page");
+
 	core_set_busy(cm_index, WAIT);
 	if (coremap.cm[cm_index].use == 0 )
 		panic("free_kpages: freeing a free page\n");

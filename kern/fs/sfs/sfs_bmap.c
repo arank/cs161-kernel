@@ -198,6 +198,7 @@ sfs_bmap_subtree(struct sfs_fs *sfs,
 			return result;
 		}
 		iddata = buffer_map(idbuf);
+		idbuf_dirty = false;
 
 		/*
 		 * Compute the index into the indirect block.
