@@ -17,6 +17,7 @@
 #include <cleaning_deamon.h>
 #include <cpu.h>
 
+extern char _end;
 
 int stat_coremap(int nargs, char **args) {
     (void)nargs;
@@ -108,6 +109,7 @@ void cm_bootstrap(void) {
 void
 vm_bootstrap(void) {
     cm_bootstrap();
+    kprintf("%c\n", _end);
 }
 
 // Given a locked non-kern dirty cme, it cleans it to disk
