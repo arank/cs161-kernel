@@ -207,7 +207,7 @@ as_destroy(struct addrspace *as)
 					set_use_bit(cm_index, 0);
                     set_dirty_bit(cm_index, 0);
 
-                    coremap.cm[cm_index].ref = 0;
+                    coremap.cm[cm_index].age = 0;
 					coremap.cm[cm_index].slen = 0;
 					coremap.cm[cm_index].seq = 0;
 					coremap.cm[cm_index].junk = 0;
