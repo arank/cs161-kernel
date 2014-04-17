@@ -71,8 +71,8 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 		return 0;
 	}
 	lock_release(backing_store->lock);
+
     core_set_busy(PADDR_TO_CMI(backing_store->swap), true);
-    //memset((void *)PADDR_TO_KVADDR(backing_store->swap), 0, PAGE_SIZE);
 
 	struct iovec iov;
 	struct uio uio;
@@ -83,7 +83,7 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 		return 0;
     }
 
-    paddr_t swap_addr = get_free_cme(swap_into, false);
+    paddr_t swap_addr = get_free_cme(swap_into, USER_CMI);
     if(swap_addr == 0){
     	core_set_free(PADDR_TO_CMI(backing_store->swap));
     	return 0;

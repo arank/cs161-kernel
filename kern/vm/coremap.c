@@ -432,6 +432,9 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 		pt->table[pti].ppn = PADDR_TO_CMI(get_free_cme(vaddr, USER_CMI));
         if (pt->table[pti].ppn == 0) return ENOMEM;
 
+        KASSERT(coremap.cm[pt->table[pti].ppn].kern == 0);
+        KASSERT(coremap.cm[pt->table[pti].ppn].pid != 0);
+
         coremap.cm[pt->table[pti].ppn].age = 0;
         core_set_free(pt->table[pti].ppn);
 
@@ -440,6 +443,9 @@ static int validate_vaddr(vaddr_t vaddr, struct page_table *pt, int pti){
 
 		pt->table[pti].ppn = PADDR_TO_CMI(retrieve_from_disk(pt->table[pti].ppn, vaddr));
 		if(pt->table[pti].ppn == 0) return ENOMEM;
+
+        KASSERT(coremap.cm[pt->table[pti].ppn].kern == 0);
+        KASSERT(coremap.cm[pt->table[pti].ppn].pid != 0);
 
 		pt->table[pti].present = 1;
         coremap.cm[pt->table[pti].ppn].age = 0;
@@ -500,9 +506,11 @@ tlb_miss_on_store(vaddr_t vaddr, struct page_table *pt){
 	if (validate_vaddr(vaddr, pt, pti) != 0) return EFAULT;
 
     unsigned pid = coremap.cm[pt->table[pti].ppn].pid;
+    KASSERT(pid != 0);
+    KASSERT(coremap.cm[pt->table[pti].ppn].kern == 0);
+
     struct addrspace *as = get_proc(pid)->p_addrspace;
     if (pt->table[pti].write == 0 && !as->loading) return EFAULT;
-
 
 	core_set_busy(pt->table[pti].ppn, WAIT);
     set_dirty_bit(pt->table[pti].ppn, 1);
