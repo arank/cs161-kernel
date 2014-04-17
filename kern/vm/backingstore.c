@@ -88,6 +88,8 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
     	core_set_free(PADDR_TO_CMI(backing_store->swap));
     	return 0;
     }
+    coremap.cm[PADDR_TO_CMI(swap_addr)].swap = swap_index;
+
     kprintf("copying form %zu to %zu\n", PADDR_TO_CMI(swap_addr), PADDR_TO_CMI(backing_store->swap));
     memcpy((void *)PADDR_TO_KVADDR(swap_addr), (void *)PADDR_TO_KVADDR(backing_store->swap), PAGE_SIZE);
     core_set_free(PADDR_TO_CMI(backing_store->swap));
