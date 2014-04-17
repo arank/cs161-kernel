@@ -8,6 +8,9 @@
 #define WAIT        1
 #define NO_WAIT     0
 
+#define DIRTY_AGE_THRESHOLD 3
+#define CLEAN_AGE_THRESHOLD 5
+
 void cm_bootstrap(void);
 void cleaning_bootstrap(void);
 
@@ -40,8 +43,8 @@ struct cme {
              slen:      10, /* sequence length */
              seq:       1,  /* this bit is 1 if it's a sequence entry except for the first one */
              dirty:     1,
-             ref:       1,
-             junk:      4;
+             age:       4,
+             junk:      1;
 };
 
 struct coremap {
