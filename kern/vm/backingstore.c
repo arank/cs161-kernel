@@ -75,8 +75,8 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 		return 0;
 	}
 	lock_release(backing_store->lock);
+
     core_set_busy(PADDR_TO_CMI(backing_store->swap), true);
-    //memset((void *)PADDR_TO_KVADDR(backing_store->swap), 0, PAGE_SIZE);
 
 	struct iovec iov;
 	struct uio uio;
@@ -87,12 +87,14 @@ paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
 		return 0;
     }
 
-    paddr_t swap_addr = get_free_cme(swap_into, false);
+    paddr_t swap_addr = get_free_cme(swap_into, USER_CMI);
     if(swap_addr == 0){
     	core_set_free(PADDR_TO_CMI(backing_store->swap));
     	return 0;
     }
-    kprintf("copying form %zu to %zu\n", PADDR_TO_CMI(swap_addr), PADDR_TO_CMI(backing_store->swap));
+    coremap.cm[PADDR_TO_CMI(swap_addr)].swap = swap_index;
+
+    //kprintf("copying form %zu to %zu\n", PADDR_TO_CMI(swap_addr), PADDR_TO_CMI(backing_store->swap));
     memcpy((void *)PADDR_TO_KVADDR(swap_addr), (void *)PADDR_TO_KVADDR(backing_store->swap), PAGE_SIZE);
     core_set_free(PADDR_TO_CMI(backing_store->swap));
     KASSERT(coremap.cm[PADDR_TO_CMI(swap_addr)].busybit == 1);
@@ -123,6 +125,6 @@ int write_to_disk(paddr_t location, int index){
 		return -1;
 
 	// At this point the data is now on disk
-    kprintf("written to disk: cme %zu, swap_index %zu\n", PADDR_TO_CMI(location), offset);
+    //kprintf("written to disk: cme %zu, swap_index %zu\n", PADDR_TO_CMI(location), offset);
 	return offset;
 }

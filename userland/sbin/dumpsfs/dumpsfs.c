@@ -29,8 +29,11 @@
 
 #include <sys/types.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <limits.h>
 #include <err.h>
@@ -47,6 +50,8 @@
 #define SWAPL(x) ntohl(x)
 #define SWAPS(x) ntohs(x)
 
+extern const char *hostcompat_progname;
+
 #else
 
 #define SWAPL(x) (x)
@@ -56,33 +61,278 @@
 
 #include "disk.h"
 
+#define ARRAYCOUNT(a) (sizeof(a) / sizeof((a)[0]))
+#define DIVROUNDUP(a, b) (((a) + (b) - 1) / (b))
+
+static bool dofiles, dodirs;
+static bool doindirect;
+static bool recurse;
+
+////////////////////////////////////////////////////////////
+// printouts
+
+static unsigned dumppos;
+
+static
+void
+dumpval(const char *desc, const char *val)
+{
+	size_t dlen, vlen, used;
+
+	dlen = strlen(desc);
+	vlen = strlen(val);
+
+	printf("    ");
+
+	printf("%s: %s", desc, val);
+
+	used = dlen + 2 + vlen;
+	for (; used < 36; used++) {
+		putchar(' ');
+	}
+
+	if (dumppos % 2 == 1) {
+		printf("\n");
+	}
+	dumppos++;
+}
+
+static
+void
+dumpvalf(const char *desc, const char *valf, ...)
+{
+	va_list ap;
+	char buf[128];
+	
+	va_start(ap, valf);
+	vsnprintf(buf, sizeof(buf), valf, ap);
+	va_end(ap);
+	dumpval(desc, buf);
+}
+
+static
+void
+dumplval(const char *desc, const char *lval)
+{
+	if (dumppos % 2 == 1) {
+		printf("\n");
+		dumppos++;
+	}
+	printf("    %s: %s\n", desc, lval);
+	dumppos += 2;
+}
+
+////////////////////////////////////////////////////////////
+// fs structures
+
+static void dumpinode(uint32_t ino, const char *name);
+
 static
 uint32_t
-dumpsb(void)
+readsb(void)
 {
 	struct sfs_super sp;
+
 	diskread(&sp, SFS_SB_LOCATION);
 	if (SWAPL(sp.sp_magic) != SFS_MAGIC) {
 		errx(1, "Not an sfs filesystem");
 	}
-	sp.sp_volname[sizeof(sp.sp_volname)-1] = 0;
-	printf("Volume name: %-40s  %u blocks\n", sp.sp_volname,
-	       SWAPL(sp.sp_nblocks));
-
 	return SWAPL(sp.sp_nblocks);
 }
 
 static
 void
-dodirblock(uint32_t block)
+dumpsb(void)
+{
+	struct sfs_super sp;
+	unsigned i;
+
+	diskread(&sp, SFS_SB_LOCATION);
+	sp.sp_volname[sizeof(sp.sp_volname)-1] = 0;
+
+	printf("Superblock\n");
+	printf("----------\n");
+	dumpvalf("Magic", "0x%8x", SWAPL(sp.sp_magic));
+	dumpvalf("Size", "%u blocks", SWAPL(sp.sp_nblocks));
+	dumpvalf("Bitmap size", "%u blocks",
+		 SFS_BITBLOCKS(SWAPL(sp.sp_nblocks)));
+	dumpvalf("Block size", "%u bytes", SFS_BLOCKSIZE);
+	dumplval("Volume name", sp.sp_volname);
+
+	for (i=0; i<ARRAYCOUNT(sp.reserved); i++) {
+		if (sp.reserved[i] != 0) {
+			printf("    Word %u in reserved area: 0x%x\n",
+			       i, SWAPL(sp.reserved[i]));
+		}
+	}
+	printf("\n");
+}
+
+static
+void
+dumpbits(uint32_t fsblocks)
+{
+	uint32_t nblocks = SFS_BITBLOCKS(fsblocks);
+	uint32_t i, j, k, bn;
+	uint8_t data[SFS_BLOCKSIZE], mask;
+	char tmp[16];
+
+	printf("Free block bitmap\n");
+	printf("-----------------\n");
+	for (i=0; i<nblocks; i++) {
+		diskread(data, SFS_MAP_LOCATION+i);
+		printf("    Bitmap block #%u in disk block %u: blocks %u - %u"
+		       " (0x%x - 0x%x)\n",
+		       i, SFS_MAP_LOCATION+i,
+		       i*SFS_BLOCKBITS, (i+1)*SFS_BLOCKBITS - 1,
+		       i*SFS_BLOCKBITS, (i+1)*SFS_BLOCKBITS - 1);
+		for (j=0; j<SFS_BLOCKSIZE; j++) {
+			if (j % 8 == 0) {
+				snprintf(tmp, sizeof(tmp), "0x%x",
+					 i*SFS_BLOCKBITS + j*8);
+				printf("%-7s ", tmp);
+			}
+			for (k=0; k<8; k++) {
+				bn = i*SFS_BLOCKBITS + j*8 + k;
+				mask = 1U << k;
+				if (bn >= fsblocks) {
+					if (data[j] & mask) {
+						putchar('x');
+					}
+					else {
+						putchar('!');
+					}
+				}
+				else {
+					if (data[j] & mask) {
+						putchar('*');
+					}
+					else {
+						putchar('.');
+					}
+				}
+			}
+			if (j % 8 == 7) {
+				printf("\n");
+			}
+			else {
+				printf(" ");
+			}
+		}
+	}
+	printf("\n");
+}
+
+static
+void
+dumpindirect(uint32_t block, unsigned indirection)
+{
+	uint32_t ib[SFS_BLOCKSIZE/sizeof(uint32_t)];
+	char tmp[128];
+	unsigned i;
+
+	static const char *const names[4] = {
+		"Direct", "Indirect", "Double indirect", "Triple indirect"
+	};
+
+	assert(indirection < 4);
+
+	if (block == 0) {
+		return;
+	}
+	printf("%s block %u\n", names[indirection], block);
+	
+	diskread(ib, block);
+	for (i=0; i<ARRAYCOUNT(ib); i++) {
+		if (i % 4 == 0) {
+			printf("@%-3u   ", i);
+		}
+		snprintf(tmp, sizeof(tmp), "%u (0x%x)",
+			 SWAPL(ib[i]), SWAPL(ib[i]));
+		printf("  %-16s", tmp);
+		if (i % 4 == 3) {
+			printf("\n");
+		}
+	}
+	if (indirection > 1) {
+		for (i=0; i<ARRAYCOUNT(ib); i++) {
+			dumpindirect(SWAPL(ib[i]), indirection - 1);
+		}
+	}
+}
+
+static
+uint32_t
+traverse_ib(uint32_t fileblock, uint32_t numblocks, uint32_t block,
+	    unsigned indirection, void (*doblock)(uint32_t, uint32_t))
+{
+	uint32_t ib[SFS_BLOCKSIZE/sizeof(uint32_t)];
+	unsigned i;
+
+	if (block == 0) {
+		memset(ib, 0, sizeof(ib));
+	}
+	else {
+		diskread(ib, block);
+	}
+	for (i=0; i<ARRAYCOUNT(ib) && fileblock < numblocks; i++) {
+		if (indirection > 1) {
+			fileblock = traverse_ib(fileblock, numblocks,
+						SWAPL(ib[i]), indirection-1,
+						doblock);
+		}
+		else {
+			doblock(fileblock++, SWAPL(ib[i]));
+		}
+	}
+	return fileblock;
+}
+
+static
+void
+traverse(const struct sfs_dinode *sfi, void (*doblock)(uint32_t, uint32_t))
+{
+	uint32_t fileblock;
+	uint32_t numblocks;
+	unsigned i;
+
+	numblocks = DIVROUNDUP(SWAPL(sfi->sfi_size), SFS_BLOCKSIZE);
+
+	fileblock = 0;
+	for (i=0; i<SFS_NDIRECT && fileblock < numblocks; i++) {
+		doblock(fileblock++, SWAPL(sfi->sfi_direct[i]));
+	}
+	if (fileblock < numblocks) {
+		fileblock = traverse_ib(fileblock, numblocks,
+					SWAPL(sfi->sfi_indirect), 1, doblock);
+	}
+	if (fileblock < numblocks) {
+		fileblock = traverse_ib(fileblock, numblocks,
+					SWAPL(sfi->sfi_dindirect), 2, doblock);
+	}
+	if (fileblock < numblocks) {
+		fileblock = traverse_ib(fileblock, numblocks,
+					SWAPL(sfi->sfi_tindirect), 3, doblock);
+	}
+	assert(fileblock == numblocks);
+}
+
+static
+void
+dumpdirblock(uint32_t fileblock, uint32_t diskblock)
 {
 	struct sfs_dir sds[SFS_BLOCKSIZE/sizeof(struct sfs_dir)];
 	int nsds = SFS_BLOCKSIZE/sizeof(struct sfs_dir);
 	int i;
 
-	diskread(&sds, block);
+	(void)fileblock;
+	if (diskblock == 0) {
+		printf("    [block %u - empty]\n", diskblock);
+		return;
+	}
+	diskread(&sds, diskblock);
 
-	printf("    [block %u]\n", block);
+	printf("    [block %u]\n", diskblock);
 	for (i=0; i<nsds; i++) {
 		uint32_t ino = SWAPL(sds[i].sfd_ino);
 		if (ino==SFS_NOINO) {
@@ -97,80 +347,289 @@ dodirblock(uint32_t block)
 
 static
 void
-dumpdir(uint32_t ino)
+dumpdir(uint32_t ino, const struct sfs_dinode *sfi)
 {
-	struct sfs_dinode sfi;
-	uint32_t ib[SFS_DBPERIDB];
-	int nentries, i;
-	uint32_t block, nblocks=0;
+	int nentries;
 
-	diskread(&sfi, ino);
-
-	nentries = SWAPL(sfi.sfi_size) / sizeof(struct sfs_dir);
-	if (SWAPL(sfi.sfi_size) % sizeof(struct sfs_dir) != 0) {
+	nentries = SWAPL(sfi->sfi_size) / sizeof(struct sfs_dir);
+	if (SWAPL(sfi->sfi_size) % sizeof(struct sfs_dir) != 0) {
 		warnx("Warning: dir size is not a multiple of dir entry size");
 	}
-	printf("Directory %u: %d entries\n", ino, nentries);
-
-	for (i=0; i<SFS_NDIRECT; i++) {
-		block = SWAPL(sfi.sfi_direct[i]);
-		if (block) {
-			dodirblock(block);
-			nblocks++;
-		}
-	}
-	if (SWAPL(sfi.sfi_indirect)) {
-		diskread(&ib, SWAPL(sfi.sfi_indirect));
-		for (i=0; i<SFS_DBPERIDB; i++) {
-			block = SWAPL(ib[i]);
-			if (block) {
-				dodirblock(block);
-				nblocks++;
-			}
-		}
-	}
-	printf("    %u blocks in directory\n", nblocks);
+	printf("Directory contents for inode %u: %d entries\n", ino, nentries);
+	traverse(sfi, dumpdirblock);
 }
 
 static
 void
-dumpbits(uint32_t fsblocks)
+recursedirblock(uint32_t fileblock, uint32_t diskblock)
 {
-	uint32_t nblocks = SFS_BITBLOCKS(fsblocks);
-	uint32_t i, j;
-	char data[SFS_BLOCKSIZE];
+	struct sfs_dir sds[SFS_BLOCKSIZE/sizeof(struct sfs_dir)];
+	int nsds = SFS_BLOCKSIZE/sizeof(struct sfs_dir);
+	int i;
 
-	printf("Freemap: %u blocks (%u %u %u)\n", nblocks, SFS_BITMAPSIZE(fsblocks), fsblocks, SFS_BLOCKBITS);
+	(void)fileblock;
+	if (diskblock == 0) {
+		printf("    [block %u - empty]\n", diskblock);
+		return;
+	}
+	diskread(&sds, diskblock);
 
-	for (i=0; i<nblocks; i++) {
-		diskread(data, SFS_MAP_LOCATION+i);
-		for (j=0; j<SFS_BLOCKSIZE; j++) {
-			printf("%02x", (unsigned char)data[j]);
-			if (j%32==31) {
-				printf("\n");
+	for (i=0; i<nsds; i++) {
+		uint32_t ino = SWAPL(sds[i].sfd_ino);
+		if (ino==SFS_NOINO) {
+			continue;
+		}
+		sds[i].sfd_name[SFS_NAMELEN-1] = 0; /* just in case */
+		if (!strcmp(sds[i].sfd_name, ".") ||
+		    !strcmp(sds[i].sfd_name, "..")) {
+			continue;
+		}
+		dumpinode(ino, sds[i].sfd_name);
+	}
+}
+
+static
+void
+recursedir(uint32_t ino, const struct sfs_dinode *sfi)
+{
+	int nentries;
+
+	nentries = SWAPL(sfi->sfi_size) / sizeof(struct sfs_dir);
+	printf("Recursing into directory %u: %d entries\n", ino, nentries);
+	traverse(sfi, recursedirblock);
+	printf("Done with directory %u\n", ino);
+}
+
+static
+void dumpfileblock(uint32_t fileblock, uint32_t diskblock)
+{
+	uint8_t data[SFS_BLOCKSIZE];
+	unsigned i, j;
+	char tmp[128];
+
+	if (diskblock == 0) {
+		printf("    0x%6x  [sparse]\n", fileblock * SFS_BLOCKSIZE);
+		return;
+	}
+
+	diskread(data, diskblock);
+	for (i=0; i<SFS_BLOCKSIZE; i++) {
+		if (i % 16 == 0) {
+			snprintf(tmp, sizeof(tmp), "0x%x",
+				 fileblock * SFS_BLOCKSIZE + i);
+			printf("%8s", tmp);
+		}
+		if (i % 8 == 0) {
+			printf("  ");
+		}
+		else {
+			printf(" ");
+		}
+		printf("%02x", data[i]);
+		if (i % 16 == 15) {
+			printf("  ");
+			for (j = i-15; j<=i; j++) {
+				if (data[j] < 32 || data[j] > 126) {
+					putchar('.');
+				}
+				else {
+					putchar(data[j]);
+				}
 			}
+			printf("\n");
 		}
 	}
+}
+
+static
+void
+dumpfile(uint32_t ino, const struct sfs_dinode *sfi)
+{
+	printf("File contents for inode %u:\n", ino);
+	traverse(sfi, dumpfileblock);
+}
+
+static
+void
+dumpinode(uint32_t ino, const char *name)
+{
+	struct sfs_dinode sfi;
+	const char *typename;
+	char tmp[128];
+	unsigned i;
+
+	diskread(&sfi, ino);
+
+	printf("Inode %u", ino);
+	if (name != NULL) {
+		printf(" (%s)", name);
+	}
 	printf("\n");
+	printf("--------------\n");
+
+	switch (SWAPS(sfi.sfi_type)) {
+	    case SFS_TYPE_FILE: typename = "regular file"; break;
+	    case SFS_TYPE_DIR: typename = "directory"; break;
+	    default: typename = "invalid"; break;
+	}
+	dumpvalf("Type", "%u (%s)", SWAPS(sfi.sfi_type), typename);
+	dumpvalf("Size", "%u", SWAPL(sfi.sfi_size));
+	dumpvalf("Link count", "%u", SWAPS(sfi.sfi_linkcount));
+	printf("\n");
+
+        printf("    Direct blocks:\n");
+        for (i=0; i<SFS_NDIRECT; i++) {
+		if (i % 4 == 0) {
+			printf("@%-2u    ", i);
+		}
+		/*
+		 * Assume the disk size might be > 64K sectors (which
+		 * would be 32M) but is < 1024K sectors (512M) so we
+		 * need up to 5 hex digits for a block number. And
+		 * assume it's actually < 1 million sectors so we need
+		 * only up to 6 decimal digits. The complete block
+		 * number print then needs up to 16 digits.
+		 */
+		snprintf(tmp, sizeof(tmp), "%u (0x%x)", 
+			 SWAPL(sfi.sfi_direct[i]), SWAPL(sfi.sfi_direct[i]));
+		printf("  %-16s", tmp);
+		if (i % 4 == 3) {
+			printf("\n");
+		}
+	}
+	if (i % 4 != 0) {
+		printf("\n");
+	}
+	printf("    Indirect block: %u (0x%x)\n",
+	       SWAPL(sfi.sfi_indirect), SWAPL(sfi.sfi_indirect));
+	printf("    Double indirect block: %u (0x%x)\n",
+	       SWAPL(sfi.sfi_dindirect), SWAPL(sfi.sfi_dindirect));
+	printf("    Triple indirect block: %u (0x%x)\n",
+	       SWAPL(sfi.sfi_tindirect), SWAPL(sfi.sfi_tindirect));
+	for (i=0; i<ARRAYCOUNT(sfi.sfi_waste); i++) {
+		if (sfi.sfi_waste[i] != 0) {
+			printf("    Word %u in waste area: 0x%x\n",
+			       i, SWAPL(sfi.sfi_waste[i]));
+		}
+	}
+
+	if (doindirect) {
+		dumpindirect(SWAPL(sfi.sfi_indirect), 1);
+		dumpindirect(SWAPL(sfi.sfi_dindirect), 2);
+		dumpindirect(SWAPL(sfi.sfi_tindirect), 3);
+	}
+
+	if (SWAPS(sfi.sfi_type) == SFS_TYPE_DIR && dodirs) {
+		dumpdir(ino, &sfi);
+	}
+	if (SWAPS(sfi.sfi_type) == SFS_TYPE_FILE && dofiles) {
+		dumpfile(ino, &sfi);
+	}
+	if (SWAPS(sfi.sfi_type) == SFS_TYPE_DIR && recurse) {
+		recursedir(ino, &sfi);
+	}
+}
+
+////////////////////////////////////////////////////////////
+// main
+
+static
+void
+usage(void)
+{
+	warnx("Usage: dumpsfs [options] device/diskfile");
+	warnx("   -s: dump superblock");
+	warnx("   -b: dump free block bitmap");
+	warnx("   -i ino: dump specified inode");
+	warnx("   -I: dump indirect blocks");
+	warnx("   -f: dump file contents");
+	warnx("   -d: dump directory contents");
+	warnx("   -r: recurse into directory contents");
+	warnx("   -a: equivalent to -sbdfr -i 1");
+	errx(1, "   Default is -i 1");
 }
 
 int
 main(int argc, char **argv)
 {
+	bool dosb = false;
+	bool dobitmap = false;
+	uint32_t dumpino = 0;
+	const char *dumpdisk = NULL;
+
+	int i, j;
 	uint32_t nblocks;
 
 #ifdef HOST
-	hostcompat_init(argc, argv);
+	/* Don't do this; it frobs the tty and you can't pipe to less */
+	/*hostcompat_init(argc, argv);*/
+	hostcompat_progname = argv[0];
 #endif
 
-	if (argc!=2) {
-		errx(1, "Usage: dumpsfs device/diskfile");
+	for (i=1; i<argc; i++) {
+		if (argv[i][0] == '-') {
+			for (j=1; argv[i][j]; j++) {
+				switch (argv[i][j]) {
+				    case 's': dosb = true; break;
+				    case 'b': dobitmap = true; break;
+				    case 'i':
+					if (argv[i][j+1] == 0) {
+						dumpino = atoi(argv[++i]);
+					}
+					else {
+						dumpino = atoi(argv[i]+j+1);
+						j = strlen(argv[i]);
+					}
+					/* XXX ugly */
+					goto nextarg;
+				    case 'I': doindirect = true; break;
+				    case 'f': dofiles = true; break;
+				    case 'd': dodirs = true; break;
+				    case 'r': recurse = true; break;
+				    case 'a':
+					dosb = true;
+					dobitmap = true;
+					dumpino = SFS_ROOT_LOCATION;
+					doindirect = true;
+					dofiles = true;
+					dodirs = true;
+					recurse = true;
+					break;
+				    default:
+					usage();
+					break;
+				}
+			}
+		}
+		else {
+			if (dumpdisk != NULL) {
+				usage();
+			}
+			dumpdisk = argv[i];
+		}
+	 nextarg:
+		;
+	}
+	if (dumpdisk == NULL) {
+		usage();
 	}
 
-	opendisk(argv[1]);
-	nblocks = dumpsb();
-	dumpbits(nblocks);
-	dumpdir(SFS_ROOT_LOCATION);
+	if (!dosb && !dobitmap && dumpino == 0) {
+		dumpino = SFS_ROOT_LOCATION;
+	}
+
+	opendisk(dumpdisk);
+	nblocks = readsb();
+
+	if (dosb) {
+		dumpsb();
+	}
+	if (dobitmap) {
+		dumpbits(nblocks);
+	}
+	if (dumpino != 0) {
+		dumpinode(dumpino, NULL);
+	}
 
 	closedisk();
 
