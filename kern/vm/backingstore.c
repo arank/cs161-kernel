@@ -13,6 +13,7 @@
 #include <vfs.h>
 #include <current.h>
 #include <proc.h>
+#include <addrspace.h>
 
 static struct vnode *bs;
 extern struct semaphore *tlb_sem;
@@ -65,6 +66,9 @@ void remove_from_disk(int swap_index){
 // This assumes that the location has been set as busy by get free cme
 // returns with lock set on swap_addr's cme
 paddr_t retrieve_from_disk(int swap_index, vaddr_t swap_into){
+
+	KASSERT(swap_into >= USERSTACK - (STACK_PAGES * PAGE_SIZE));
+
 	lock_acquire(backing_store->lock);
 	if(!bitmap_isset(backing_store->bm, swap_index)){
 		lock_release(backing_store->lock);
