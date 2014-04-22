@@ -17,6 +17,7 @@ enum operation{
 	ABORT,
 	COMMIT,
 	ADD_DIRENTRY,
+	MODIFY_DIRENTRY_SIZE,
 	MODIFY_DIRENTRY,
 	RENAME_DIRENTRY,
 	REMOVE_DIRENTRY,
@@ -55,6 +56,13 @@ struct add_direntry{
 	unsigned old_link_count;
 	unsigned new_link_count;
 	char name[NAME_MAX];
+};
+
+struct modify_direntry_size{
+	uint64_t transaction_id;
+	unsigned inode_id;
+	uint32_t old_len;
+	uint32_t new_len;
 };
 
 
@@ -97,8 +105,6 @@ struct alloc_inode{
 struct free_inode{
 	uint64_t transaction_id;
 	unsigned inode_id;
-	uint32_t old_len;
-	uint32_t new_len;
 };
 
 struct dirty_inode{
