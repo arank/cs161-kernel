@@ -2,15 +2,23 @@
 #include <limits.h>
 
 #define LOG_BUFFER_SIZE 4096
+#define DISK_LOG_SIZE 9092
+#define MARGIN 400
 
 // TODO possibly have two of these?
 struct log_buffer{
-	char buffer [LOG_BUFFER_SIZE];
 	struct lock *lock;
+	unsigned buffer_filled;
+	char buffer [LOG_BUFFER_SIZE];
+};
+
+struct log_info{
+	struct lock *lock;
+	struct log_buffer *active_buffer;
 	unsigned head;
 	unsigned tail;
 	uint64_t last_id;
-}log_buffer;
+}log_info;
 
 enum operation{
 	CHECKPOINT = 1,
@@ -107,8 +115,6 @@ struct free_inode{
 	unsigned inode_id;
 };
 
-struct dirty_inode{
-	uint64_t transaction_id;
-	unsigned inode_id;
-};
+int log_buffer_bootstrap(void);
+uint64_t log_write(enum operation op, uint16_t size, char *operation_struct);
 
