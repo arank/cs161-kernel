@@ -23,20 +23,21 @@ enum operation{
 	REMOVE_DIRENTRY,
 	ALLOC_INODE,
 	FREE_INODE,
-	DIRTY_INODE, // TODO do we need this? indicates that the inode has been written to and won't be 0'd
 	// TODO removed truncate as we can log a bunch of free's instead of creating a completely new structure.
 };
 
 enum object_type{
 	FILE = 1,
-	DIR
+	DIR,
+    INDIRECTION,
+    USERBLOCK
 };
 
 struct record_header{
 	uint64_t record_id;
 	// Size of the structure after this. Not including the header
 	uint16_t size;
-	enum operation op;
+	uint16_t op;    /* for partability; enums are just ints */
 };
 
 struct checkpoint{
@@ -64,7 +65,6 @@ struct modify_direntry_size{
 	uint32_t old_len;
 	uint32_t new_len;
 };
-
 
 struct modify_direntry{
 	uint64_t transaction_id;
@@ -99,16 +99,10 @@ struct remove_direntry{
 struct alloc_inode{
 	uint64_t transaction_id;
 	unsigned inode_id;
-	enum object_type type;
+	uint32_t type;  /* enum object_type */
 };
 
 struct free_inode{
 	uint64_t transaction_id;
 	unsigned inode_id;
 };
-
-struct dirty_inode{
-	uint64_t transaction_id;
-	unsigned inode_id;
-};
-
