@@ -176,6 +176,7 @@ syscall(struct trapframe *tf)
 		err =  sys_sbrk(tf->tf_a0, (uint32_t *)&retval);
 		break;
 
+#if 0
 	    case SYS_sync:
 		err = sys_sync();
 		break;
@@ -222,7 +223,7 @@ syscall(struct trapframe *tf)
 			err = sys_ftruncate(tf->tf_a0, len);
 		}
 		break;
-
+#endif
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;
