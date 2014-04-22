@@ -2,7 +2,7 @@
 #include <current.h>
 #include <lib.h>
 #include <log.h>
-#include <errno.h>
+#include <kern/errno.h>
 
 static struct log_buffer *buf1, *buf2;
 
@@ -20,9 +20,6 @@ int log_buffer_bootstrap(){
 
 	buf2->lock = lock_create("buffer lock");
 	if (buf2->lock == NULL) goto out;
-
-	&log_info = kmalloc(sizeof(struct log_info));
-	if(&log_info == NULL) goto out;
 
 	log_info.lock = lock_create("log info lock");
 	if (log_info.lock == NULL) goto out;
@@ -52,20 +49,20 @@ uint64_t log_write(enum operation op, uint16_t size, char *operation_struct){
 	lock_acquire(log_info.lock);
 	if(sizeof(struct record_header) + size + log_info.active_buffer->buffer_filled >= LOG_BUFFER_SIZE){
 		switch_buffer();
-		// TODO flush the old buffer
+		// TODO flush the old buffer and if it fails goto out
+		goto out;
 	}
 
-	struct record_header header = {0};
-	if(header == NULL) goto out;
+	struct record_header header;
 	header.size = size;
 	header.op = op;
 	header.record_id = log_info.last_id++;
 
 	// Copy onto the buffer
 	// TODO is this pointer math right?
-	memcpy((void*)log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], &header, sizeof(struct record_header));
+	memcpy(&log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], &header, sizeof(struct record_header));
 	log_info.active_buffer->buffer_filled += sizeof(struct record_header);
-	memcpy((void*)log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], operation_struct, size);
+	memcpy(&log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], operation_struct, size);
 	log_info.active_buffer->buffer_filled += size;
 
 	lock_release(log_info.lock);
