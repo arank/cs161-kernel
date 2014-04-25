@@ -1,9 +1,12 @@
+#ifndef _H_LOG_H_
+#define _H_LOG_H_
+
 #include <synch.h>
 #include <limits.h>
 
 #define LOG_BUFFER_SIZE 4096
-#define DISK_LOG_SIZE 9092
-#define MARGIN 400
+#define DISK_LOG_SIZE 5242880
+#define MARGIN 8192
 
 // TODO possibly have two of these?
 struct log_buffer{
@@ -17,7 +20,10 @@ struct log_info{
 	struct log_buffer *active_buffer;
 	unsigned head;
 	unsigned tail;
+	unsigned len;
+	uint16_t page_count;
 	uint64_t last_id;
+	uint64_t earliest_transaction;
 }log_info;
 
 enum operation{
@@ -116,5 +122,9 @@ struct free_inode{
 };
 
 int log_buffer_bootstrap(void);
+int disk_log_bootstrap(void);
+int recover(void);
 uint64_t log_write(enum operation op, uint16_t size, char *operation_struct);
+int checkpoint(void);
 
+#endif
