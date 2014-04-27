@@ -15,6 +15,13 @@ static struct vnode *bs;
 int disk_log_bootstrap(){
 	if(vfs_open(kstrdup("lhd1raw:"), O_RDWR, 0, &bs) != 0)
 		panic ("vfs_open failed\n");
+
+//	struct iovec iov;
+//	struct uio uio;
+//	uio_kinit(&iov, &uio, kernel_buffer, size, 0, UIO_WRITE);
+//
+//	if (VOP_WRITE(bs, &uio) != 0)
+//		return -1;
 	// TODO byte 0 through n reserved for meta data
 
 	// TODO define log region and meta data region
@@ -28,6 +35,24 @@ int disk_log_bootstrap(){
 int recover(){
 	// TODO read meta data from byte 0
 	// TODO handle first boot w/ no checkpoint
+
+//	switch(op){
+//
+//	case CHECKPOINT:
+//	case ABORT:
+//	case COMMIT:
+//	case ADD_DIRENTRY:
+//	case MODIFY_DIRENTRY_SIZE:
+//	case MODIFY_DIRENTRY:
+//	case RENAME_DIRENTRY:
+//	case REMOVE_DIRENTRY:
+//	case ALLOC_INODE:
+//	case FREE_INODE:
+//	default:
+//		panic("Undefined log entry code\n");
+//		break;
+//	}
+
 	// TODO checkpoint at the end
 	// TODO after recovery is over zero the entire space
 	return 0;
@@ -96,7 +121,7 @@ static int flush_log_to_disk(struct log_buffer *buf, struct log_info *info){
 
 	// TODO write out log to disk, in circular fashion
 
-	// move the head forward (lenght is already tracked and updated)
+	// Move the head forward (length is already tracked and updated)
 	info->head = (info->head + buf->buffer_filled) % DISK_LOG_SIZE;
 
 	// Flush the meta data associated with the log to disk to ensure consistent state
@@ -118,12 +143,20 @@ int checkpoint(){
 
 	// Create a new checkpoint entry
 	struct checkpoint ch;
-	ch.new_tail = log_info.earliest_transaction;
+	if(log_info.earliest_transaction)
+		ch.new_tail = log_info.head;
+	else
+		ch.new_tail = log_info.earliest_transaction;
 
 	// Updates the meta data of the log
-	log_info.tail = log_info.earliest_transaction;
+	log_info.tail = ch.new_tail;
+
 	// TODO is this math correct?
-	log_info.len = log_info.head -  log_info.tail + 1;
+	log_info.len = 0;
+	for(unsigned ptr = log_info.tail; ptr != log_info.head;){
+		ptr =  (ptr + 1) % DISK_LOG_SIZE;
+		log_info.len++;
+	}
 
 	log_write(CHECKPOINT, sizeof(struct checkpoint), (char *)&ch);
 
