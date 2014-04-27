@@ -82,11 +82,12 @@ static int flush_log_to_disk(struct log_buffer *buf){
 	kprintf("Writing log to disk\n");
 	KASSERT(lock_do_i_hold(log_info.lock));
 
-	// move the head forward
-	log_info.head = (log_info.head + buf->buffer_filled) % DISK_LOG_SIZE;
-
 	// TODO write out log to disk, in circular fashion
 
+	// move the head forward (lenght is already tracked and updated)
+	log_info.head = (log_info.head + buf->buffer_filled) % DISK_LOG_SIZE;
+
+	// Flush the meta data associated with the log to disk to ensure consistent state
 	flush_meta_data_to_disk();
 
 	return 0;
@@ -101,8 +102,14 @@ int checkpoint(){
 
 	// TODO flush buffer cache to disk
 
+	// Create a new checkpoint entry
 	struct checkpoint ch;
 	ch.new_tail = log_info.earliest_transaction;
+
+	// Updates the meta data of the log
+	log_info.tail = log_info.earliest_transaction;
+	log_info.len = log_info.head -  log_info.tail + 1;
+
 	log_write(CHECKPOINT, sizeof(struct checkpoint), (char *)&ch);
 
 	flush_log_to_disk(log_info.active_buffer);
@@ -125,11 +132,17 @@ uint64_t log_write(enum operation op, uint16_t size, char *operation_struct){
 
 	// TODO ensure if buffer is full then flushed, and the disk_log is full and needs to be checkpointed, behavior is well defined
 	// Augment len and check if we will blow the log, if the op is a checkpoint, then don't infinitely recurse
-	if(size+sizeof(struct record_header)+log_info.len > DISK_LOG_SIZE - MARGIN && op != CHECKPOINT){
-		// TODO checkpoint and if it fails goto out, should we thread fork?
-		if(checkpoint() != 0) goto out;
-		// Ensure that there is space after checkpoint
-		KASSERT(size+sizeof(struct record_header)+log_info.len <= DISK_LOG_SIZE - MARGIN);
+	if(size+sizeof(struct record_header)+log_info.len > DISK_LOG_SIZE - MARGIN){
+		if(op == CHECKPOINT){
+			// check that we don't run the head into the tail (in case we can't clear enough memory with checkpointing)
+			// TODO this is a huge edge case, should it be here?
+			KASSERT(size+sizeof(struct record_header)+log_info.len < DISK_LOG_SIZE);
+		}else{
+			// TODO checkpoint and if it fails goto out, should we thread fork?
+			if(checkpoint() != 0) goto out;
+			// Ensure that there is space after checkpoint
+			KASSERT(size+sizeof(struct record_header)+log_info.len <= DISK_LOG_SIZE - MARGIN);
+		}
 	}
 
 	struct record_header header;
