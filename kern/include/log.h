@@ -59,9 +59,9 @@ enum object_type{
     USERBLOCK
 };
 
+>>>>>>> 387cbbadd1132f147c675adb466971b1fc1b717c
 struct record_header{
-	uint64_t record_id;
-	// Size of the structure after this. Not including the header
+	uint64_t record_id; // Size of the structure after this. Not including the header
 	uint16_t size;
 	uint16_t op;    /* for partability; enums are just ints */
 };
@@ -136,7 +136,7 @@ struct free_inode{
 int log_buffer_bootstrap(void);
 int disk_log_bootstrap(void);
 int recover(void);
-uint64_t log_write(enum operation op, uint16_t size, char *operation_struct);
+uint64_t log_write(enum operation op, uint16_t size, void *operation_struct);
 int checkpoint(void);
 
 #endif

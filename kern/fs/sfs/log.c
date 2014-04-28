@@ -8,9 +8,12 @@
 #include <kern/fcntl.h>
 #include <uio.h>
 #include <kern/iovec.h>
+#include <vector.h>
+
 
 static struct log_buffer *buf1, *buf2;
 static struct vnode *bs;
+static Vector tvector;
 
 // Opens the disk object, and reads the data from it into the log_info object
 // this should be called before recovery
@@ -101,6 +104,8 @@ int log_buffer_bootstrap(){
 
 	log_info.lock = lock_create("log info lock");
 	if (log_info.lock == NULL) goto out;
+    
+    vector_init(&tvector);
 
 	// Auto set to buf1
 	log_info.active_buffer = buf1;
@@ -252,7 +257,7 @@ int checkpoint(){
 }
 
 
-uint64_t log_write(enum operation op, uint16_t size, char *operation_struct){
+uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
 	// Lock to ensure that active never changes
 	lock_acquire(log_info.lock);
 
@@ -301,7 +306,16 @@ uint64_t log_write(enum operation op, uint16_t size, char *operation_struct){
 	// Augment the log info data but don't augment the head till its flushed, so we can know where to flush to
 	log_info.len += size+sizeof(struct record_header);
 
-	// TODO update log_info.earliest transaction
+	// TODO update log_info.earliest_transaction
+    // TODO need to check
+    struct commit *oper = operation_struct;
+    if (op == COMMIT) { // remove it from the queue
+        int index = vector_find(&tvector, oper->transaction_id);
+        KASSERT (index != -1);  // if it's a commit, the transaction must be in the vector
+        vector_set(&tvector, index, 0);  // invalidate
+        log_info.earliest_transaction = vector_get_min(&tvector);  // get the next minimum or 0
+    } else  // new transaction or another operation of the yet uncommited transaction
+        vector_insert(&tvector, oper->transaction_id);
 
 	lock_release(log_info.lock);
 
