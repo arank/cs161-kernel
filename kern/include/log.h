@@ -7,6 +7,7 @@
 #define LOG_BUFFER_SIZE 4096
 #define DISK_LOG_SIZE 524288
 #define MARGIN 52430
+#define META_DATA_MAGIC 0xB16B00B5
 
 // TODO possibly have two of these?
 struct log_buffer{
@@ -23,16 +24,18 @@ struct log_info{
 	unsigned tail; // byte index of the tail
 	// These are constantly updated in memory
 	unsigned len; // len in bytes of the on disk + in memory log
-	uint16_t page_count; // pages stored in memory without checkpointing
+	uint16_t page_count; // pages stored on disk without checkpointing
 	uint64_t last_id; // id of last entry written
 	unsigned earliest_transaction; // index in bytes of first entry of uncommitted transaction farthest in the past
 }log_info;
 
 struct stored_info{
+	unsigned magic_start;
 	unsigned head; // byte index of the head
 	unsigned tail; // byte index of the tail
 	unsigned len; // len in bytes of the on disk + in memory log
 	uint64_t last_id; // id of last entry written
+	unsigned magic_end;
 };
 
 // Macro to define where meta data ends and log begins
@@ -133,7 +136,7 @@ struct free_inode{
 };
 
 int log_buffer_bootstrap(void);
-int disk_log_bootstrap(void);
+void disk_log_bootstrap(void);
 int recover(void);
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct);
 int checkpoint(void);
