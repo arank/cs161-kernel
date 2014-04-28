@@ -226,8 +226,11 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
         int index = vector_find(&tvector, oper->transaction_id);
         KASSERT (index != -1);  // if it's a commit, the transaction must be in the vector
         vector_set(&tvector, index, 0);  // invalidate
-        log_info.earliest_transaction = vector_get_min(&tvector);  // get the next minimum or 0
+        // TODO: earliest_transaction should get offset instead of trascation_id
+        log_info.earliest_transaction = vector_get_min(&tvector);  // get the next mininun offset
     } else  // new transaction or another operation of the yet uncommited transaction
+        // if it's the first == not in the list
+        // info->head = (info->head + buf->buffer_filled) % DISK_LOG_SIZE;
         vector_insert(&tvector, oper->transaction_id);
 
 	lock_release(log_info.lock);
