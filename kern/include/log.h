@@ -36,7 +36,7 @@ struct stored_info{
 };
 
 // Macro to define where meta data ends and log begins
-#define LOG_START (sizeof(struct log_info));
+//#define LOG_START (sizeof(struct log_info));
 
 enum operation{
 	CHECKPOINT = 1,

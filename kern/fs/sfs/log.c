@@ -24,7 +24,7 @@ int disk_log_bootstrap(){
 //
 //	if (VOP_WRITE(bs, &uio) != 0)
 //		return -1;
-	// TODO byte 0 through n reserved for meta data
+	// TODO byte 0 through sizeof(struct stored_info) reserved for meta data
 
 	// TODO define log region and meta data region
 	// TODO put 2 magic numbers into meta data one for start one for end 0xB16B00B5 if first boot
