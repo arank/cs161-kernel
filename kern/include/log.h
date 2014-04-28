@@ -28,6 +28,16 @@ struct log_info{
 	unsigned earliest_transaction; // index in bytes of first entry of uncommitted transaction farthest in the past
 }log_info;
 
+struct stored_info{
+	unsigned head; // byte index of the head
+	unsigned tail; // byte index of the tail
+	unsigned len; // len in bytes of the on disk + in memory log
+	uint64_t last_id; // id of last entry written
+};
+
+// Macro to define where meta data ends and log begins
+#define LOG_START (sizeof(struct log_info));
+
 enum operation{
 	CHECKPOINT = 1,
 	ABORT,
