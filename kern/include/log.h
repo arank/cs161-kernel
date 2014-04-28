@@ -49,7 +49,6 @@ enum object_type{
     USERBLOCK
 };
 
->>>>>>> 387cbbadd1132f147c675adb466971b1fc1b717c
 struct record_header{
 	uint64_t record_id; // Size of the structure after this. Not including the header
 	uint16_t size;
