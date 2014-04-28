@@ -5,7 +5,7 @@
 #include <limits.h>
 
 #define LOG_BUFFER_SIZE 4096
-#define DISK_LOG_SIZE 5242880
+#define DISK_LOG_SIZE 524288
 #define MARGIN 8192
 
 // TODO possibly have two of these?
@@ -48,8 +48,7 @@ enum object_type{
 };
 
 struct record_header{
-	uint64_t record_id;
-	// Size of the structure after this. Not including the header
+	uint64_t record_id; // Size of the structure after this. Not including the header
 	uint16_t size;
 	uint16_t op;    /* for partability; enums are just ints */
 };
@@ -124,7 +123,7 @@ struct free_inode{
 int log_buffer_bootstrap(void);
 int disk_log_bootstrap(void);
 int recover(void);
-uint64_t log_write(enum operation op, uint16_t size, char *operation_struct);
+uint64_t log_write(enum operation op, uint16_t size, void *operation_struct);
 int checkpoint(void);
 
 #endif
