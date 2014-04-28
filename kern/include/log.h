@@ -6,24 +6,26 @@
 
 #define LOG_BUFFER_SIZE 4096
 #define DISK_LOG_SIZE 524288
-#define MARGIN 8192
+#define MARGIN 52430
 
 // TODO possibly have two of these?
 struct log_buffer{
-	struct lock *lock;
-	unsigned buffer_filled;
-	char buffer [LOG_BUFFER_SIZE];
+	struct lock *lock; // lock to ensure mutual exclusion during flushing
+	unsigned buffer_filled; // bytes of the buffer filled
+	char buffer [LOG_BUFFER_SIZE]; // bytes array
 };
 
 struct log_info{
-	struct lock *lock;
-	struct log_buffer *active_buffer;
-	unsigned head;
-	unsigned tail;
-	unsigned len;
-	uint16_t page_count;
-	uint64_t last_id;
-	uint64_t earliest_transaction;
+	struct lock *lock; // lock to ensure up to data meta data
+	struct log_buffer *active_buffer; // the active buffer of the two that we switch between
+	// These are only updated before flushing to disk
+	unsigned head; // byte index of the head
+	unsigned tail; // byte index of the tail
+	// These are constantly updated in memory
+	unsigned len; // len in bytes of the on disk + in memory log
+	uint16_t page_count; // pages stored in memory without checkpointing
+	uint64_t last_id; // id of last entry written
+	unsigned earliest_transaction; // index in bytes of first entry of uncommitted transaction farthest in the past
 }log_info;
 
 enum operation{
@@ -47,6 +49,7 @@ enum object_type{
     USERBLOCK
 };
 
+>>>>>>> 387cbbadd1132f147c675adb466971b1fc1b717c
 struct record_header{
 	uint64_t record_id; // Size of the structure after this. Not including the header
 	uint16_t size;
@@ -54,8 +57,8 @@ struct record_header{
 };
 
 struct checkpoint{
-	// record_id of new tail
-	uint64_t new_tail;
+	// offset in bytes into the array where the new tail is
+	unsigned new_tail;
 };
 
 struct commit{
