@@ -14,6 +14,7 @@
 static struct log_buffer *buf1, *buf2;
 static struct vnode *bs;
 static Vector tvector;
+static uint64_t wrap_times;
 
 // Opens the disk object, and reads the data from it into the log_info object
 // this should be called before recovery
@@ -296,6 +297,8 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
 	header.op = op;
 	header.record_id = log_info.last_id++;
 
+    uint64_t offset = ((log_info.head + log_info.active_buffer->buffer_filled) % DISK_LOG_SIZE) + (wrap_times * DISK_LOG_SIZE);
+
 	// Copy onto the buffer
 	// TODO is this pointer math right?
 	memcpy(&log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], &header, sizeof(struct record_header));
@@ -303,22 +306,19 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
 	memcpy(&log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], operation_struct, size);
 	log_info.active_buffer->buffer_filled += size;
 
+    // before = (info->head + buf->buffer_filled) % DISK_LOG_SIZE
 	// Augment the log info data but don't augment the head till its flushed, so we can know where to flush to
-	log_info.len += size+sizeof(struct record_header);
-
-	// TODO update log_info.earliest_transaction
-    // TODO need to check
-    struct commit *oper = operation_struct;
+	log_info.len += size + sizeof(struct record_header);
+    if ((log_info.head + size + sizeof(struct record_header)) / DISK_LOG_SIZE == 1) 
+        wrap_times++;
+    
     if (op == COMMIT) { // remove it from the queue
-        int index = vector_find(&tvector, oper->transaction_id);
+        int index = vector_find(&tvector, offset);
         KASSERT (index != -1);  // if it's a commit, the transaction must be in the vector
         vector_set(&tvector, index, 0);  // invalidate
-        // TODO: earliest_transaction should get offset instead of trascation_id
-        log_info.earliest_transaction = vector_get_min(&tvector);  // get the next mininun offset
+        log_info.earliest_transaction = vector_get_min(&tvector);  // get the next mininun offset or 0
     } else  // new transaction or another operation of the yet uncommited transaction
-        // if it's the first == not in the list
-        // info->head = (info->head + buf->buffer_filled) % DISK_LOG_SIZE;
-        vector_insert(&tvector, oper->transaction_id);
+        vector_insert(&tvector, offset);    // if already there, vector_insert does nothing
 
 	lock_release(log_info.lock);
 
