@@ -1,20 +1,20 @@
 #include <types.h>
 #include <current.h>
 #include <lib.h>
+#include <limits.h>
 #include <log.h>
 #include <vnode.h>
 #include <vfs.h>
 #include <kern/errno.h>
 #include <kern/fcntl.h>
-#include <uio.h>
 #include <kern/iovec.h>
 #include <vector.h>
 #include <fs.h>
 #include <sfs.h>
 #include <buf.h>
+#include <mips/vm.h>
 
 static struct log_buffer *buf1, *buf2;
-static struct vnode *bs;
 static Vector tvector;
 static uint64_t wrap_times;
 
@@ -52,11 +52,6 @@ static int write_meta_data_to_disk(struct fs *fs, char *buf){
 
 // Creates the log buffer global object and log info global object, call this before recovery
 int log_buffer_bootstrap(){
-
-	(void)write_meta_data_to_disk;
-	(void)read_meta_data_from_disk;
-	(void)write_log_to_disk;
-	(void)read_log_from_disk;
 
 	// Head, tail and last_id will be set during pulling data from disk
 	buf1 = kmalloc(sizeof(struct log_buffer));
@@ -96,20 +91,20 @@ static int pull_meta_data(struct log_info *log_info){
 
 	struct stored_info *st = kmalloc(sizeof(struct stored_info));
 
-	struct iovec iov;
-	struct uio uio;
-	uio_kinit(&iov, &uio, st, sizeof(struct stored_info), 0, UIO_READ);
-
-	if (VOP_READ(bs, &uio) != 0)
+	if(read_meta_data_from_disk(log_info->fs, (char *)st) != 0)
 		panic("failed to read from disk");
+
+	log_info->earliest_transaction = 0;
+	log_info->page_count = 0;
 
 	// Check if we have never written meta data to disk before
 	if(st->magic_start != META_DATA_MAGIC || st->magic_end != META_DATA_MAGIC){
 		kfree(st);
 
 		// Initialize values to first time
-		log_info->head = sizeof(struct stored_info);
-		log_info->tail = log_info->head;
+		log_info->len = 0;
+		log_info->head = 0;
+		log_info->tail = 0;
 		log_info->last_id = 1;
 
 		return -1;
@@ -127,16 +122,14 @@ static int pull_meta_data(struct log_info *log_info){
 
 
 int recover(){
+	(void)read_log_from_disk;
 	// Read meta data from byte 0 checking if there is no data there
 	if(pull_meta_data(&log_info) != 0){
-		// TODO fix this
+		// TODO this assumes disk_log_size % page_size == 0 right?
 		// Zero disk to claim space for log and meta data (this loop will take a while but it is only for 1st time setup)
-		for(unsigned i = 0; i < (DISK_LOG_SIZE + sizeof(struct stored_info)); i++){
-			struct iovec iov;
-			struct uio uio;
-			unsigned filler = 0;
-			uio_kinit(&iov, &uio, &filler, sizeof(unsigned), i*sizeof(unsigned), UIO_WRITE);
-			if (VOP_WRITE(bs, &uio) != 0)
+		char zero[PAGE_SIZE] = {0};
+		for(unsigned i = 0; i < (DISK_LOG_SIZE/PAGE_SIZE); i++){
+			if (write_log_to_disk(log_info.fs, (i*PAGE_SIZE), (char *)&zero, PAGE_SIZE) != 0)
 				return -1;
 		}
 
@@ -192,7 +185,7 @@ static struct log_buffer* switch_buffer(){
 	}
 }
 
-// TODO fix this
+
 // Flushes all the meta data to disk
 static int flush_meta_data_to_disk(struct log_info *info){
 
@@ -206,18 +199,13 @@ static int flush_meta_data_to_disk(struct log_info *info){
 	cpy.magic_end =  META_DATA_MAGIC;
 
 	// Writes out all metadata to disk
-	struct iovec iov;
-	struct uio uio;
-
-	uio_kinit(&iov, &uio, &cpy, sizeof(struct stored_info), 0, UIO_WRITE);
-
-	if (VOP_WRITE(bs, &uio) != 0)
+	if(write_meta_data_to_disk(info->fs, (char *)&cpy) != 0)
 		return -1;
 
 	return 0;
 }
 
-// TODO fix this
+
 // Flushes buffer, if there is anything to flush, to disk at this point the len is up to date
 static int flush_log_to_disk(struct log_buffer *buf, struct log_info *info){
 	kprintf("Writing log to disk\n");
@@ -235,32 +223,14 @@ static int flush_log_to_disk(struct log_buffer *buf, struct log_info *info){
 	// Flush out to disk
 	// TODO is this math correct
 	if(remainder >= buf->buffer_filled){
-
-		struct iovec iov;
-		struct uio uio;
-
-		uio_kinit(&iov, &uio, buf->buffer, buf->buffer_filled, info->head, UIO_WRITE);
-
-		if (VOP_WRITE(bs, &uio) != 0)
+		if (write_log_to_disk(info->fs, info->head, buf->buffer, buf->buffer_filled) != 0)
 			goto out;
 	}
-	// In this case we split to 2 seperate writes to wrap around the buffer
 	else{
-		struct iovec iov1;
-		struct uio uio1;
-
-		uio_kinit(&iov1, &uio1, buf->buffer, remainder, info->head, UIO_WRITE);
-
-		if (VOP_WRITE(bs, &uio1) != 0)
+		// In this case we split to 2 seperate writes to wrap around the buffer
+		if (write_log_to_disk(info->fs, info->head, buf->buffer, remainder) != 0)
 			goto out;
-
-		struct iovec iov2;
-		struct uio uio2;
-
-		// Start at the offset after the stored info
-		uio_kinit(&iov2, &uio2, buf->buffer+remainder, buf->buffer_filled-remainder, sizeof(struct log_info), UIO_WRITE);
-
-		if (VOP_WRITE(bs, &uio2) != 0)
+		if (write_log_to_disk(info->fs, 0, buf->buffer+remainder, buf->buffer_filled-remainder) != 0)
 			goto out;
 	}
 
@@ -281,14 +251,16 @@ out:
 	return -1;
 }
 
+
 // TODO does this work
 static int flush_buffer_cache_to_disk(struct log_info *info){
 	sync_fs_buffers(info->fs);
 	return 0;
 }
 
+
 // Flushes current buffer after adding a checkpoint, blocking all writes to the log buffer and hence the cache
-// TODO check this logic
+// TODO check this ordering, also should we change this to rolling?
 int checkpoint(){
 	kprintf("Checkpointing\n");
 	KASSERT(lock_do_i_hold(log_info.lock));

@@ -5,8 +5,8 @@
 #include <limits.h>
 
 #define LOG_BUFFER_SIZE 4096
-#define DISK_LOG_SIZE 524288
-#define MARGIN 52430
+#define DISK_LOG_SIZE (512*512)
+#define MARGIN ((512*512)/10)
 #define META_DATA_MAGIC 0xB16B00B5
 
 // TODO possibly have two of these?

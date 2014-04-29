@@ -436,9 +436,8 @@ sfs_domount(void *options, struct device *dev, struct fs **ret)
 	/* Hand back the abstract fs */
 	*ret = &sfs->sfs_absfs;
 
-
-	// TODO scale to arbitrary # of file systems (by creating new object and linking it)
 	// Bootstrap log here
+	// TODO scale to arbitrary # of file systems (by creating new object and linking it)
 	log_info.fs = &sfs->sfs_absfs;
 	log_buffer_bootstrap();
 	recover();
