@@ -33,10 +33,9 @@
 #include <assert.h>
 #include <limits.h>
 #include <err.h>
-
+#include <stdio.h>
 #include "support.h"
 #include "kern/sfs.h"
-
 
 #ifdef HOST
 
@@ -151,10 +150,21 @@ writebitmap(uint32_t fsblocks)
 	}
 	rootdir_data_block = SFS_MAP_LOCATION + nblocks;
 	doallocbit(rootdir_data_block);
+
+    printf("fsblocks: %zu, nbits: %zu, nblocks %zu, rootdir_datablock: %d\n", 
+            fsblocks, nbits, nblocks, rootdir_data_block);
+
+    for (i = rootdir_data_block + 1; 
+         i < rootdir_data_block + 1 + SFS_JOURNAL_SIZE; 
+         i++)
+        doallocbit(i);
+
+    /* mark non-existent blocks as used */
 	for (i=fsblocks; i<nbits; i++) {
 		doallocbit(i);
 	}
-
+    
+    /* write to disk our bitmap */
 	for (i=0; i<nblocks; i++) {
 		ptr = bitbuf + i*SFS_BLOCKSIZE;
 		diskwrite(ptr, SFS_MAP_LOCATION+i);
