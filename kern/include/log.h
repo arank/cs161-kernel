@@ -19,6 +19,7 @@ struct log_buffer{
 struct log_info{
 	struct lock *lock; // lock to ensure up to data meta data
 	struct log_buffer *active_buffer; // the active buffer of the two that we switch between
+	struct fs *fs;
 	// These are only updated before flushing to disk
 	unsigned head; // byte index of the head
 	unsigned tail; // byte index of the tail
@@ -136,7 +137,6 @@ struct free_inode{
 };
 
 int log_buffer_bootstrap(void);
-void disk_log_bootstrap(void);
 int recover(void);
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct);
 int checkpoint(void);

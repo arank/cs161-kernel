@@ -18,15 +18,46 @@ static struct vnode *bs;
 static Vector tvector;
 static uint64_t wrap_times;
 
-// Opens the disk object, this should be called before recovery
-void disk_log_bootstrap(){
-	if(vfs_open(kstrdup("lhd1raw:"), O_RDWR, 0, &bs) != 0)
-		panic ("vfs_open failed\n");
+// TODO Ivan write this
+static int read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
+	(void) fs;
+	(void) off;
+	(void) buf;
+	(void) size;
+	return 0;
 }
 
+// TODO Ivan write this
+static int write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
+	(void) fs;
+	(void) off;
+	(void) buf;
+	(void) size;
+	return 0;
+}
+
+// TODO Ivan write this
+static int read_meta_data_from_disk(struct fs *fs, char *buf){
+	(void) fs;
+	(void) buf;
+	return 0;
+}
+
+// TODO Ivan write this
+static int write_meta_data_to_disk(struct fs *fs, char *buf){
+	(void) fs;
+	(void) buf;
+	return 0;
+}
 
 // Creates the log buffer global object and log info global object, call this before recovery
 int log_buffer_bootstrap(){
+
+	(void)write_meta_data_to_disk;
+	(void)read_meta_data_from_disk;
+	(void)write_log_to_disk;
+	(void)read_log_from_disk;
+
 	// Head, tail and last_id will be set during pulling data from disk
 	buf1 = kmalloc(sizeof(struct log_buffer));
 	if(buf1 == NULL) goto out;
@@ -118,7 +149,7 @@ int recover(){
 		return 0;
 	}
 
-// TODO do recovery
+// TODO do recovery and use active buffer to do the reading
 //	switch(op){
 //
 //	case CHECKPOINT:
@@ -250,9 +281,9 @@ out:
 	return -1;
 }
 
-// TODO flush buffer cache to disk
-static int flush_buffer_cache_to_disk(){
-//	sync_fs_buffers();
+// TODO does this work
+static int flush_buffer_cache_to_disk(struct log_info *info){
+	sync_fs_buffers(info->fs);
 	return 0;
 }
 
@@ -264,7 +295,7 @@ int checkpoint(){
 
 	flush_log_to_disk(log_info.active_buffer, &log_info);
 
-	flush_buffer_cache_to_disk();
+	flush_buffer_cache_to_disk(&log_info);
 
 	// Create a new checkpoint entry
 	struct checkpoint ch;

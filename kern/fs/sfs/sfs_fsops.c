@@ -44,6 +44,7 @@
 #include <buf.h>
 #include <device.h>
 #include <sfs.h>
+#include <log.h>
 #include "sfsprivate.h"
 
 
@@ -434,6 +435,14 @@ sfs_domount(void *options, struct device *dev, struct fs **ret)
 
 	/* Hand back the abstract fs */
 	*ret = &sfs->sfs_absfs;
+
+
+	// TODO scale to arbitrary # of file systems (by creating new object and linking it)
+	// Bootstrap log here
+	log_info.fs = &sfs->sfs_absfs;
+	log_buffer_bootstrap();
+	recover();
+
 
 	lock_release(sfs->sfs_vnlock);
 	lock_release(sfs->sfs_bitlock);
