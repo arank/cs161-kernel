@@ -17,18 +17,60 @@
 static struct log_buffer *buf1, *buf2;
 static Vector tvector;
 static uint64_t wrap_times;
+#define BLOCK_SIZE 512
+#define METADATA_BLOCK 6
+#define JOURNAL_START_BLOCK 7
 
 // TODO Ivan write this
-static int read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
-	(void) fs;
-	(void) off;
-	(void) buf;
-	(void) size;
+static 
+int 
+read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
+    KASSERT(size <= LOG_BUFFER_SIZE);
+    if (size == 0) return -1;
+
+    // restore the actual offset into the disk
+    unsigned offset = off + (JOURNAL_START_BLOCK * BLOCK_SIZE);
+    // computer the first block to read from
+    unsigned first_block = offset / BLOCK_SIZE;
+    // compute the index into the first block from which to start cp into buf
+    unsigned buf_index = offset % BLOCK_SIZE; 
+    // compute the number of blocks to read
+    unsigned nblocks = size / BLOCK_SIZE;
+    // in case size is not block aligned
+    unsigned bytes_left = size % BLOCK_SIZE;
+    if (bytes_left != 0) nblocks++;
+
+    char local_buf[BLOCK_SIZE] = {0};
+    int rv;
+
+    // read first block 
+    rv = FSOP_READBLOCK(fs, first_block, local_buf, BLOCK_SIZE);
+    if (rv) return -1;
+    memcpy(buf, local_buf + buf_index, buf_index);
+    buf += buf_index;
+
+    // read blocks that are aligned
+    for (unsigned i = 1; i < nblocks; i++) {
+        rv = FSOP_READBLOCK(fs, first_block + i, local_buf, BLOCK_SIZE);
+        if (rv) return -1;
+        memcpy(buf, local_buf, BLOCK_SIZE);
+        buf += BLOCK_SIZE;
+    }
+    
+    if (bytes_left != 0) {
+        rv = FSOP_READBLOCK(fs, first_block + nblocks, local_buf, BLOCK_SIZE);
+        if (rv) return -1;
+        memcpy(buf, local_buf, bytes_left);
+        buf += bytes_left;
+    }
+
 	return 0;
 }
 
 // TODO Ivan write this
-static int write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
+static 
+int 
+write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
 	(void) fs;
 	(void) off;
 	(void) buf;
@@ -38,16 +80,12 @@ static int write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned si
 
 // TODO Ivan write this
 static int read_meta_data_from_disk(struct fs *fs, char *buf){
-	(void) fs;
-	(void) buf;
-	return 0;
+	return FSOP_READBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
 }
 
 // TODO Ivan write this
 static int write_meta_data_to_disk(struct fs *fs, char *buf){
-	(void) fs;
-	(void) buf;
-	return 0;
+	return FSOP_WRITEBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
 }
 
 // Creates the log buffer global object and log info global object, call this before recovery
