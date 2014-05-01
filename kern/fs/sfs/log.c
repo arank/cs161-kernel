@@ -17,40 +17,114 @@
 static struct log_buffer *buf1, *buf2;
 static Vector tvector;
 static uint64_t wrap_times;
+#define BLOCK_SIZE 512
+#define METADATA_BLOCK 6
+#define JOURNAL_START_BLOCK 7
 
-// TODO Ivan write this
-static int read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
-	(void) fs;
-	(void) off;
-	(void) buf;
-	(void) size;
+static 
+int 
+read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
+    KASSERT(size <= LOG_BUFFER_SIZE);
+    if (size == 0) return -1;
+
+    // restore the actual offset into the disk
+    unsigned offset = off + (JOURNAL_START_BLOCK * BLOCK_SIZE);
+    // computer the first block to read from
+    unsigned first_block = offset / BLOCK_SIZE;
+    // compute the index into the first block from which to start cp into buf
+    unsigned buf_index = offset % BLOCK_SIZE; 
+    // compute the number of blocks to read
+    unsigned nblocks = size / BLOCK_SIZE;
+    // in case size is not block aligned
+    unsigned bytes_left = size % BLOCK_SIZE;
+
+    char local_buf[BLOCK_SIZE] = {0};
+    int rv;
+
+    // read first block 
+    rv = FSOP_READBLOCK(fs, first_block, local_buf, BLOCK_SIZE);
+    if (rv) return -1;
+    memcpy(buf, local_buf + buf_index, buf_index);
+    buf += buf_index;
+
+    // read blocks that are aligned
+    for (unsigned i = 1; i < nblocks; i++) {
+        rv = FSOP_READBLOCK(fs, first_block + i, local_buf, BLOCK_SIZE);
+        if (rv) return -1;
+        memcpy(buf, local_buf, BLOCK_SIZE);
+        buf += BLOCK_SIZE;
+    }
+    
+    if (bytes_left != 0 && nblocks != 0) {
+        rv = FSOP_READBLOCK(fs, first_block + nblocks, local_buf, BLOCK_SIZE);
+        if (rv) return -1;
+        memcpy(buf, local_buf, bytes_left);
+        buf += bytes_left;
+    }
+
 	return 0;
 }
 
-// TODO Ivan write this
-static int write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
-	(void) fs;
-	(void) off;
-	(void) buf;
-	(void) size;
+static 
+int 
+write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
+    KASSERT(size <= LOG_BUFFER_SIZE);
+    if (size == 0) return -1;
+
+    // restore the actual offset into the disk
+    unsigned offset = off + (JOURNAL_START_BLOCK * BLOCK_SIZE);
+    // compute the index into the first block 
+    unsigned buf_index = offset % BLOCK_SIZE; 
+    // computer the first block to mofidy
+    unsigned first_block = offset / BLOCK_SIZE;
+    // compute the number of blocks to write
+    unsigned nblocks = size / BLOCK_SIZE;
+    // in case size is not block aligned
+    unsigned bytes_left = size % BLOCK_SIZE;
+    
+    char local_buf[BLOCK_SIZE] = {0};
+    int rv;
+
+    // read first block, modify, write back in case size is not block aligned
+    rv = FSOP_READBLOCK(fs, first_block, local_buf, BLOCK_SIZE);
+    if (rv) return -1;
+    memcpy(local_buf + buf_index, buf, BLOCK_SIZE - buf_index);
+    buf += buf_index;
+    rv = FSOP_WRITEBLOCK(fs, first_block, local_buf, BLOCK_SIZE);
+    if (rv) return -1;
+    
+    // write subsequent block-aligned blocks
+    for (unsigned i = 1; i < nblocks; i++) {
+        rv = FSOP_WRITEBLOCK(fs, first_block + i, buf, BLOCK_SIZE);
+        buf += BLOCK_SIZE;
+        if (rv) return -1;
+    }
+    
+    // write bytes from the last block if it's not block aligned
+    if (bytes_left != 0 && nblocks != 0) {
+        memset(local_buf, 0, BLOCK_SIZE);
+        memcpy(local_buf, buf, bytes_left);
+        rv = FSOP_WRITEBLOCK(fs, first_block + nblocks, local_buf, BLOCK_SIZE);
+        if (rv) return -1;
+    }
+
 	return 0;
 }
 
-// TODO Ivan write this
 static int read_meta_data_from_disk(struct fs *fs, char *buf){
-	(void) fs;
-	(void) buf;
-	return 0;
+	 int rv = FSOP_READBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
+     if (rv) return -1;
+     return 0;
 }
 
-// TODO Ivan write this
 static int write_meta_data_to_disk(struct fs *fs, char *buf){
-	(void) fs;
-	(void) buf;
-	return 0;
+	int rv = FSOP_WRITEBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
+    if (rv) return -1;
+    return 0;
 }
 
-// Creates the log buffer global object and log info global object, call this before recovery
+// Creates the log buffer global object and log info global object 
+// call this before recovery
 int log_buffer_bootstrap(){
 
 	// Head, tail and last_id will be set during pulling data from disk
