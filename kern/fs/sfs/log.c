@@ -85,7 +85,7 @@ write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     char local_buf[BLOCK_SIZE] = {0};
     int rv;
 
-    // read first block, modify, write back  in case size is not block aligned
+    // read first block, modify, write back in case size is not block aligned
     rv = FSOP_READBLOCK(fs, first_block, local_buf, BLOCK_SIZE);
     if (rv) return -1;
     memcpy(local_buf + buf_index, buf, BLOCK_SIZE - buf_index);
@@ -112,11 +112,15 @@ write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
 }
 
 static int read_meta_data_from_disk(struct fs *fs, char *buf){
-	return FSOP_READBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
+	 int rv = FSOP_READBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
+     if (rv) return -1;
+     return 0;
 }
 
 static int write_meta_data_to_disk(struct fs *fs, char *buf){
-	return FSOP_WRITEBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
+	int rv = FSOP_WRITEBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
+    if (rv) return -1;
+    return 0;
 }
 
 // Creates the log buffer global object and log info global object 
