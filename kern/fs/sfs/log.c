@@ -121,6 +121,50 @@ static int pull_meta_data(struct log_info *log_info){
 }
 
 
+static int circular_read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
+
+	unsigned remainder = DISK_LOG_SIZE - off;
+
+	// TODO is this math correct
+	if(remainder >= size){
+		if (read_log_from_disk(fs, off, buf, size) != 0)
+			return -1;
+	}
+	else{
+		// In this case we split to 2 seperate writes to wrap around the buffer
+		if (write_log_to_disk(fs, off, buf, remainder) != 0)
+			return -1;
+		if (write_log_to_disk(fs, 0, buf+remainder, size-remainder) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+char * scan_forward(){
+
+}
+
+char* move_forward(){
+	// if it overflows put it in the overflow array
+	unsigned to_read;
+	if(log_info.len < LOG_BUFFER_SIZE)
+		to_read = log_info.len;
+	else
+		to_read = LOG_BUFFER_SIZE;
+
+	circular_read_log_from_disk(log_info.fs, log_info.tail, log_info.active_buffer->buffer, to_read);
+
+	// check txn id = record id
+
+	// check if we have enough space to read the header
+
+	// check if we have enough space to read the body
+
+	// else pull new array into memory and update to_read
+
+}
+
+
 int recover(){
 	(void)read_log_from_disk;
 	// Read meta data from byte 0 checking if there is no data there
@@ -142,23 +186,24 @@ int recover(){
 		return 0;
 	}
 
-// TODO do recovery and use active buffer to do the reading
-//	switch(op){
-//
-//	case CHECKPOINT:
-//	case ABORT:
-//	case COMMIT:
-//	case ADD_DIRENTRY:
-//	case MODIFY_DIRENTRY_SIZE:
-//	case MODIFY_DIRENTRY:
-//	case RENAME_DIRENTRY:
-//	case REMOVE_DIRENTRY:
-//	case ALLOC_INODE:
-//	case FREE_INODE:
-//	default:
-//		panic("Undefined log entry code\n");
-//		break;
-//	}
+
+	// TODO do recovery and use active buffer to do the reading
+	switch(op){
+
+	case CHECKPOINT:
+	case ABORT:
+	case COMMIT:
+	case ADD_DIRENTRY:
+	case MODIFY_DIRENTRY_SIZE:
+	case MODIFY_DIRENTRY:
+	case RENAME_DIRENTRY:
+	case REMOVE_DIRENTRY:
+	case ALLOC_INODE:
+	case FREE_INODE:
+	default:
+		panic("Undefined log entry code\n");
+		break;
+	}
 
 	lock_acquire(log_info.lock);
 	checkpoint();
@@ -254,8 +299,8 @@ out:
 
 // TODO does this work
 static int flush_buffer_cache_to_disk(struct log_info *info){
-	sync_fs_buffers(info->fs);
-	return 0;
+	int result = sync_fs_buffers(info->fs);
+	return result;
 }
 
 
