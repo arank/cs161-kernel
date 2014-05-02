@@ -140,6 +140,6 @@ int log_buffer_bootstrap(void);
 int recover(void);
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct);
 int checkpoint(void);
-void test_read_write(void);
+int test_read_write(int nargs, char **args);
 
 #endif

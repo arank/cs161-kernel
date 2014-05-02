@@ -577,8 +577,6 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	DEBUGASSERT(curcpu->c_curthread == curthread);
 	DEBUGASSERT(curthread->t_cpu == curcpu->c_self);
 
-    KASSERT(curthread->t_curspl != 0);
-
 	/* Explicitly disable interrupts on this processor */
 	spl = splhigh();
 

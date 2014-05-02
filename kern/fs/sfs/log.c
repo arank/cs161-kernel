@@ -40,7 +40,7 @@ read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     // in case size is not block aligned
     unsigned bytes_left = size % BLOCK_SIZE;
 
-    char local_buf[BLOCK_SIZE] = {0};
+    char *local_buf = kmalloc(BLOCK_SIZE);
     int rv;
 
     // read first block 
@@ -63,7 +63,7 @@ read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
         memcpy(buf, local_buf, bytes_left);
         buf += bytes_left;
     }
-
+    kfree(local_buf);
 	return 0;
 }
 
@@ -85,7 +85,7 @@ write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     // in case size is not block aligned
     unsigned bytes_left = size % BLOCK_SIZE;
     
-    char local_buf[BLOCK_SIZE] = {0};
+    char *local_buf = kmalloc(BLOCK_SIZE);
     int rv;
 
     // read first block, modify, write back in case size is not block aligned
@@ -111,15 +111,22 @@ write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
         if (rv) return -1;
     }
 
+    kfree(local_buf);
+
 	return 0;
 }
 
-void test_read_write(void) {
-    char buf[42] = "What a wonderful day";
-    write_log_to_disk(log_info.fs, 42, buf, 42);
-    char bufin[42];
-    read_log_from_disk(log_info.fs, 42, bufin, 42);
+int test_read_write(int nargs, char **args) {
+    (void)nargs;
+    (void)args;
+
+    char *buf = kmalloc(BLOCK_SIZE);
+    strcpy(buf, "What a wonderful night");
+    write_log_to_disk(log_info.fs, 24242, buf, 42);
+    char *bufin = kmalloc(BLOCK_SIZE);
+    read_log_from_disk(log_info.fs, 24242, bufin, 42);
     kprintf("%s\n", bufin);
+    return 0;
 }
 
 static int read_meta_data_from_disk(struct fs *fs, char *buf){
@@ -174,7 +181,8 @@ out:
 
 static int pull_meta_data(struct log_info *log_info){
 
-	struct stored_info *st = kmalloc(sizeof(struct stored_info));
+	//struct stored_info *st = kmalloc(sizeof(struct stored_info));
+	struct stored_info *st = kmalloc(BLOCK_SIZE);
 
 	if(read_meta_data_from_disk(log_info->fs, (char *)st) != 0)
 		panic("failed to read from disk");
@@ -212,11 +220,15 @@ int recover(){
 	if(pull_meta_data(&log_info) != 0){
 		// TODO this assumes disk_log_size % page_size == 0 right?
 		// Zero disk to claim space for log and meta data (this loop will take a while but it is only for 1st time setup)
-		char zero[PAGE_SIZE] = {0};
+		char *zero_page = kmalloc(PAGE_SIZE);
 		for(unsigned i = 0; i < (DISK_LOG_SIZE/PAGE_SIZE); i++){
-			if (write_log_to_disk(log_info.fs, (i*PAGE_SIZE), (char *)&zero, PAGE_SIZE) != 0)
+			if (write_log_to_disk(log_info.fs, (i*PAGE_SIZE), zero_page,
+                                    PAGE_SIZE) != 0) {
+                kfree(zero_page);
 				return -1;
+            }
 		}
+        kfree(zero_page);
 
 		// Add checkpoint to ensure we don't redo this if we crash
 		lock_acquire(log_info.lock);
@@ -383,8 +395,7 @@ int checkpoint(){
 
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
 	// Lock to ensure that active never changes
-	lock_acquire(log_info.lock);
-
+    
 	// Check if we blow the buffer
 	if(sizeof(struct record_header) + size + log_info.active_buffer->buffer_filled >= LOG_BUFFER_SIZE){
 		struct log_buffer *buf = switch_buffer();
@@ -443,11 +454,8 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
     } else  // new transaction or another operation of the yet uncommited transaction
         vector_insert(&tvector, offset);    // if already there, vector_insert does nothing
 
-	lock_release(log_info.lock);
-
 	return header.record_id;
 
 out:
-	lock_release(log_info.lock);
 	return 0;
 }

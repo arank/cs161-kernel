@@ -177,7 +177,7 @@ lock_acquire(struct lock *lock) {
     KASSERT(lock != NULL);
 
     spinlock_acquire(&lock->lk_spinlk);
-    KASSERT(curthread->t_curspl != 0);
+    //KASSERT(curthread->t_curspl != 0);
     // TODO curthread is broken is at 0x0 during get_pid
     KASSERT(lock->lk_holder != curthread);  /* the thread doesn't hold the lock */
     while (lock->lk_holder != NULL) 
@@ -192,7 +192,7 @@ lock_release(struct lock *lock) {
     KASSERT(lock != NULL);
 
     spinlock_acquire(&lock->lk_spinlk);
-    KASSERT(curthread->t_curspl != 0);
+    //KASSERT(curthread->t_curspl != 0);
     KASSERT(lock->lk_holder == curthread);  /* release only your own lock */
     lock->lk_holder = NULL;
     wchan_wakeone(lock->lk_wchan, &lock->lk_spinlk);

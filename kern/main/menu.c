@@ -632,7 +632,7 @@ static struct {
     /* synchronization unit tests */
     { "lk",     lock_unittest },
     { "cv",     cv_unittest },
-
+    { "lrw",    test_read_write},
     /* TODO file descriptor unit tests */
 
     /* TODO process unit tests */
