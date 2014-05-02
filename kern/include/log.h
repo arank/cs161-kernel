@@ -53,7 +53,7 @@ enum operation{
 	ADD_DIRENTRY,
 	MODIFY_DIRENTRY_SIZE,
 	MODIFY_DIRENTRY,
-	RENAME_DIRENTRY,
+//	RENAME_DIRENTRY,
 	REMOVE_DIRENTRY,
 	ALLOC_INODE,
 	FREE_INODE,
@@ -62,7 +62,7 @@ enum operation{
 
 enum object_type{
 	FILE = 1,
-	DIR,
+	DIR, // 2 link count all others are 1 (because of . entry)
     INDIRECTION,
     USERBLOCK
 };
@@ -70,7 +70,7 @@ enum object_type{
 struct record_header{
 	uint64_t record_id; // Size of the structure after this. Not including the header
 	uint16_t size;
-	uint16_t op;    /* for partability; enums are just ints */
+	uint16_t op;    /* for portability; enums are just ints */
 	uint64_t transaction_id;
 };
 
@@ -102,15 +102,16 @@ struct modify_direntry{
 	unsigned inode1_new_link_count;
 	unsigned inode2_old_link_count;
 	unsigned inode2_new_link_count;
-	char name[NAME_MAX];
-};
-
-struct rename_direntry{
-	unsigned dir_inode_id;
-	unsigned target_inode_id;
 	char old_name[NAME_MAX];
 	char new_name[NAME_MAX];
 };
+
+//struct rename_direntry{
+//	unsigned dir_inode_id;
+//	unsigned target_inode_id;
+//	char old_name[NAME_MAX];
+//	char new_name[NAME_MAX];
+//};
 
 struct remove_direntry{
 	unsigned dir_inode_id;

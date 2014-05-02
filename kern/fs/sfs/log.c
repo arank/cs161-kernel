@@ -567,8 +567,15 @@ int checkpoint(){
 	return 0;
 }
 
+uint64_t safe_log_write(enum operation op, uint16_t size, void *operation_struct, uint64_t txn_id){
+	uint64_t ret;
+	lock_acquire(log_info.lock);
+	ret = log_write(op, size, operation_struct, txn_id);
+	lock_release(log_info.lock);
+	return ret;
+}
 
-// Operation struct can be NULL
+// Operation struct can be NULL, pass in 0 for txn_id to get a unique txn_id back, and attached to this function
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct, uint64_t txn_id){
 	KASSERT(lock_do_i_hold(log_info.lock));
 

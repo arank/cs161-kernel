@@ -274,7 +274,7 @@ sfs_dir_findino(struct sfs_vnode *sv, uint32_t ino,
  * Requires up to 3 buffers.
  */
 int
-sfs_dir_link(struct sfs_vnode *sv, const char *name, uint32_t ino, int *slot)
+sfs_dir_link(struct sfs_vnode *sv, const char *name, uint32_t ino, int *slot, uint64_t txn_id)
 {
 	int emptyslot = -1;
 	int result;
