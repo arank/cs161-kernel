@@ -214,6 +214,194 @@ static int pull_meta_data(struct log_info *log_info){
 }
 
 
+static int circular_read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
+
+	unsigned remainder = DISK_LOG_SIZE - off;
+
+	// TODO is this math correct
+	if(remainder >= size){
+		if (read_log_from_disk(fs, off, buf, size) != 0)
+			return -1;
+	}
+	else{
+		// In this case we split to 2 seperate writes to wrap around the buffer
+		if (read_log_from_disk(fs, off, buf, remainder) != 0)
+			return -1;
+		if (read_log_from_disk(fs, 0, buf+remainder, size-remainder) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+static void redo(char* op_list, unsigned op_list_fill){
+
+	unsigned offset = 0;
+	while(true){
+		struct record_header *header =  (struct record_header *)&op_list[offset];
+		char *st = (char *)header + sizeof(struct record_header);
+		// TODO redo each of these
+		switch(header->op){
+			case ADD_DIRENTRY:
+			case MODIFY_DIRENTRY_SIZE:
+			case MODIFY_DIRENTRY:
+			case RENAME_DIRENTRY:
+			case REMOVE_DIRENTRY:
+			case ALLOC_INODE:
+			case FREE_INODE:
+				(void) st;
+				break;
+			default:
+				panic("Undefined log entry code\n");
+				break;
+		}
+
+		offset += header->size + sizeof(struct record_header);
+		op_list_fill -= header->size - sizeof(struct record_header);
+		if(op_list_fill == 0)
+			break;
+	}
+}
+
+static void undo(char* op_list, unsigned op_list_fill){
+
+	while(true){
+		unsigned offset = 0;
+		struct record_header *header;
+		char *st;
+
+		// Read to the end and pull that
+		while(true){
+			header =  (struct record_header *)&op_list[offset];
+			if(offset + header->size + sizeof(struct record_header) == op_list_fill){
+				st = (char *)header + sizeof(struct record_header);
+				op_list_fill -= header->size - sizeof(struct record_header);
+				break;
+			}
+			offset += header->size + sizeof(struct record_header);
+		}
+
+		// TODO undo each of these
+		switch(header->op){
+			case ADD_DIRENTRY:
+			case MODIFY_DIRENTRY_SIZE:
+			case MODIFY_DIRENTRY:
+			case RENAME_DIRENTRY:
+			case REMOVE_DIRENTRY:
+			case ALLOC_INODE:
+			case FREE_INODE:
+				(void) st;
+				break;
+			default:
+				panic("Undefined log entry code\n");
+				break;
+		}
+
+		if(op_list_fill == 0)
+			break;
+	}
+}
+
+// Scans from the current tail forward
+static void recover_transaction(struct record_header *header, unsigned seek_location, int flag){
+
+	// Initialization
+	char* op_list = kmalloc(LOG_BUFFER_SIZE);
+	unsigned op_list_fill;
+
+	uint64_t transaction = header->transaction_id;
+
+	unsigned filled = buf1 ->buffer_filled;
+	unsigned offset = 0;
+	struct log_buffer *active = buf1;
+
+	// Check if obj is within bounds of buffer, if not pull into new buffer with this as tail and set char*
+	// I know I can read this whole struct from memory
+	while(true){
+
+		// Make sure we have enough space to read the next entry
+		if(((LOG_BUFFER_SIZE - filled) < sizeof(struct record_header)) ||
+				((LOG_BUFFER_SIZE - filled) < (sizeof(struct record_header) + header->size))){
+			circular_read_log_from_disk(log_info.fs, ((seek_location + offset) % DISK_LOG_SIZE), buf2->buffer, LOG_BUFFER_SIZE);
+			header =  (struct record_header *)&buf2->buffer[0];
+			filled = LOG_BUFFER_SIZE;
+			active = buf2;
+		}
+
+		if(header->transaction_id == transaction){
+			switch(header->op){
+			case CHECKPOINT:
+				panic("Invalid transaction id for checkpoint.\n");
+				break;
+			case ABORT:
+				if(flag == UNDO)
+					undo(op_list, op_list_fill);
+				goto out;
+				break;
+			case COMMIT:
+				if(flag == REDO)
+					redo(op_list, op_list_fill);
+				goto out;
+			default:
+				memcpy((void *)&op_list[op_list_fill], (void *)header, sizeof(struct record_header) + header->size);
+				op_list_fill += sizeof(struct record_header) + header->size;
+				break;
+			}
+		}
+
+		// TODO will this work?
+		// Move up to next header
+		header = (struct record_header *)((char *)header + sizeof(struct record_header) + header->size);
+
+		// Decrement how much of the buffer is left to read
+		filled -= sizeof(struct record_header) + header->size;
+
+		// Increment offset into log from the tail
+		offset += sizeof(struct record_header) + header->size;
+
+		if(offset >= log_info.len){
+			if(flag == UNDO)
+				undo(op_list, op_list_fill);
+			goto out;
+		}
+	}
+
+out:
+	kfree(op_list);
+}
+
+static void scan_buffer(int flag){
+
+	unsigned offset = 0;
+	struct record_header *header;
+
+	circular_read_log_from_disk(log_info.fs, log_info.tail, buf1->buffer, LOG_BUFFER_SIZE);
+	header = (struct record_header *)&buf1->buffer[0];
+
+	while(true){
+
+		// Make sure we have enough space to read the next entry
+		if(((LOG_BUFFER_SIZE - buf1->buffer_filled) < sizeof(struct record_header)) ||
+				((LOG_BUFFER_SIZE - buf1->buffer_filled) < (sizeof(struct record_header) + header->size))){
+			circular_read_log_from_disk(log_info.fs, ((log_info.tail + offset) % DISK_LOG_SIZE), buf1->buffer, LOG_BUFFER_SIZE);
+			buf1->buffer_filled = LOG_BUFFER_SIZE;
+		}
+
+		if(header->record_id == header->transaction_id)
+			recover_transaction(header, ((log_info.tail + offset) % DISK_LOG_SIZE), flag);
+
+		// Move up to next header
+		header = (struct record_header *)((char *)header + sizeof(struct record_header) + header->size);
+
+		// Decrement how much of the buffer is left to read
+		buf1->buffer_filled -= sizeof(struct record_header) + header->size;
+
+		// Increment offset into log from the tail
+		offset += sizeof(struct record_header) + header->size;
+
+	}
+}
+
+
 int recover(){
 	(void)read_log_from_disk;
 	// Read meta data from byte 0 checking if there is no data there
@@ -239,23 +427,11 @@ int recover(){
 		return 0;
 	}
 
-// TODO do recovery and use active buffer to do the reading
-//	switch(op){
-//
-//	case CHECKPOINT:
-//	case ABORT:
-//	case COMMIT:
-//	case ADD_DIRENTRY:
-//	case MODIFY_DIRENTRY_SIZE:
-//	case MODIFY_DIRENTRY:
-//	case RENAME_DIRENTRY:
-//	case REMOVE_DIRENTRY:
-//	case ALLOC_INODE:
-//	case FREE_INODE:
-//	default:
-//		panic("Undefined log entry code\n");
-//		break;
-//	}
+	// TODO possibly do one more scan for user writes to ensure no user data is leaked
+	// Do undo loop
+	scan_buffer(UNDO);
+	// Do redo loop
+	scan_buffer(REDO);
 
 	lock_acquire(log_info.lock);
 	checkpoint();
@@ -350,8 +526,8 @@ out:
 
 // TODO does this work
 static int flush_buffer_cache_to_disk(struct log_info *info){
-	sync_fs_buffers(info->fs);
-	return 0;
+	int result = sync_fs_buffers(info->fs);
+	return result;
 }
 
 
@@ -392,27 +568,24 @@ int checkpoint(){
 }
 
 
-
+// Operation struct can be NULL
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
-	// Lock to ensure that active never changes
-    
+	KASSERT(lock_do_i_hold(log_info.lock));
+
 	// Check if we blow the buffer
 	if(sizeof(struct record_header) + size + log_info.active_buffer->buffer_filled >= LOG_BUFFER_SIZE){
 		struct log_buffer *buf = switch_buffer();
 
 		// Copy current state of meta data as it will be updated during flushing
-		struct log_info *cpy = kmalloc(sizeof(struct log_info));
-		memcpy(cpy, &log_info, sizeof(struct log_info));
+		struct log_info cpy;
+		memcpy(&cpy, &log_info, sizeof(struct log_info));
 
 		// TODO thread fork this to allow for non-quiesence
 		// TODO will forking here mess up the locks?
-		if(flush_log_to_disk(buf, cpy) != 0) goto out;
+		if(flush_log_to_disk(buf, &cpy) != 0) goto out;
 
-		// TODO Clean up the copied structure after thread fork is done
-		kfree(cpy);
 	}
 
-	// TODO ensure if buffer is full then flushed, and the disk_log is full and needs to be checkpointed, behavior is well defined
 	// Augment len and check if we will blow the log, if the op is a checkpoint, then don't infinitely recurse
 	if(size+sizeof(struct record_header)+log_info.len > DISK_LOG_SIZE - MARGIN){
 		if(op == CHECKPOINT){
@@ -437,8 +610,11 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
 	// TODO is this pointer math right?
 	memcpy(&log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], &header, sizeof(struct record_header));
 	log_info.active_buffer->buffer_filled += sizeof(struct record_header);
-	memcpy(&log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], operation_struct, size);
-	log_info.active_buffer->buffer_filled += size;
+
+	if(operation_struct != NULL){
+		memcpy(&log_info.active_buffer->buffer[log_info.active_buffer->buffer_filled], operation_struct, size);
+		log_info.active_buffer->buffer_filled += size;
+	}
 
     // before = (info->head + buf->buffer_filled) % DISK_LOG_SIZE
 	// Augment the log info data but don't augment the head till its flushed, so we can know where to flush to
@@ -459,3 +635,20 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
 out:
 	return 0;
 }
+
+
+// Does a simple log dump
+//static void log_dump(){
+//	char *buf = kmalloc(513);
+//	buf[512] = '\0';
+//	while(true){
+//		unsigned offset = 0;
+//		read_log_from_disk(log_info.fs, offset, buf, 512);
+//		kprintf("%s", buf);
+//		offset += 512;
+//		if(offset == DISK_LOG_SIZE)
+//			break;
+//	}
+//}
+
+
