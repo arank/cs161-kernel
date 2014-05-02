@@ -312,7 +312,7 @@ sfs_dir_link(struct sfs_vnode *sv, const char *name, uint32_t ino, int *slot)
 	if (slot) {
 		*slot = emptyslot;
 	}
-
+    
 	/* Write the entry. */
 	return sfs_writedir(sv, emptyslot, &sd);
 }

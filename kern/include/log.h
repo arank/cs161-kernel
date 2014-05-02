@@ -68,7 +68,7 @@ enum object_type{
 };
 
 struct record_header{
-	uint64_t record_id; // Size of the structure after this. Not including the header
+	uint64_t record_id; // Size of the structure after this. Not including the header
 	uint16_t size;
 	uint16_t op;    /* for partability; enums are just ints */
 	uint64_t transaction_id;
@@ -80,7 +80,8 @@ struct checkpoint{
 };
 
 struct add_direntry{
-	unsigned dir_inode_id;
+    uint32_t inode_type;
+	unsigned inode_id;
 	unsigned target_inode_id;
 	unsigned old_link_count;
 	unsigned new_link_count;
