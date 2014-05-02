@@ -244,7 +244,7 @@ static void redo(char* op_list, unsigned op_list_fill){
 			case ADD_DIRENTRY:
 			case MODIFY_DIRENTRY_SIZE:
 			case MODIFY_DIRENTRY:
-			case RENAME_DIRENTRY:
+//			case RENAME_DIRENTRY:
 			case REMOVE_DIRENTRY:
 			case ALLOC_INODE:
 			case FREE_INODE:
@@ -285,7 +285,7 @@ static void undo(char* op_list, unsigned op_list_fill){
 			case ADD_DIRENTRY:
 			case MODIFY_DIRENTRY_SIZE:
 			case MODIFY_DIRENTRY:
-			case RENAME_DIRENTRY:
+//			case RENAME_DIRENTRY:
 			case REMOVE_DIRENTRY:
 			case ALLOC_INODE:
 			case FREE_INODE:
