@@ -112,6 +112,7 @@ spinlock_acquire(struct spinlock *splk)
 
 	membar_store_any();
 	splk->splk_holder = mycpu;
+    KASSERT(curthread->t_curspl != 0);
 }
 
 /*

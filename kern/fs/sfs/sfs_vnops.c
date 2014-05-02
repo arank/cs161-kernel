@@ -44,6 +44,7 @@
 #include <buf.h>
 #include <sfs.h>
 #include "sfsprivate.h"
+#include "log.h"
 
 /*
  * Locking protocol for sfs:
@@ -646,6 +647,15 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 		return 0;
 	}
 
+    /*
+    struct alloc_inode op;
+    lock_acquire(log_info.lock);
+	op.transaction_id = log_info.last_id++;
+    lock_release(log_info.lock);
+	op.inode_id = newguy->sv_ino;
+	op.type = ALLOC_INODE;
+    */
+
 	/* Didn't exist - create it */
 	result = sfs_makeobj(sfs, SFS_TYPE_FILE, &newguy);
 	if (result) {
@@ -668,6 +678,7 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 		VOP_DECREF(&newguy->sv_v);
 		lock_release(sv->sv_lock);
 		unreserve_buffers(4, SFS_BLOCKSIZE);
+        // abort
 		return result;
 	}
 

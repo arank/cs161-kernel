@@ -14,17 +14,19 @@
 #include <buf.h>
 #include <mips/vm.h>
 
-static struct log_buffer *buf1, *buf2;
-static Vector tvector;
-static uint64_t wrap_times;
 #define BLOCK_SIZE 512
 #define METADATA_BLOCK 6
 #define JOURNAL_START_BLOCK 7
+
+static struct log_buffer *buf1, *buf2;
+static Vector tvector;
+static uint64_t wrap_times;
 
 static 
 int 
 read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     KASSERT(size <= LOG_BUFFER_SIZE);
+	kprintf("Reading from disk\n");
     if (size == 0) return -1;
 
     // restore the actual offset into the disk
@@ -69,6 +71,7 @@ static
 int 
 write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     KASSERT(size <= LOG_BUFFER_SIZE);
+	kprintf("Writing to disk\n");
     if (size == 0) return -1;
 
     // restore the actual offset into the disk
@@ -111,6 +114,14 @@ write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
 	return 0;
 }
 
+void test_read_write(void) {
+    char buf[42] = "What a wonderful day";
+    write_log_to_disk(log_info.fs, 42, buf, 42);
+    char bufin[42];
+    read_log_from_disk(log_info.fs, 42, bufin, 42);
+    kprintf("%s\n", bufin);
+}
+
 static int read_meta_data_from_disk(struct fs *fs, char *buf){
 	 int rv = FSOP_READBLOCK(fs, METADATA_BLOCK, buf, BLOCK_SIZE);
      if (rv) return -1;
@@ -131,7 +142,7 @@ int log_buffer_bootstrap(){
 	buf1 = kmalloc(sizeof(struct log_buffer));
 	if(buf1 == NULL) goto out;
 
-	buf1->lock = lock_create("buffer lock");
+	buf1->lock = lock_create("buffer lock 1");
 	if (buf1->lock == NULL) goto out;
 
 	buf1->buffer_filled = 0;
@@ -139,7 +150,7 @@ int log_buffer_bootstrap(){
 	buf2 = kmalloc(sizeof(struct log_buffer));
 	if(buf2 == NULL) goto out;
 
-	buf2->lock = lock_create("buffer lock");
+	buf2->lock = lock_create("buffer lock 2");
 	if (buf2->lock == NULL) goto out;
 
 	buf2->buffer_filled = 0;
@@ -299,8 +310,7 @@ static int flush_log_to_disk(struct log_buffer *buf, struct log_info *info){
 	if(remainder >= buf->buffer_filled){
 		if (write_log_to_disk(info->fs, info->head, buf->buffer, buf->buffer_filled) != 0)
 			goto out;
-	}
-	else{
+	} else {
 		// In this case we split to 2 seperate writes to wrap around the buffer
 		if (write_log_to_disk(info->fs, info->head, buf->buffer, remainder) != 0)
 			goto out;

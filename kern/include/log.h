@@ -64,7 +64,7 @@ enum object_type{
 };
 
 struct record_header{
-	uint64_t record_id; // Size of the structure after this. Not including the header
+	uint64_t record_id; // Size of the structure after this. Not including the header
 	uint16_t size;
 	uint16_t op;    /* for partability; enums are just ints */
 };
@@ -140,5 +140,6 @@ int log_buffer_bootstrap(void);
 int recover(void);
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct);
 int checkpoint(void);
+void test_read_write(void);
 
 #endif
