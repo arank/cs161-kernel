@@ -558,7 +558,7 @@ int checkpoint(){
 		log_info.len++;
 	}
 
-	log_write(CHECKPOINT, sizeof(struct checkpoint), (char *)&ch);
+	log_write(CHECKPOINT, sizeof(struct checkpoint), (char *)&ch, 0);
 
 	flush_log_to_disk(log_info.active_buffer, &log_info);
 
@@ -569,7 +569,7 @@ int checkpoint(){
 
 
 // Operation struct can be NULL
-uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
+uint64_t log_write(enum operation op, uint16_t size, void *operation_struct, uint64_t txn_id){
 	KASSERT(lock_do_i_hold(log_info.lock));
 
 	// Check if we blow the buffer
@@ -604,6 +604,14 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
 	header.op = op;
 	header.record_id = log_info.last_id++;
 
+	if(op != CHECKPOINT)
+		if(txn_id == 0)
+			header.transaction_id = header.record_id;
+		else
+			header.transaction_id = txn_id;
+	else
+		header.transaction_id = 0;
+
     uint64_t offset = ((log_info.head + log_info.active_buffer->buffer_filled) % DISK_LOG_SIZE) + (wrap_times * DISK_LOG_SIZE);
 
 	// Copy onto the buffer
@@ -627,8 +635,9 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct){
         KASSERT (index != -1);  // if it's a commit, the transaction must be in the vector
         vector_set(&tvector, index, 0);  // invalidate
         log_info.earliest_transaction = vector_get_min(&tvector);  // get the next mininun offset or 0
-    } else  // new transaction or another operation of the yet uncommited transaction
+    } else { // new transaction or another operation of the yet uncommited transaction
         vector_insert(&tvector, offset);    // if already there, vector_insert does nothing
+    }
 
 	return header.record_id;
 

@@ -131,7 +131,7 @@ struct free_inode{
 
 int log_buffer_bootstrap(void);
 int recover(void);
-uint64_t log_write(enum operation op, uint16_t size, void *operation_struct);
+uint64_t log_write(enum operation op, uint16_t size, void *operation_struct, uint64_t txn_id);
 int checkpoint(void);
 int test_read_write(int nargs, char **args);
 

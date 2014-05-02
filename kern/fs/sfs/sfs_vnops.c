@@ -190,6 +190,7 @@ sfs_write(struct vnode *v, struct uio *uio)
 	lock_acquire(sv->sv_lock);
 	reserve_buffers(3, SFS_BLOCKSIZE);
 
+	// TODO log here
 	result = sfs_io(sv, uio);
 
 	unreserve_buffers(3, SFS_BLOCKSIZE);
@@ -436,6 +437,7 @@ sfs_truncate(struct vnode *v, off_t len)
 	lock_acquire(sv->sv_lock);
 	reserve_buffers(4, SFS_BLOCKSIZE);
 
+	// TODO log here
 	result = sfs_itrunc(sv, len);
 
 	unreserve_buffers(4, SFS_BLOCKSIZE);
@@ -566,6 +568,7 @@ sfs_namefile(struct vnode *vv, struct uio *uio)
 		len = bufmax - bufpos;
 		len--;  /* skip the trailing slash */
 		KASSERT(len <= uio->uio_resid);
+		//TODO log here
 		result = uiomove(buf+bufpos, len, uio);
 	}
 
