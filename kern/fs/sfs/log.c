@@ -14,17 +14,19 @@
 #include <buf.h>
 #include <mips/vm.h>
 
-static struct log_buffer *buf1, *buf2;
-static Vector tvector;
-static uint64_t wrap_times;
 #define BLOCK_SIZE 512
 #define METADATA_BLOCK 6
 #define JOURNAL_START_BLOCK 7
+
+static struct log_buffer *buf1, *buf2;
+static Vector tvector;
+static uint64_t wrap_times;
 
 static 
 int 
 read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     KASSERT(size <= LOG_BUFFER_SIZE);
+	kprintf("Reading from disk\n");
     if (size == 0) return -1;
 
     // restore the actual offset into the disk
@@ -38,7 +40,7 @@ read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     // in case size is not block aligned
     unsigned bytes_left = size % BLOCK_SIZE;
 
-    char local_buf[BLOCK_SIZE] = {0};
+    char *local_buf = kmalloc(BLOCK_SIZE);
     int rv;
 
     // read first block 
@@ -61,7 +63,7 @@ read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
         memcpy(buf, local_buf, bytes_left);
         buf += bytes_left;
     }
-
+    kfree(local_buf);
 	return 0;
 }
 
@@ -69,6 +71,7 @@ static
 int 
 write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     KASSERT(size <= LOG_BUFFER_SIZE);
+	kprintf("Writing to disk\n");
     if (size == 0) return -1;
 
     // restore the actual offset into the disk
@@ -82,7 +85,7 @@ write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
     // in case size is not block aligned
     unsigned bytes_left = size % BLOCK_SIZE;
     
-    char local_buf[BLOCK_SIZE] = {0};
+    char *local_buf = kmalloc(BLOCK_SIZE);
     int rv;
 
     // read first block, modify, write back in case size is not block aligned
@@ -108,7 +111,22 @@ write_log_to_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
         if (rv) return -1;
     }
 
+    kfree(local_buf);
+
 	return 0;
+}
+
+int test_read_write(int nargs, char **args) {
+    (void)nargs;
+    (void)args;
+
+    char *buf = kmalloc(BLOCK_SIZE);
+    strcpy(buf, "What a wonderful night");
+    write_log_to_disk(log_info.fs, 24242, buf, 42);
+    char *bufin = kmalloc(BLOCK_SIZE);
+    read_log_from_disk(log_info.fs, 24242, bufin, 42);
+    kprintf("%s\n", bufin);
+    return 0;
 }
 
 static int read_meta_data_from_disk(struct fs *fs, char *buf){
@@ -131,7 +149,7 @@ int log_buffer_bootstrap(){
 	buf1 = kmalloc(sizeof(struct log_buffer));
 	if(buf1 == NULL) goto out;
 
-	buf1->lock = lock_create("buffer lock");
+	buf1->lock = lock_create("buffer lock 1");
 	if (buf1->lock == NULL) goto out;
 
 	buf1->buffer_filled = 0;
@@ -139,7 +157,7 @@ int log_buffer_bootstrap(){
 	buf2 = kmalloc(sizeof(struct log_buffer));
 	if(buf2 == NULL) goto out;
 
-	buf2->lock = lock_create("buffer lock");
+	buf2->lock = lock_create("buffer lock 2");
 	if (buf2->lock == NULL) goto out;
 
 	buf2->buffer_filled = 0;
@@ -163,7 +181,8 @@ out:
 
 static int pull_meta_data(struct log_info *log_info){
 
-	struct stored_info *st = kmalloc(sizeof(struct stored_info));
+	//struct stored_info *st = kmalloc(sizeof(struct stored_info));
+	struct stored_info *st = kmalloc(BLOCK_SIZE);
 
 	if(read_meta_data_from_disk(log_info->fs, (char *)st) != 0)
 		panic("failed to read from disk");
@@ -389,11 +408,15 @@ int recover(){
 	if(pull_meta_data(&log_info) != 0){
 		// TODO this assumes disk_log_size % page_size == 0 right?
 		// Zero disk to claim space for log and meta data (this loop will take a while but it is only for 1st time setup)
-		char zero[PAGE_SIZE] = {0};
+		char *zero_page = kmalloc(PAGE_SIZE);
 		for(unsigned i = 0; i < (DISK_LOG_SIZE/PAGE_SIZE); i++){
-			if (write_log_to_disk(log_info.fs, (i*PAGE_SIZE), (char *)&zero, PAGE_SIZE) != 0)
+			if (write_log_to_disk(log_info.fs, (i*PAGE_SIZE), zero_page,
+                                    PAGE_SIZE) != 0) {
+                kfree(zero_page);
 				return -1;
+            }
 		}
+        kfree(zero_page);
 
 		// Add checkpoint to ensure we don't redo this if we crash
 		lock_acquire(log_info.lock);
@@ -475,8 +498,7 @@ static int flush_log_to_disk(struct log_buffer *buf, struct log_info *info){
 	if(remainder >= buf->buffer_filled){
 		if (write_log_to_disk(info->fs, info->head, buf->buffer, buf->buffer_filled) != 0)
 			goto out;
-	}
-	else{
+	} else {
 		// In this case we split to 2 seperate writes to wrap around the buffer
 		if (write_log_to_disk(info->fs, info->head, buf->buffer, remainder) != 0)
 			goto out;

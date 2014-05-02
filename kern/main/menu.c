@@ -47,6 +47,8 @@
 #include "opt-sfs.h"
 #include "opt-net.h"
 #include <coremap.h>
+#include <log.h>
+
 /*
  * In-kernel menu and command dispatcher.
  */
@@ -520,6 +522,7 @@ static const char *testmenu[] = {
 
     "[lk] Lock unit test        (1)      ",
     "[cv] CV unit test          (1)      ",
+    "[lrw] Log read write       (4)      ",
 	NULL
 };
 
@@ -629,7 +632,7 @@ static struct {
     /* synchronization unit tests */
     { "lk",     lock_unittest },
     { "cv",     cv_unittest },
-
+    { "lrw",    test_read_write},
     /* TODO file descriptor unit tests */
 
     /* TODO process unit tests */

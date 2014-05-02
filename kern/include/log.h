@@ -12,12 +12,13 @@
 #define UNDO 1
 #define REDO 2
 
-// TODO possibly have two of these?
 struct log_buffer{
 	struct lock *lock; // lock to ensure mutual exclusion during flushing
 	unsigned buffer_filled; // bytes of the buffer filled
 	char buffer [LOG_BUFFER_SIZE]; // bytes array
 };
+
+
 
 struct log_info{
 	struct lock *lock; // lock to ensure up to data meta data
@@ -132,5 +133,6 @@ int log_buffer_bootstrap(void);
 int recover(void);
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct);
 int checkpoint(void);
+int test_read_write(int nargs, char **args);
 
 #endif
