@@ -9,6 +9,9 @@
 #define MARGIN ((512*512)/10)
 #define META_DATA_MAGIC 0xB16B00B5
 
+#define UNDO 1
+#define REDO 2
+
 // TODO possibly have two of these?
 struct log_buffer{
 	struct lock *lock; // lock to ensure mutual exclusion during flushing
@@ -67,6 +70,7 @@ struct record_header{
 	uint64_t record_id; // Size of the structure after this. Not including the header
 	uint16_t size;
 	uint16_t op;    /* for partability; enums are just ints */
+	uint64_t transaction_id;
 };
 
 struct checkpoint{
@@ -74,13 +78,7 @@ struct checkpoint{
 	unsigned new_tail;
 };
 
-struct commit{
-	// unique for each transaction, based on the id of the first action in the transaction
-	uint64_t transaction_id;
-};
-
 struct add_direntry{
-	uint64_t transaction_id;
 	unsigned dir_inode_id;
 	unsigned target_inode_id;
 	unsigned old_link_count;
@@ -89,14 +87,12 @@ struct add_direntry{
 };
 
 struct modify_direntry_size{
-	uint64_t transaction_id;
 	unsigned inode_id;
 	uint32_t old_len;
 	uint32_t new_len;
 };
 
 struct modify_direntry{
-	uint64_t transaction_id;
 	// TODO don't I need 2 inode id's?
 	unsigned inode_id;
 	unsigned new_inode_value;
@@ -109,7 +105,6 @@ struct modify_direntry{
 };
 
 struct rename_direntry{
-	uint64_t transaction_id;
 	unsigned dir_inode_id;
 	unsigned target_inode_id;
 	char old_name[NAME_MAX];
@@ -117,7 +112,6 @@ struct rename_direntry{
 };
 
 struct remove_direntry{
-	uint64_t transaction_id;
 	unsigned dir_inode_id;
 	unsigned target_inode_id;
 	unsigned old_link_count;
@@ -126,13 +120,11 @@ struct remove_direntry{
 };
 
 struct alloc_inode{
-	uint64_t transaction_id;
 	unsigned inode_id;
 	uint32_t type;  /* enum object_type */
 };
 
 struct free_inode{
-	uint64_t transaction_id;
 	unsigned inode_id;
 };
 

@@ -1489,6 +1489,7 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 	bzero(&sd, sizeof(sd));
 	sd.sfd_ino = obj1->sv_ino;
 	strcpy(sd.sfd_name, name2);
+	// TODO Ivan should we log here?
 	result = sfs_writedir(dir2, slot2, &sd);
 	if (result) {
 		goto out4;
