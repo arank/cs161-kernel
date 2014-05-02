@@ -526,7 +526,7 @@ out:
 
 // TODO does this work
 static int flush_buffer_cache_to_disk(struct log_info *info){
-	int result = sync_fs_buffers(info->fs);
+	int result = FSOP_SYNC(info->fs);
 	return result;
 }
 

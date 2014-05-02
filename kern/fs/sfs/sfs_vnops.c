@@ -44,7 +44,7 @@
 #include <buf.h>
 #include <sfs.h>
 #include "sfsprivate.h"
-#include "log.h"
+#include <log.h>
 
 /*
  * Locking protocol for sfs:
@@ -404,9 +404,10 @@ static
 int
 sfs_fsync(struct vnode *v)
 {
-	struct sfs_vnode *sv = v->vn_data;
+(void) v;
+//	struct sfs_vnode *sv = v->vn_data;
 
-	return FSOP_SYNC(sv->sv_v.vn_fs);
+	return checkpoint();
 }
 
 /*

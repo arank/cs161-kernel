@@ -43,6 +43,7 @@
 #include <fs.h>
 #include <vnode.h>
 #include <device.h>
+#include <log.h>
 
 /*
  * Structure for a single named device.
@@ -123,7 +124,8 @@ vfs_sync(void)
 	for (i=0; i<num; i++) {
 		dev = knowndevarray_get(knowndevs, i);
 		if (dev->kd_fs != NULL) {
-			/*result =*/ FSOP_SYNC(dev->kd_fs);
+			/*result = FSOP_SYNC(dev->kd_fs); */
+			checkpoint();
 		}
 	}
 
