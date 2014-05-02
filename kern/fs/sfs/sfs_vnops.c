@@ -650,10 +650,6 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 		return 0;
 	}
 
-    struct alloc_inode op;
-	op.inode_id = newguy->sv_ino;
-	op.type = FILE;
-
 	/* Didn't exist - create it */
 	result = sfs_makeobj(sfs, SFS_TYPE_FILE, &newguy);
 	if (result) {
@@ -661,6 +657,12 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 		lock_release(sv->sv_lock);
 		return result;
 	}
+
+    struct alloc_inode op;
+	op.inode_id = newguy->sv_ino;
+	op.type = FILE;
+
+    uint64_t tr_id = log_write(ALLOC_INODE, sizeof (struct alloc_inode), &op, 0);
 
 	/* sfs_makeobj loads the inode for us */
 	new_inodeptr = sfs_dinode_map(newguy);
@@ -676,7 +678,7 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 		VOP_DECREF(&newguy->sv_v);
 		lock_release(sv->sv_lock);
 		unreserve_buffers(4, SFS_BLOCKSIZE);
-
+        log_write(ABORT, 0, NULL, rt_id);
 		return result;
 	}
 
