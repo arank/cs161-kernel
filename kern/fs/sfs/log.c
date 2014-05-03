@@ -13,6 +13,7 @@
 #include <sfs.h>
 #include <buf.h>
 #include <mips/vm.h>
+#include "sfsprivate.h"
 
 #define BLOCK_SIZE 512
 #define METADATA_BLOCK 6
@@ -240,15 +241,35 @@ static void redo(char* op_list, unsigned op_list_fill){
 		struct record_header *header =  (struct record_header *)&op_list[offset];
 		char *st = (char *)header + sizeof(struct record_header);
 		// TODO redo each of these
+		// These are all idempotent operations
 		switch(header->op){
 			case ADD_DIRENTRY:
+//				sfs_dir_link();
+//				((struct add_direntry *)st)->inode_id;
+				break;
 			case MODIFY_DIRENTRY_SIZE:
+				break;
 			case MODIFY_DIRENTRY:
+				break;
 //			case RENAME_DIRENTRY:
+			case MODIFY_LINKCOUNT:
+			{
+				struct sfs_dinode *inodeptr = kmalloc(sizeof(struct sfs_dinode));
+				if (sfs_readblock(log_info.fs, ((struct modify_linkcount *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
+					panic("Error reading from disk.\n");
+				inodeptr->sfi_linkcount = ((struct modify_linkcount *)st)->new_linkcount;
+				if (sfs_writeblock(log_info.fs, ((struct modify_linkcount *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
+					panic("Error writing to disk.\n");
+				kfree(inodeptr);
+				break;
+			}
 			case REMOVE_DIRENTRY:
+				break;
 			case ALLOC_INODE:
+				sfs_balloc((struct sfs_fs*)log_info.fs->fs_data, (daddr_t *)&((struct alloc_inode *)st)->inode_id, NULL);
+				break;
 			case FREE_INODE:
-				(void) st;
+				sfs_bfree((struct sfs_fs*)log_info.fs->fs_data, (daddr_t)((struct free_inode *)st)->inode_id);
 				break;
 			default:
 				panic("Undefined log entry code\n");
@@ -281,15 +302,29 @@ static void undo(char* op_list, unsigned op_list_fill){
 		}
 
 		// TODO undo each of these
+		// These are all idempotent operations
 		switch(header->op){
 			case ADD_DIRENTRY:
+				break;
 			case MODIFY_DIRENTRY_SIZE:
 			case MODIFY_DIRENTRY:
 //			case RENAME_DIRENTRY:
+			case MODIFY_LINKCOUNT:
+			{
+				struct sfs_dinode *inodeptr;
+				if (sfs_readblock(log_info.fs, ((struct modify_linkcount *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
+					panic("Error reading from disk.\n");
+				inodeptr->sfi_linkcount = ((struct modify_linkcount *)st)->old_linkcount;
+				if (sfs_writeblock(log_info.fs, ((struct modify_linkcount *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
+					panic("Error writing to disk.\n");
+				break;
+			}
 			case REMOVE_DIRENTRY:
 			case ALLOC_INODE:
+				sfs_bfree((struct sfs_fs*)log_info.fs->fs_data, (daddr_t)((struct alloc_inode *)st)->inode_id);
+				break;
 			case FREE_INODE:
-				(void) st;
+				sfs_balloc((struct sfs_fs*)log_info.fs->fs_data, (daddr_t *)&((struct free_inode *)st)->inode_id, NULL);
 				break;
 			default:
 				panic("Undefined log entry code\n");
