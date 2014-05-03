@@ -663,12 +663,24 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 	op1.type = FILE;
 	op1.inode_id = newguy->sv_ino;
     uint64_t tr_id = safe_log_write(ALLOC_INODE, sizeof (struct alloc_inode), &op1, 0);
-
+    
+    struct modify_linkcount op2;
+    op2.inode_id = newguy->sv_ino;
+    op2.old_linkcount = 0;
+    op2.new_linkcount = 1;
+    safe_log_write(MODIFY_LINKCOUNT, sizeof (struct modify_linkcount), &op2, tr_id);
+    
 	/* sfs_makeobj loads the inode for us */
 	new_inodeptr = sfs_dinode_map(newguy);
 
 	/* We don't currently support file permissions; ignore MODE */
 	(void)mode;
+
+    struct add_direntry op3; 
+	op3.inode_id = sv->sv_ino;
+    op3.target_inode_id = newguy->sv_ino;
+	strcpy(op3.name, name);
+    safe_log_write(ADD_DIRENTRY, sizeof (struct add_direntry), &op3, tr_id);
 
 	/* Link it into the directory */
 	result = sfs_dir_link(sv, name, newguy->sv_ino, NULL);
@@ -686,12 +698,6 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 	/* Update the linkcount of the new file */
 	new_inodeptr->sfi_linkcount++;
 
-    struct add_direntry op2; /* don't care about link counts, it's a file */
-	op2.inode_id = sv->sv_ino;
-    op2.target_inode_id = newguy->sv_ino;
-	strcpy(op2.name, name);
-
-    safe_log_write(ADD_DIRENTRY, sizeof (struct alloc_inode), &op2, tr_id);
     safe_log_write(COMMIT, 0, NULL, tr_id);
 
 	/* and consequently mark it dirty. */
@@ -746,9 +752,14 @@ sfs_link(struct vnode *dir, const char *name, struct vnode *file)
 	op1.inode_id = sv->sv_ino;
     op1.target_inode_id = f->sv_ino;
 	strcpy(op1.name, name);
+    uint64_t tr_id = safe_log_write(ADD_DIRENTRY, sizeof (struct add_direntry), &op1, 0);
     
-    uint64_t tr_id = safe_log_write(ADD_DIRENTRY, sizeof (struct alloc_inode), &op1, 0);
-    
+    struct modify_linkcount op2;
+    op2.inode_id = f->sv_ino;
+    op2.old_linkcount = inodeptr->sfi_linkcount;
+    op2.new_linkcount = inodeptr->sfi_linkcount + 1;
+    safe_log_write(MODIFY_LINKCOUNT, sizeof (struct modify_linkcount), &op2, tr_id);
+
 	/* Just create a link */
 	result = sfs_dir_link(sv, name, f->sv_ino, NULL);
 	if (result) {
@@ -760,12 +771,6 @@ sfs_link(struct vnode *dir, const char *name, struct vnode *file)
 
 		return result;
 	}
-
-    struct modify_linkcount op2;
-    op2.inode_id = f->sv_ino;
-    op2.old_linkcount = inodeptr->sfi_linkcount;
-    op2.new_linkcount = inodeptr->sfi_linkcount + 1;
-    safe_log_write(MODIFY_LINKCOUNT, sizeof (struct modify_linkcount), &op2, tr_id);
 
     safe_log_write(COMMIT, 0, NULL, tr_id);
 
@@ -842,7 +847,6 @@ sfs_mkdir(struct vnode *v, const char *name, mode_t mode)
     struct alloc_inode op1; /* linkcount is always 2; remember at recovery */
 	op1.inode_id = newguy->sv_ino;
 	op1.type = DIR;
-
     uint64_t tr_id = safe_log_write(ALLOC_INODE, sizeof (struct alloc_inode), &op1, 0);
 
     /* update the child with a pointer to itself */
@@ -850,8 +854,7 @@ sfs_mkdir(struct vnode *v, const char *name, mode_t mode)
 	op2.inode_id = newguy->sv_ino;
 	op2.target_inode_id = newguy->sv_ino;
 	strcpy(op2.name, ".");
-
-    safe_log_write(ADD_DIRENTRY, sizeof (struct alloc_inode), &op2, tr_id);
+    safe_log_write(ADD_DIRENTRY, sizeof (struct add_direntry), &op2, tr_id);
     
 	result = sfs_dir_link(newguy, ".", newguy->sv_ino, NULL);
 	if (result) {
@@ -863,8 +866,7 @@ sfs_mkdir(struct vnode *v, const char *name, mode_t mode)
 	op3.inode_id = newguy->sv_ino;
 	op3.target_inode_id = sv->sv_ino;
 	strcpy(op3.name, "..");
-
-    safe_log_write(ADD_DIRENTRY, sizeof (struct alloc_inode), &op3, tr_id);
+    safe_log_write(ADD_DIRENTRY, sizeof (struct add_direntry), &op3, tr_id);
 
 	result = sfs_dir_link(newguy, "..", sv->sv_ino, NULL);
 	if (result) {
@@ -876,8 +878,7 @@ sfs_mkdir(struct vnode *v, const char *name, mode_t mode)
 	op4.inode_id = sv->sv_ino;
 	op4.target_inode_id = newguy->sv_ino;
 	strcpy(op4.name, name);
-
-    safe_log_write(ADD_DIRENTRY, sizeof (struct alloc_inode), &op4, tr_id);
+    safe_log_write(ADD_DIRENTRY, sizeof (struct add_direntry), &op4, tr_id);
 
     struct modify_linkcount op5;
     op5.inode_id = sv->sv_ino;
@@ -1004,11 +1005,30 @@ sfs_rmdir(struct vnode *v, const char *name)
 	if (result) {
 		goto die_total;
 	}
+    struct modify_linkcount op1;
+    op1.inode_id = victim->sv_ino;
+    op1.old_linkcount = victim_inodeptr->sfi_linkcount;
+    op1.new_linkcount = victim_inodeptr->sfi_linkcount - 2;
+    uint64_t tr_id = safe_log_write(MODIFY_LINKCOUNT, sizeof (struct modify_linkcount), &op1, 0);
+    
+    struct remove_direntry op2;
+    op2.dir_inode_id = sv->sv_ino;
+    op2.slot = slot;
+    safe_log_write(REMOVE_DIRENTRY, sizeof (struct remove_direntry), &op2, tr_id);
+    
+    struct modify_linkcount op3;
+    op3.inode_id = sv->sv_ino;
+    op3.old_linkcount = dir_inodeptr->sfi_linkcount;
+    op3.new_linkcount = dir_inodeptr->sfi_linkcount;
+    safe_log_write(MODIFY_LINKCOUNT, sizeof (struct modify_linkcount), &op3, tr_id);
 
 	result = sfs_dir_unlink(sv, slot);
 	if (result) {
+        safe_log_write(ABORT, 0, NULL, tr_id);
 		goto die_total;
 	}
+
+    safe_log_write(COMMIT, 0, NULL, tr_id);
 
 	KASSERT(dir_inodeptr->sfi_linkcount > 1);
 	KASSERT(victim_inodeptr->sfi_linkcount==2);
@@ -1097,11 +1117,25 @@ sfs_remove(struct vnode *dir, const char *name)
 		goto out_reference;
 	}
 
+    struct modify_linkcount op1;
+    op1.inode_id = victim->sv_ino;
+    op1.old_linkcount = victim_inodeptr->sfi_linkcount;
+    op1.new_linkcount = victim_inodeptr->sfi_linkcount - 1;
+    uint64_t tr_id = safe_log_write(MODIFY_LINKCOUNT, sizeof (struct modify_linkcount), &op1, 0);
+    
+    struct remove_direntry op2;
+    op2.dir_inode_id = sv->sv_ino;
+    op2.slot = slot;
+    safe_log_write(REMOVE_DIRENTRY, sizeof (struct remove_direntry), &op2, tr_id);
+
 	/* Erase its directory entry. */
 	result = sfs_dir_unlink(sv, slot);
 	if (result) {
+        safe_log_write(ABORT, 0, NULL, tr_id);
 		goto out_reference;
 	}
+
+    safe_log_write(COMMIT, 0, NULL, tr_id);
 
 	/* Decrement the link count. */
 	KASSERT(victim_inodeptr->sfi_linkcount > 0);

@@ -121,10 +121,7 @@ struct rename_direntry{
 
 struct remove_direntry{
 	unsigned dir_inode_id;
-	unsigned target_inode_id;
-	unsigned old_link_count;
-	unsigned new_link_count;
-	char name[NAME_MAX];
+    int slot;
 };
 
 struct alloc_inode{
