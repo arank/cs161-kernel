@@ -108,7 +108,8 @@ struct modify_direntry{
 	unsigned inode1_new_link_count;
 	unsigned inode2_old_link_count;
 	unsigned inode2_new_link_count;
-	char name[NAME_MAX];
+	char old_name[NAME_MAX];
+	char new_name[NAME_MAX];
 };
 
 struct rename_direntry{
@@ -138,6 +139,7 @@ struct free_inode{
 int log_buffer_bootstrap(void);
 int recover(void);
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct, uint64_t txn_id);
+uint64_t safe_log_write(enum operation op, uint16_t size, void *operation_struct, uint64_t txn_id);
 int checkpoint(void);
 int test_read_write(int nargs, char **args);
 
