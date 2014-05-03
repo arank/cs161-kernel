@@ -244,9 +244,13 @@ static void redo(char* op_list, unsigned op_list_fill){
 		// These are all idempotent operations
 		switch(header->op){
 			case ADD_DIRENTRY:
-//				sfs_dir_link();
-//				((struct add_direntry *)st)->inode_id;
+			{
+				struct sfs_vnode *sv;
+				if(sfs_loadvnode((struct sfs_fs*)log_info.fs->fs_data, ((struct add_direntry *)st)->target_inode_id, SFS_TYPE_INVAL, &sv) != 0)
+					panic("Error reading from disk");
+				sfs_dir_link(sv, ((struct add_direntry *)st)->name, ((struct add_direntry *)st)->inode_id, NULL);
 				break;
+			}
 			case MODIFY_SIZE:
 				break;
 			case RENAME_DIRENTRY:
@@ -263,7 +267,13 @@ static void redo(char* op_list, unsigned op_list_fill){
 				break;
 			}
 			case REMOVE_DIRENTRY:
+			{
+				struct sfs_vnode *sv;
+				if(sfs_loadvnode((struct sfs_fs*)log_info.fs->fs_data, ((struct remove_direntry *)st)->victim_inode, SFS_TYPE_INVAL, &sv) != 0)
+					panic("Error reading from disk");
+				sfs_dir_unlink(sv, ((struct remove_direntry *)st)->slot);
 				break;
+			}
 			case ALLOC_INODE:
 				sfs_balloc((struct sfs_fs*)log_info.fs->fs_data, (daddr_t *)&((struct alloc_inode *)st)->inode_id, NULL);
 				break;
@@ -304,20 +314,39 @@ static void undo(char* op_list, unsigned op_list_fill){
 		// These are all idempotent operations
 		switch(header->op){
 			case ADD_DIRENTRY:
+			{
+				struct sfs_vnode *sv;
+				int slot;
+				// re-link the node first
+				if(sfs_loadvnode((struct sfs_fs*)log_info.fs->fs_data, ((struct add_direntry *)st)->target_inode_id, SFS_TYPE_INVAL, &sv) != 0)
+					panic("Error reading from disk");
+				sfs_dir_link(sv, ((struct add_direntry *)st)->name, ((struct add_direntry *)st)->inode_id, &slot); // Getting EEXIST is fine here
+
+				// now unlink the node
+				sfs_dir_unlink(sv, slot);
 				break;
+            }
 			case MODIFY_SIZE:
 			case RENAME_DIRENTRY:
 			case MODIFY_LINKCOUNT:
 			{
-				struct sfs_dinode *inodeptr;
+				struct sfs_dinode *inodeptr = kmalloc(sizeof(struct sfs_dinode));
 				if (sfs_readblock(log_info.fs, ((struct modify_linkcount *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
 					panic("Error reading from disk.\n");
 				inodeptr->sfi_linkcount = ((struct modify_linkcount *)st)->old_linkcount;
 				if (sfs_writeblock(log_info.fs, ((struct modify_linkcount *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
 					panic("Error writing to disk.\n");
+				kfree(inodeptr);
 				break;
 			}
 			case REMOVE_DIRENTRY:
+			{
+				struct sfs_vnode *sv;
+				if(sfs_loadvnode((struct sfs_fs*)log_info.fs->fs_data, ((struct remove_direntry *)st)->victim_inode, SFS_TYPE_INVAL, &sv) != 0)
+					panic("Error reading from disk");
+				sfs_dir_link(sv, ((struct remove_direntry *)st)->victim_name, ((struct remove_direntry *)st)->dir_inode_id, NULL);
+				break;
+			}
 			case ALLOC_INODE:
 				sfs_bfree((struct sfs_fs*)log_info.fs->fs_data, (daddr_t)((struct alloc_inode *)st)->inode_id);
 				break;
