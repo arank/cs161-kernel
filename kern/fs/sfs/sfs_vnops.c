@@ -677,6 +677,7 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 	(void)mode;
 
     struct add_direntry op3; 
+	op3.inode_type = FILE;
 	op3.inode_id = sv->sv_ino;
     op3.target_inode_id = newguy->sv_ino;
 	strcpy(op3.name, name);
@@ -749,6 +750,7 @@ sfs_link(struct vnode *dir, const char *name, struct vnode *file)
 	}
 
     struct add_direntry op1; 
+    op1.inode_type = FILE;
 	op1.inode_id = sv->sv_ino;
     op1.target_inode_id = f->sv_ino;
 	strcpy(op1.name, name);
@@ -851,6 +853,7 @@ sfs_mkdir(struct vnode *v, const char *name, mode_t mode)
 
     /* update the child with a pointer to itself */
     struct add_direntry op2;
+	op2.inode_type = DIR;
 	op2.inode_id = newguy->sv_ino;
 	op2.target_inode_id = newguy->sv_ino;
 	strcpy(op2.name, ".");
@@ -863,6 +866,7 @@ sfs_mkdir(struct vnode *v, const char *name, mode_t mode)
 
     /* update the child with a pointer to the parent */
     struct add_direntry op3;
+	op3.inode_type = DIR;
 	op3.inode_id = newguy->sv_ino;
 	op3.target_inode_id = sv->sv_ino;
 	strcpy(op3.name, "..");
@@ -875,6 +879,7 @@ sfs_mkdir(struct vnode *v, const char *name, mode_t mode)
 
     /* update the parent */
     struct add_direntry op4;
+	op4.inode_type = DIR;
 	op4.inode_id = sv->sv_ino;
 	op4.target_inode_id = newguy->sv_ino;
 	strcpy(op4.name, name);
@@ -1013,7 +1018,9 @@ sfs_rmdir(struct vnode *v, const char *name)
     
     struct remove_direntry op2;
     op2.dir_inode_id = sv->sv_ino;
+    op2.victim_inode = victim->sv_ino;
     op2.slot = slot;
+    strcpy(op2.victim_name, name);
     safe_log_write(REMOVE_DIRENTRY, sizeof (struct remove_direntry), &op2, tr_id);
     
     struct modify_linkcount op3;
@@ -1126,6 +1133,8 @@ sfs_remove(struct vnode *dir, const char *name)
     struct remove_direntry op2;
     op2.dir_inode_id = sv->sv_ino;
     op2.slot = slot;
+    op2.victim_inode = victim->sv_ino;
+    strcpy(op2.victim_name, name);
     safe_log_write(REMOVE_DIRENTRY, sizeof (struct remove_direntry), &op2, tr_id);
 
 	/* Erase its directory entry. */

@@ -120,8 +120,10 @@ struct rename_direntry{
 };
 
 struct remove_direntry{
-	unsigned dir_inode_id;
     int slot;
+	unsigned dir_inode_id;
+    unsigned victim_inode;
+    char victim_name[NAME_MAX];
 };
 
 struct alloc_inode{
