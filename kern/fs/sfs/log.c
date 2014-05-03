@@ -247,11 +247,10 @@ static void redo(char* op_list, unsigned op_list_fill){
 //				sfs_dir_link();
 //				((struct add_direntry *)st)->inode_id;
 				break;
-			case MODIFY_DIRENTRY_SIZE:
+			case MODIFY_SIZE:
 				break;
-			case MODIFY_DIRENTRY:
-				break;
-//			case RENAME_DIRENTRY:
+			case RENAME_DIRENTRY:
+                break;
 			case MODIFY_LINKCOUNT:
 			{
 				struct sfs_dinode *inodeptr = kmalloc(sizeof(struct sfs_dinode));
@@ -306,9 +305,8 @@ static void undo(char* op_list, unsigned op_list_fill){
 		switch(header->op){
 			case ADD_DIRENTRY:
 				break;
-			case MODIFY_DIRENTRY_SIZE:
-			case MODIFY_DIRENTRY:
-//			case RENAME_DIRENTRY:
+			case MODIFY_SIZE:
+			case RENAME_DIRENTRY:
 			case MODIFY_LINKCOUNT:
 			{
 				struct sfs_dinode *inodeptr;
