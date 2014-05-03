@@ -99,19 +99,6 @@ struct modify_direntry_size{
 	uint32_t new_len;
 };
 
-struct modify_direntry{
-	// TODO don't I need 2 inode id's?
-	unsigned inode_id;
-	unsigned new_inode_value;
-	unsigned old_inode_value;
-	unsigned inode1_old_link_count;
-	unsigned inode1_new_link_count;
-	unsigned inode2_old_link_count;
-	unsigned inode2_new_link_count;
-	char old_name[NAME_MAX];
-	char new_name[NAME_MAX];
-};
-
 struct rename_direntry{
 	unsigned dir_inode_id;
 	unsigned target_inode_id;

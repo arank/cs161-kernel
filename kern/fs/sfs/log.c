@@ -252,10 +252,14 @@ static void redo(char* op_list, unsigned op_list_fill){
 				break;
 			}
 			case MODIFY_DIRENTRY_SIZE:
+			{
+				struct sfs_vnode *sv;
+				if(sfs_loadvnode((struct sfs_fs*)log_info.fs->fs_data, ((struct modify_direntry_size *)st)->victim_inode, SFS_TYPE_INVAL, &sv) != 0)
+					panic("Error reading from disk");
 				break;
-			case MODIFY_DIRENTRY:
+			}
+			case RENAME_DIRENTRY:
 				break;
-//			case RENAME_DIRENTRY:
 			case MODIFY_LINKCOUNT:
 			{
 				struct sfs_dinode *inodeptr = kmalloc(sizeof(struct sfs_dinode));
@@ -328,8 +332,9 @@ static void undo(char* op_list, unsigned op_list_fill){
 				break;
 			}
 			case MODIFY_DIRENTRY_SIZE:
-			case MODIFY_DIRENTRY:
-//			case RENAME_DIRENTRY:
+				break;
+			case RENAME_DIRENTRY:
+				break;
 			case MODIFY_LINKCOUNT:
 			{
 				struct sfs_dinode *inodeptr = kmalloc(sizeof(struct sfs_dinode));
