@@ -51,12 +51,12 @@ enum operation{
 	ABORT,
 	COMMIT,
 	ADD_DIRENTRY,
-	MODIFY_DIRENTRY_SIZE,
-	MODIFY_DIRENTRY,
-	RENAME_DIRENTRY,
-	REMOVE_DIRENTRY,
+	MODIFY_SIZE,
     MODIFY_LINKCOUNT,
+	REMOVE_DIRENTRY,
 	ALLOC_INODE,
+
+	RENAME_DIRENTRY,
 	FREE_INODE,
 	// TODO removed truncate as we can log a bunch of free's instead of creating a completely new structure.
 };
@@ -93,7 +93,7 @@ struct modify_linkcount {   /* for for files and dirs */
 	unsigned new_linkcount;
 };
 
-struct modify_direntry_size{
+struct modify_size{
 	unsigned inode_id;
 	uint32_t old_len;
 	uint32_t new_len;

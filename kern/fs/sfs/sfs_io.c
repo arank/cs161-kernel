@@ -42,6 +42,7 @@
 #include <device.h>
 #include <sfs.h>
 #include "sfsprivate.h"
+#include <log.h>
 
 ////////////////////////////////////////////////////////////
 //
@@ -302,8 +303,9 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 	int result = 0;
 	uint32_t extraresid = 0;
 	struct sfs_dinode *inodeptr;
+    uint64_t old_size;
 
-	KASSERT(lock_do_i_hold(sv->sv_lock));
+    KASSERT(lock_do_i_hold(sv->sv_lock));
 
 	result = sfs_dinode_load(sv);
 	if (result) {
@@ -389,10 +391,20 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 
  out:
 
+    old_size = inodeptr->sfi_size;
 	/* If writing, adjust file length */
 	if (uio->uio_rw == UIO_WRITE &&
 	    uio->uio_offset > (off_t)inodeptr->sfi_size) {
 		inodeptr->sfi_size = uio->uio_offset;
+        
+        struct modify_size op1;
+        op1.inode_id = sv->sv_ino;
+        op1.old_len = old_size;
+        op1.new_len = inodeptr->sfi_size;
+        uint64_t tr_id = safe_log_write(MODIFY_SIZE, sizeof (struct modify_size), &op1, 0);
+
+        safe_log_write(COMMIT, 0, NULL, tr_id);
+
 		sfs_dinode_mark_dirty(sv);
 	}
 	sfs_dinode_unload(sv);
