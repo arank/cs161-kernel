@@ -522,10 +522,10 @@ int recover(){
 	}
 
 	// TODO possibly do one more scan for user writes to ensure no user data is leaked
-	// Do undo loop
-	scan_buffer(UNDO);
 	// Do redo loop
 	scan_buffer(REDO);
+	// Do undo loop
+	scan_buffer(UNDO);
 
 	lock_acquire(log_info.lock);
 	checkpoint();
