@@ -190,7 +190,6 @@ sfs_write(struct vnode *v, struct uio *uio)
 	lock_acquire(sv->sv_lock);
 	reserve_buffers(3, SFS_BLOCKSIZE);
 
-	// TODO log here
 	result = sfs_io(sv, uio);
 
 	unreserve_buffers(3, SFS_BLOCKSIZE);
