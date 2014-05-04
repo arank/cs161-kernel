@@ -438,7 +438,11 @@ sfs_truncate(struct vnode *v, off_t len)
 	lock_acquire(sv->sv_lock);
 	reserve_buffers(4, SFS_BLOCKSIZE);
 
-	result = sfs_itrunc(sv, len);
+    struct nop op1;
+    uint64_t tr_id = safe_log_write(NOP, sizeof (struct nop), &op1, 0);
+	result = sfs_itrunc(sv, len, tr_id);
+
+    safe_log_write(COMMIT, 0, NULL, tr_id);
 
 	unreserve_buffers(4, SFS_BLOCKSIZE);
 	lock_release(sv->sv_lock);
@@ -1034,8 +1038,6 @@ sfs_rmdir(struct vnode *v, const char *name)
 		goto die_total;
 	}
 
-    safe_log_write(COMMIT, 0, NULL, tr_id);
-
 	KASSERT(dir_inodeptr->sfi_linkcount > 1);
 	KASSERT(victim_inodeptr->sfi_linkcount==2);
 
@@ -1046,8 +1048,9 @@ sfs_rmdir(struct vnode *v, const char *name)
 	sfs_dinode_mark_dirty(victim);
 	/* buffer released below */
 
-	result = sfs_itrunc(victim, 0);
+	result = sfs_itrunc(victim, 0, tr_id);
 	/* XXX: I guess we corrupt the fs if truncate fails */
+    safe_log_write(COMMIT, 0, NULL, tr_id);
 
 die_total:
 	sfs_dinode_unload(victim);
@@ -1256,7 +1259,8 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 	int result, result2;
 	struct sfs_dir sd;
 	int found_dir1;
-
+    uint64_t tr_id = 42;
+    
 	/* make gcc happy */
 	obj2_inodeptr = NULL;
 
@@ -1578,7 +1582,7 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 			sfs_dinode_mark_dirty(obj2);
 
 			/* ignore errors on this */
-			sfs_itrunc(obj2, 0);
+			sfs_itrunc(obj2, 0, tr_id);
 		}
 		else {
 			KASSERT(obj1->sv_type == SFS_TYPE_FILE);
@@ -1703,6 +1707,7 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 	}
 
  out4:
+    safe_log_write(ABORT, 0, NULL, tr_id);
  	sfs_dinode_unload(dir1);
  out3:
  	sfs_dinode_unload(dir2);

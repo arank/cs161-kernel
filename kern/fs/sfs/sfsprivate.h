@@ -50,7 +50,7 @@ int sfs_bused(struct sfs_fs *sfs, daddr_t diskblock);
 /* Functions in sfs_bmap.c */
 int sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock,
 		bool doalloc, daddr_t *diskblock);
-int sfs_itrunc(struct sfs_vnode *sv, off_t len);
+int sfs_itrunc(struct sfs_vnode *sv, off_t len, uint64_t td_id);
 
 /* Functions in sfs_dir.c */
 int sfs_readdir(struct sfs_vnode *sv, int slot, struct sfs_dir *sd);

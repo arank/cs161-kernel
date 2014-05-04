@@ -331,7 +331,7 @@ sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock, bool doalloc,
  * Requires up to 4 buffers.
  */
 int
-sfs_itrunc(struct sfs_vnode *sv, off_t len)
+sfs_itrunc(struct sfs_vnode *sv, off_t len, uint64_t tr_id)
 {
 	struct sfs_fs *sfs = sv->sv_v.vn_fs->fs_data;
 
@@ -346,7 +346,6 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 	uint32_t baseblock, highblock;
 	int result = 0, final_result = 0;
 	int id_hasnonzero = 0, did_hasnonzero = 0, tid_hasnonzero = 0;
-    uint64_t tr_id = 0;
     struct free_inode op1;
 
 	COMPILE_ASSERT(SFS_DBPERIDB * sizeof(iddata[0]) == SFS_BLOCKSIZE);
@@ -366,9 +365,7 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 		block = inodeptr->sfi_direct[i];
 		if (i >= blocklen && block != 0) {
             op1.inode_id = block;
-            tr_id = (tr_id == 0) 
-                ? safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, 0)
-                : safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
+            safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
 
 			sfs_bfree(sfs, block);
 			inodeptr->sfi_direct[i] = 0;
@@ -646,9 +643,7 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 							sfs_bfree(sfs, block);
 
                             op1.inode_id = block;
-                            tr_id = (tr_id == 0) 
-                                ? safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, 0)
-                                : safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
+                            safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
 						}
 
 						/*
@@ -669,9 +664,7 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 						 * free it
 						 */
                         op1.inode_id = idblock;
-                        tr_id = (tr_id == 0) 
-                            ? safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, 0)
-                            : safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
+                        safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
 
 						sfs_bfree(sfs, idblock);
 
@@ -721,9 +714,7 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 					 * block is empty now; free it
 					 */
                     op1.inode_id = didblock;
-                    tr_id = (tr_id == 0) 
-                        ? safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, 0)
-                        : safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
+                    safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
 
 					sfs_bfree(sfs, didblock);
 
@@ -762,9 +753,7 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 				 * empty now; free it
 				 */
                 op1.inode_id = tidblock;
-                tr_id = (tr_id == 0) 
-                    ? safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, 0)
-                    : safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
+                safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
 
 				sfs_bfree(sfs, tidblock);
 
@@ -786,23 +775,17 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len)
 	/* Set the file size */
 	inodeptr->sfi_size = len;
 
-    if (len != 0) {
-        struct truncate op2;
-        for (int i = 0; i < SFS_NDIRECT; i++)
-            op2.sfi_direct[i] = inodeptr->sfi_direct[i];
+    struct truncate op2;
+    for (int i = 0; i < SFS_NDIRECT; i++)
+        op2.sfi_direct[i] = inodeptr->sfi_direct[i];
 
-        op2.sfi_indirect = inodeptr->sfi_indirect;
-        op2.sfi_dindirect = inodeptr->sfi_dindirect;
-        op2.sfi_tindirect = inodeptr->sfi_tindirect;
-        op2.inode_id = sv->sv_ino;
+    op2.sfi_indirect = inodeptr->sfi_indirect;
+    op2.sfi_dindirect = inodeptr->sfi_dindirect;
+    op2.sfi_tindirect = inodeptr->sfi_tindirect;
+    op2.inode_id = sv->sv_ino;
 
-        tr_id = (tr_id == 0) 
-            ? safe_log_write(TRUNCATE, sizeof (struct truncate), &op2, tr_id)
-            : safe_log_write(TRUNCATE, sizeof (struct truncate), &op2, tr_id);
-        
-        safe_log_write(COMMIT, 0, NULL, tr_id);
-    } 
-
+    safe_log_write(TRUNCATE, sizeof (struct truncate), &op2, tr_id);
+    
 	/* Mark the inode dirty */
 	sfs_dinode_mark_dirty(sv);
 
