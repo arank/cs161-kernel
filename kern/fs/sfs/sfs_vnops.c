@@ -705,7 +705,7 @@ sfs_creat(struct vnode *v, const char *name, bool excl, mode_t mode,
 	sfs_dinode_mark_dirty(newguy);
 
 	*ret = &newguy->sv_v;
-    
+
 	sfs_dinode_unload(newguy);
 	unreserve_buffers(4, SFS_BLOCKSIZE);
 	lock_release(newguy->sv_lock);
