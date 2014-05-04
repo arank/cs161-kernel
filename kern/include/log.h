@@ -81,7 +81,6 @@ struct checkpoint{
 };
 
 struct add_direntry{
-    uint32_t inode_type;
 	unsigned inode_id;
 	unsigned target_inode_id;
 	char name[NAME_MAX];
@@ -117,6 +116,7 @@ struct alloc_inode{
 
 struct free_inode{
 	unsigned inode_id;
+	uint32_t type;  /* enum object_type */
 };
 
 struct nop {
