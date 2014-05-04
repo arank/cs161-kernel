@@ -97,16 +97,11 @@ struct modify_size{
 	unsigned inode_id;
 	uint32_t old_len;
 	uint32_t new_len;
+	uint32_t sfi_direct[15];	/* Direct blocks */
+	uint32_t sfi_indirect;			/* Indirect block */
+	uint32_t sfi_dindirect;   /* Double indirect block */
+	uint32_t sfi_tindirect;   /* Triple indirect block */
 };
-
-// ??? do we need this
-//struct rename_direntry{
-//	unsigned dir_old_inode_id;
-//	unsigned dir_new_inode_id;
-//	unsigned target_inode_id;
-//	char old_name[NAME_MAX];
-//	char new_name[NAME_MAX];
-//};
 
 struct remove_direntry{
     int slot;
@@ -122,14 +117,6 @@ struct alloc_inode{
 
 struct free_inode{
 	unsigned inode_id;
-};
-
-struct truncate {
-	uint32_t sfi_direct[15];	/* Direct blocks */
-	uint32_t sfi_indirect;			/* Indirect block */
-	uint32_t sfi_dindirect;   /* Double indirect block */
-	uint32_t sfi_tindirect;   /* Triple indirect block */
-    unsigned inode_id;
 };
 
 struct nop {

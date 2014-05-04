@@ -401,6 +401,13 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
         op1.inode_id = sv->sv_ino;
         op1.old_len = old_size;
         op1.new_len = inodeptr->sfi_size;
+
+        for (int i = 0; i < SFS_NDIRECT; i++)
+            op1.sfi_direct[i] = inodeptr->sfi_direct[i];
+
+        op1.sfi_indirect = inodeptr->sfi_indirect;
+        op1.sfi_dindirect = inodeptr->sfi_dindirect;
+        op1.sfi_tindirect = inodeptr->sfi_tindirect;
         uint64_t tr_id = safe_log_write(MODIFY_SIZE, sizeof (struct modify_size), &op1, 0);
 
         safe_log_write(COMMIT, 0, NULL, tr_id);
