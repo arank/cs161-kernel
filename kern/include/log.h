@@ -55,7 +55,7 @@ enum operation{
     MODIFY_LINKCOUNT,
 	REMOVE_DIRENTRY,
 	ALLOC_INODE,
-
+    TRUNCATE,
 	RENAME_DIRENTRY,
 	FREE_INODE,
 	// TODO removed truncate as we can log a bunch of free's instead of creating a completely new structure.
@@ -133,6 +133,13 @@ struct alloc_inode{
 
 struct free_inode{
 	unsigned inode_id;
+};
+struct truncate {
+	uint32_t sfi_direct[15];	/* Direct blocks */
+	uint32_t sfi_indirect;			/* Indirect block */
+	uint32_t sfi_dindirect;   /* Double indirect block */
+	uint32_t sfi_tindirect;   /* Triple indirect block */
+    unsigned inode_id;
 };
 
 int log_buffer_bootstrap(void);

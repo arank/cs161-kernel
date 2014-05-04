@@ -144,7 +144,7 @@ static int write_meta_data_to_disk(struct fs *fs, char *buf){
 
 // Creates the log buffer global object and log info global object 
 // call this before recovery
-int log_buffer_bootstrap(){
+int log_buffer_bootstrap(void){
 
 	// Head, tail and last_id will be set during pulling data from disk
 	buf1 = kmalloc(sizeof(struct log_buffer));
