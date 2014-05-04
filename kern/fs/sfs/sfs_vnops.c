@@ -1254,7 +1254,7 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 	int result, result2;
 	struct sfs_dir sd;
 	int found_dir1;
-    
+
 	/* make gcc happy */
 	obj2_inodeptr = NULL;
 
@@ -1824,7 +1824,6 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 
 	lock_release(sfs->sfs_renamelock);
 
-	// TODO abort here if result != 0
     if (result != 0) safe_log_write(ABORT, 0, NULL, tr_id);
 	return result;
 }

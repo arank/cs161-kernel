@@ -55,8 +55,6 @@ enum operation{
     MODIFY_LINKCOUNT,
 	REMOVE_DIRENTRY,
 	ALLOC_INODE,
-    TRUNCATE,
-	RENAME_DIRENTRY,
 	FREE_INODE,
     NOP,
 };
@@ -96,10 +94,14 @@ struct modify_size{
 	unsigned inode_id;
 	uint32_t old_len;
 	uint32_t new_len;
-	uint32_t sfi_direct[15];	/* Direct blocks */
-	uint32_t sfi_indirect;			/* Indirect block */
-	uint32_t sfi_dindirect;   /* Double indirect block */
-	uint32_t sfi_tindirect;   /* Triple indirect block */
+	uint32_t old_sfi_direct[15];	/* Direct blocks */
+	uint32_t old_sfi_indirect;			/* Indirect block */
+	uint32_t old_sfi_dindirect;   /* Double indirect block */
+	uint32_t old_sfi_tindirect;   /* Triple indirect block */
+	uint32_t new_sfi_direct[15];	/* Direct blocks */
+	uint32_t new_sfi_indirect;			/* Indirect block */
+	uint32_t new_sfi_dindirect;   /* Double indirect block */
+	uint32_t new_sfi_tindirect;   /* Triple indirect block */
 };
 
 struct remove_direntry{
