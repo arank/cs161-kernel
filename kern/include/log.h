@@ -100,13 +100,13 @@ struct modify_size{
 };
 
 // ??? do we need this
-struct rename_direntry{
-	unsigned dir_old_inode_id;
-	unsigned dir_new_inode_id;
-	unsigned target_inode_id;
-	char old_name[NAME_MAX];
-	char new_name[NAME_MAX];
-};
+//struct rename_direntry{
+//	unsigned dir_old_inode_id;
+//	unsigned dir_new_inode_id;
+//	unsigned target_inode_id;
+//	char old_name[NAME_MAX];
+//	char new_name[NAME_MAX];
+//};
 
 struct remove_direntry{
     int slot;

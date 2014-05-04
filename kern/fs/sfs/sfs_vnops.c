@@ -1259,7 +1259,7 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 	int result, result2;
 	struct sfs_dir sd;
 	int found_dir1;
-    uint64_t tr_id = 42;
+    uint64_t tr_id;
     
 	/* make gcc happy */
 	obj2_inodeptr = NULL;
@@ -1564,15 +1564,12 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 				goto out4;
 			}
 
-			// TODO log here
-
 			/* Remove the name */
 			result = sfs_dir_unlink(dir2, slot2);
 			if (result) {
 				goto out4;
 			}
 
-			// TODO log here
 			/* Dispose of the directory */
 			KASSERT(dir2_inodeptr->sfi_linkcount > 1);
 			KASSERT(obj2_inodeptr->sfi_linkcount == 2);
@@ -1707,7 +1704,6 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 	}
 
  out4:
-    safe_log_write(ABORT, 0, NULL, tr_id);
  	sfs_dinode_unload(dir1);
  out3:
  	sfs_dinode_unload(dir2);
@@ -1735,7 +1731,8 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 
 	lock_release(sfs->sfs_renamelock);
 
-	// TODO abort here if result != 0
+	if(result != 0)
+		  safe_log_write(ABORT, 0, NULL, tr_id);
 
 	return result;
 }
