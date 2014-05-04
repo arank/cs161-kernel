@@ -300,6 +300,11 @@ sfs_bmap(struct sfs_vnode *sv, uint32_t fileblock, bool doalloc,
 	}
 
 	/* Do the work in the indicated subtree */
+    struct alloc_inode op1;
+	op1.inode_id = (uint32_t)diskblock;
+	op1.type = INDIRECTION;
+    safe_log_write(ALLOC_INODE, sizeof (struct alloc_inode), &op1, 0);
+
 	result = sfs_bmap_subtree(sfs,
 				  blockptr, indir, &inode_dirty,
 				  fileblock, doalloc,
@@ -635,15 +640,14 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len, uint64_t tr_id)
 						    level1
 						    && iddata[level1] != 0) {
 
-							int block =
-								iddata[level1];
+							int block = iddata[level1];
 							iddata[level1] = 0;
 							id_modified = 1;
 
-							sfs_bfree(sfs, block);
-
                             op1.inode_id = block;
                             safe_log_write(FREE_INODE, sizeof (struct free_inode), &op1, tr_id);
+
+							sfs_bfree(sfs, block);
 						}
 
 						/*
@@ -775,7 +779,7 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len, uint64_t tr_id)
 	/* Set the file size */
 	inodeptr->sfi_size = len;
 
-    struct truncate op2;
+    struct modify_size op2;
     for (int i = 0; i < SFS_NDIRECT; i++)
         op2.sfi_direct[i] = inodeptr->sfi_direct[i];
 
@@ -783,8 +787,9 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len, uint64_t tr_id)
     op2.sfi_dindirect = inodeptr->sfi_dindirect;
     op2.sfi_tindirect = inodeptr->sfi_tindirect;
     op2.inode_id = sv->sv_ino;
-
-    safe_log_write(TRUNCATE, sizeof (struct truncate), &op2, tr_id);
+	op2.old_len = inodeptr->sfi_size;
+	op2.new_len = len;
+    safe_log_write(MODIFY_SIZE, sizeof (struct modify_size), &op2, tr_id);
     
 	/* Mark the inode dirty */
 	sfs_dinode_mark_dirty(sv);

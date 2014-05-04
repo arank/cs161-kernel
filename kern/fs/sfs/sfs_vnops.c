@@ -1565,6 +1565,12 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 			}
 
 			// TODO log here
+            struct remove_direntry op1;
+            op1.dir_inode_id = dir2->sv_ino;
+            op1.slot = slot2;
+            //op1.victim_inode = victim->sv_ino;
+            //strcpy(op1.victim_name, name);
+            safe_log_write(REMOVE_DIRENTRY, sizeof (struct remove_direntry), &op1, tr_id);
 
 			/* Remove the name */
 			result = sfs_dir_unlink(dir2, slot2);
