@@ -23,6 +23,7 @@ static struct log_buffer *buf1, *buf2;
 static Vector tvector;
 static uint64_t wrap_times;
 
+
 static 
 int 
 read_log_from_disk(struct fs *fs, unsigned off, char *buf, unsigned size){
@@ -308,7 +309,6 @@ static void redo(char* op_list, unsigned op_list_fill){
 }
 
 static void undo(char* op_list, unsigned op_list_fill){
-
 	while(true){
 		unsigned offset = 0;
 		struct record_header *header;
@@ -669,6 +669,22 @@ uint64_t safe_log_write(enum operation op, uint16_t size, void *operation_struct
 	return ret;
 }
 
+// TODO remove once debugging is done
+// Does a simple log dump
+static void log_dump(){
+	char *buf = kmalloc(513);
+	buf[512] = '\0';
+	while(true){
+		unsigned offset = 0;
+		read_log_from_disk(log_info.fs, offset, buf, 512);
+		kprintf("%s", buf);
+		offset += 512;
+		if(offset == DISK_LOG_SIZE)
+			break;
+	}
+}
+
+
 // Operation struct can be NULL, pass in 0 for txn_id to get a unique txn_id back, and attached to this function
 uint64_t log_write(enum operation op, uint16_t size, void *operation_struct, uint64_t txn_id){
 	KASSERT(lock_do_i_hold(log_info.lock));
@@ -740,6 +756,7 @@ uint64_t log_write(enum operation op, uint16_t size, void *operation_struct, uin
         vector_insert(&tvector, offset);    // if already there, vector_insert does nothing
     }
 
+    (void)log_dump;
 	return header.record_id;
 
 out:
@@ -747,18 +764,6 @@ out:
 }
 
 
-// Does a simple log dump
-//static void log_dump(){
-//	char *buf = kmalloc(513);
-//	buf[512] = '\0';
-//	while(true){
-//		unsigned offset = 0;
-//		read_log_from_disk(log_info.fs, offset, buf, 512);
-//		kprintf("%s", buf);
-//		offset += 512;
-//		if(offset == DISK_LOG_SIZE)
-//			break;
-//	}
-//}
+
 
 
