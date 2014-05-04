@@ -313,6 +313,15 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 	}
 	inodeptr = sfs_dinode_map(sv);
 
+	struct modify_size op1;
+	for (int i = 0; i < SFS_NDIRECT; i++)
+		op1.old_sfi_direct[i] = inodeptr->sfi_direct[i];
+
+	op1.old_sfi_indirect = inodeptr->sfi_indirect;
+	op1.old_sfi_dindirect = inodeptr->sfi_dindirect;
+	op1.old_sfi_tindirect = inodeptr->sfi_tindirect;
+
+
 	/*
 	 * If reading, check for EOF. If we can read a partial area,
 	 * remember how much extra there was in EXTRARESID so we can
@@ -396,18 +405,18 @@ sfs_io(struct sfs_vnode *sv, struct uio *uio)
 	if (uio->uio_rw == UIO_WRITE &&
 	    uio->uio_offset > (off_t)inodeptr->sfi_size) {
 		inodeptr->sfi_size = uio->uio_offset;
-        
-        struct modify_size op1;
+
+        for (int i = 0; i < SFS_NDIRECT; i++)
+            op1.new_sfi_direct[i] = inodeptr->sfi_direct[i];
+
+        op1.new_sfi_indirect = inodeptr->sfi_indirect;
+        op1.new_sfi_dindirect = inodeptr->sfi_dindirect;
+        op1.new_sfi_tindirect = inodeptr->sfi_tindirect;
+
         op1.inode_id = sv->sv_ino;
         op1.old_len = old_size;
         op1.new_len = inodeptr->sfi_size;
 
-        for (int i = 0; i < SFS_NDIRECT; i++)
-            op1.sfi_direct[i] = inodeptr->sfi_direct[i];
-
-        op1.sfi_indirect = inodeptr->sfi_indirect;
-        op1.sfi_dindirect = inodeptr->sfi_dindirect;
-        op1.sfi_tindirect = inodeptr->sfi_tindirect;
         uint64_t tr_id = safe_log_write(MODIFY_SIZE, sizeof (struct modify_size), &op1, 0);
 
         safe_log_write(COMMIT, 0, NULL, tr_id);

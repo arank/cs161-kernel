@@ -352,6 +352,7 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len, uint64_t tr_id)
 	int result = 0, final_result = 0;
 	int id_hasnonzero = 0, did_hasnonzero = 0, tid_hasnonzero = 0;
     struct free_inode op1;
+    struct modify_size op2;
 
 	COMPILE_ASSERT(SFS_DBPERIDB * sizeof(iddata[0]) == SFS_BLOCKSIZE);
 	KASSERT(lock_do_i_hold(sv->sv_lock));
@@ -361,6 +362,13 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len, uint64_t tr_id)
 		return result;
 	}
 	inodeptr = sfs_dinode_map(sv);
+
+	for (int i = 0; i < SFS_NDIRECT; i++)
+		op2.old_sfi_direct[i] = inodeptr->sfi_direct[i];
+
+	op2.old_sfi_indirect = inodeptr->sfi_indirect;
+	op2.old_sfi_dindirect = inodeptr->sfi_dindirect;
+	op2.old_sfi_tindirect = inodeptr->sfi_tindirect;
 
 	/*
 	 * Go through the direct blocks. Discard any that are
@@ -777,17 +785,17 @@ sfs_itrunc(struct sfs_vnode *sv, off_t len, uint64_t tr_id)
 
 
 	/* Set the file size */
+	uint32_t tmp = inodeptr->sfi_size;
 	inodeptr->sfi_size = len;
 
-    struct modify_size op2;
     for (int i = 0; i < SFS_NDIRECT; i++)
-        op2.sfi_direct[i] = inodeptr->sfi_direct[i];
+        op2.new_sfi_direct[i] = inodeptr->sfi_direct[i];
 
-    op2.sfi_indirect = inodeptr->sfi_indirect;
-    op2.sfi_dindirect = inodeptr->sfi_dindirect;
-    op2.sfi_tindirect = inodeptr->sfi_tindirect;
+    op2.new_sfi_indirect = inodeptr->sfi_indirect;
+    op2.new_sfi_dindirect = inodeptr->sfi_dindirect;
+    op2.new_sfi_tindirect = inodeptr->sfi_tindirect;
     op2.inode_id = sv->sv_ino;
-	op2.old_len = inodeptr->sfi_size;
+	op2.old_len = tmp;
 	op2.new_len = len;
     safe_log_write(MODIFY_SIZE, sizeof (struct modify_size), &op2, tr_id);
     

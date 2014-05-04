@@ -240,7 +240,6 @@ static void redo(char* op_list, unsigned op_list_fill){
 	while(true){
 		struct record_header *header =  (struct record_header *)&op_list[offset];
 		char *st = (char *)header + sizeof(struct record_header);
-		// TODO redo each of these
 		// These are all idempotent operations
 		switch(header->op){
 			case ADD_DIRENTRY:
@@ -253,13 +252,20 @@ static void redo(char* op_list, unsigned op_list_fill){
 			}
 			case MODIFY_SIZE:
 			{
-//				struct sfs_vnode *sv;
-//				if(sfs_loadvnode((struct sfs_fs*)log_info.fs->fs_data, ((struct modify_size *)st)->inode_id, SFS_TYPE_INVAL, &sv) != 0)
-//					panic("Error reading from disk");
-//				break;
-			}
-			case TRUNCATE:
-			{
+				struct sfs_dinode *inodeptr = kmalloc(sizeof(struct sfs_dinode));
+				if (sfs_readblock(log_info.fs, ((struct modify_size *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
+					panic("Error reading from disk.\n");
+				inodeptr->sfi_dindirect = ((struct modify_size *)st)->new_sfi_dindirect;
+				inodeptr->sfi_tindirect = ((struct modify_size *)st)->new_sfi_tindirect;
+				inodeptr->sfi_indirect = ((struct modify_size *)st)->new_sfi_indirect;
+				inodeptr->sfi_size = ((struct modify_size *)st)->new_len;
+
+				for(int i = 0; i < SFS_NDIRECT; i++)
+					inodeptr->sfi_direct[i] = ((struct modify_size *)st)->new_sfi_direct[i];
+
+				if (sfs_writeblock(log_info.fs, ((struct modify_size *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
+					panic("Error writing to disk.\n");
+				kfree(inodeptr);
 				break;
 			}
 			case MODIFY_LINKCOUNT:
@@ -287,6 +293,8 @@ static void redo(char* op_list, unsigned op_list_fill){
 			case FREE_INODE:
 				sfs_bfree((struct sfs_fs*)log_info.fs->fs_data, (daddr_t)((struct free_inode *)st)->inode_id);
 				break;
+			case NOP:
+				break;
 			default:
 				panic("Undefined log entry code\n");
 				break;
@@ -306,7 +314,7 @@ static void undo(char* op_list, unsigned op_list_fill){
 		struct record_header *header;
 		char *st;
 
-		// Read to the end and pull that
+		// Read to the end and pull the last entry that hasn't been read
 		while(true){
 			header =  (struct record_header *)&op_list[offset];
 			if(offset + header->size + sizeof(struct record_header) == op_list_fill){
@@ -317,7 +325,6 @@ static void undo(char* op_list, unsigned op_list_fill){
 			offset += header->size + sizeof(struct record_header);
 		}
 
-		// TODO undo each of these
 		// These are all idempotent operations
 		switch(header->op){
 			case ADD_DIRENTRY:
@@ -335,10 +342,20 @@ static void undo(char* op_list, unsigned op_list_fill){
             }
 			case MODIFY_SIZE:
 			{
-				break;
-			}
-			case TRUNCATE:
-			{
+				struct sfs_dinode *inodeptr = kmalloc(sizeof(struct sfs_dinode));
+				if (sfs_readblock(log_info.fs, ((struct modify_size *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
+					panic("Error reading from disk.\n");
+				inodeptr->sfi_dindirect = ((struct modify_size *)st)->old_sfi_dindirect;
+				inodeptr->sfi_tindirect = ((struct modify_size *)st)->old_sfi_tindirect;
+				inodeptr->sfi_indirect = ((struct modify_size *)st)->old_sfi_indirect;
+				inodeptr->sfi_size = ((struct modify_size *)st)->old_len;
+
+				for(int i = 0; i < SFS_NDIRECT; i++)
+					inodeptr->sfi_direct[i] = ((struct modify_size *)st)->old_sfi_direct[i];
+
+				if (sfs_writeblock(log_info.fs, ((struct modify_size *)st)->inode_id, inodeptr, sizeof(struct sfs_dinode)) != 0)
+					panic("Error writing to disk.\n");
+				kfree(inodeptr);
 				break;
 			}
 			case MODIFY_LINKCOUNT:
@@ -365,6 +382,8 @@ static void undo(char* op_list, unsigned op_list_fill){
 				break;
 			case FREE_INODE:
 				sfs_balloc((struct sfs_fs*)log_info.fs->fs_data, (daddr_t *)&((struct free_inode *)st)->inode_id, NULL);
+				break;
+			case NOP:
 				break;
 			default:
 				panic("Undefined log entry code\n");
