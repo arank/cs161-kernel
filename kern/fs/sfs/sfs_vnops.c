@@ -1564,12 +1564,15 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 				goto out4;
 			}
 
+			// TODO log here
+
 			/* Remove the name */
 			result = sfs_dir_unlink(dir2, slot2);
 			if (result) {
 				goto out4;
 			}
 
+			// TODO log here
 			/* Dispose of the directory */
 			KASSERT(dir2_inodeptr->sfi_linkcount > 1);
 			KASSERT(obj2_inodeptr->sfi_linkcount == 2);
@@ -1588,11 +1591,15 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 				goto out4;
 			}
 
+			// TODO log here
+
 			/* Remove the name */
 			result = sfs_dir_unlink(dir2, slot2);
 			if (result) {
 				goto out4;
 			}
+
+			// TODO log here
 
 			/* Dispose of the file */
 			KASSERT(obj2_inodeptr->sfi_linkcount > 0);
@@ -1618,12 +1625,13 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 	bzero(&sd, sizeof(sd));
 	sd.sfd_ino = obj1->sv_ino;
 	strcpy(sd.sfd_name, name2);
-	// TODO Ivan should we log here?
+	// TODO log here
 	result = sfs_writedir(dir2, slot2, &sd);
 	if (result) {
 		goto out4;
 	}
 
+	// TODO log here
 	obj1_inodeptr->sfi_linkcount++;
 	sfs_dinode_mark_dirty(obj1);
 
@@ -1642,20 +1650,27 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 			      sd.sfd_ino, dir1->sv_ino);
 		}
 		sd.sfd_ino = dir2->sv_ino;
+
+		// TODO log here
 		result = sfs_writedir(obj1, DOTDOTSLOT, &sd);
 		if (result) {
 			goto recover1;
 		}
+
+		// TODO log here
 		dir1_inodeptr->sfi_linkcount--;
 		sfs_dinode_mark_dirty(dir1);
 		dir2_inodeptr->sfi_linkcount++;
 		sfs_dinode_mark_dirty(dir2);
 	}
 
+	// TODO log here
 	result = sfs_dir_unlink(dir1, slot1);
 	if (result) {
 		goto recover2;
 	}
+
+	// TODO log here
 	obj1_inodeptr->sfi_linkcount--;
 	sfs_dinode_mark_dirty(obj1);
 
@@ -1666,20 +1681,27 @@ sfs_rename(struct vnode *absdir1, const char *name1,
     recover2:
 		if (obj1->sv_type == SFS_TYPE_DIR) {
 			sd.sfd_ino = dir1->sv_ino;
+			// TODO log here
 			result2 = sfs_writedir(obj1, DOTDOTSLOT, &sd);
 			if (result2) {
 				recovermsg(result, result2);
 			}
+
+			// TODO log here
 			dir1_inodeptr->sfi_linkcount++;
 			sfs_dinode_mark_dirty(dir1);
 			dir2_inodeptr->sfi_linkcount--;
 			sfs_dinode_mark_dirty(dir2);
 		}
     recover1:
+
+    	// TODO log here
 		result2 = sfs_dir_unlink(dir2, slot2);
 		if (result2) {
 			recovermsg(result, result2);
 		}
+
+		// TODO log here
 		obj1_inodeptr->sfi_linkcount--;
 		sfs_dinode_mark_dirty(obj1);
 	}
@@ -1712,6 +1734,8 @@ sfs_rename(struct vnode *absdir1, const char *name1,
 	unreserve_buffers(7, SFS_BLOCKSIZE);
 
 	lock_release(sfs->sfs_renamelock);
+
+	// TODO abort here if result != 0
 
 	return result;
 }
