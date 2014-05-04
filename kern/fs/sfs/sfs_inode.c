@@ -42,7 +42,7 @@
 #include <buf.h>
 #include <sfs.h>
 #include "sfsprivate.h"
-
+#include <log.h>
 
 /*
  * Constructor for sfs_vnode.
@@ -242,8 +242,11 @@ sfs_reclaim(struct vnode *v)
 	iptr = sfs_dinode_map(sv);
 
 	/* If there are no on-disk references to the file either, erase it. */
+    struct nop op1;
+    uint64_t tr_id = safe_log_write(NOP, sizeof (struct nop), &op1, 0);
+
 	if (iptr->sfi_linkcount==0) {
-		result = sfs_itrunc(sv, 0);
+		result = sfs_itrunc(sv, 0, tr_id);
 		if (result) {
 			sfs_dinode_unload(sv);
 			lock_release(sfs->sfs_vnlock);
@@ -256,6 +259,12 @@ sfs_reclaim(struct vnode *v)
 		sfs_dinode_unload(sv);
 		/* Discard the inode */
 		buffer_drop(&sfs->sfs_absfs, sv->sv_ino, SFS_BLOCKSIZE);
+
+        struct free_inode op2;
+        op2.inode_id = sv->sv_ino;
+        safe_log_write(FREE_INODE, sizeof (struct free_inode), &op2, tr_id);
+
+        safe_log_write(COMMIT, 0, NULL, tr_id);
 		sfs_bfree(sfs, sv->sv_ino);
 	}
 	else {
