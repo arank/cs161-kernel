@@ -438,7 +438,6 @@ sfs_truncate(struct vnode *v, off_t len)
 	lock_acquire(sv->sv_lock);
 	reserve_buffers(4, SFS_BLOCKSIZE);
 
-	// TODO log here
 	result = sfs_itrunc(sv, len);
 
 	unreserve_buffers(4, SFS_BLOCKSIZE);

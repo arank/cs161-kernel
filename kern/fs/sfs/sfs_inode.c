@@ -254,6 +254,9 @@ sfs_reclaim(struct vnode *v)
 			return result;
 		}
 		sfs_dinode_unload(sv);
+
+		// TODO log here
+
 		/* Discard the inode */
 		buffer_drop(&sfs->sfs_absfs, sv->sv_ino, SFS_BLOCKSIZE);
 		sfs_bfree(sfs, sv->sv_ino);
